@@ -19,7 +19,6 @@ async function zohoGet(path: string) {
   } finally {
     clearTimeout(timer);
   }
-  return body;
 }
 
 async function safeGet(path: string) {

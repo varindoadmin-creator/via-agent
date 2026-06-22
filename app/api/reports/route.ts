@@ -41,18 +41,17 @@ async function zohoGet(path: string) {
   const sep = path.includes("?") ? "&" : "?";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
-  let body;
   try {
     const res = await fetch(`${base}${path}${sep}organization_id=${orgId}`, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       signal: controller.signal,
     });
-    body = await res.json();
+    const body = await res.json();
+    if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
+    return body;
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
-  return body;
 }
 
 function parseMoney(value: unknown): number {
