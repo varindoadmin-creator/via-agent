@@ -41,6 +41,8 @@ type AIComparisonRow = {
   proof_qty?: number | null;
   status?: string;
   notes?: string;
+  item?: string;
+  sku?: string;
 };
 
 function normalizeMatchText(value: unknown): string {
