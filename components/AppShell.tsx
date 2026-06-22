@@ -257,7 +257,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  if (pathname === '/login') return <>{children}</>;
 
   const [mode, setMode] = useState<Mode>('desktop');
   const [userCollapsed, setUserCollapsed] = useState(false);
