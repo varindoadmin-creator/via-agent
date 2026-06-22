@@ -6,10 +6,10 @@ const COOKIE = 'via_session';
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Let login page and auth API through without checking
+  // Let API routes, login page, and static assets through without checking
   if (
+    pathname.startsWith('/api/') ||
     pathname.startsWith('/login') ||
-    pathname.startsWith('/api/auth') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   ) {
