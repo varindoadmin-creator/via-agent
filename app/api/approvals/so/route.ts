@@ -379,7 +379,8 @@ function tryJson(text: string): Record<string, unknown> | null {
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    const pdfParse = (await import('pdf-parse')).default as (buf: Buffer) => Promise<{ text?: string }>;
+    const mod = await import('pdf-parse');
+    const pdfParse = (mod.default ?? mod) as unknown as (buf: Buffer) => Promise<{ text?: string }>;
     const parsed = await pdfParse(buffer);
     return (parsed.text || '').slice(0, 12000);
   } catch {
