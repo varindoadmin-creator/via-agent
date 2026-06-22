@@ -17,11 +17,13 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
+      const raw = await res.text();
       if (res.ok) {
         window.location.href = '/';
       } else {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Incorrect password');
+        let msg = `HTTP ${res.status}: ${raw.slice(0, 200)}`;
+        try { msg = JSON.parse(raw).error || msg; } catch { /* raw */ }
+        setError(msg);
       }
     } catch {
       setError('Network error. Please try again.');
