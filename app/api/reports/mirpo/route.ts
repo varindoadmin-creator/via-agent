@@ -177,15 +177,18 @@ export async function GET(req: NextRequest) {
       12
     );
 
+    // Pre-filter at header level — only fetch detail for POs that look like MIRPO,
+    // avoiding hundreds of unnecessary detail calls for unrelated POs.
+    const mirpoCandidates = poHeaders.filter(po => isMirpo(po));
+
     const mirpoDetails: AnyObj[] = [];
-    for (let i = 0; i < poHeaders.length; i += 8) {
-      const batch = poHeaders.slice(i, i + 8);
+    for (let i = 0; i < mirpoCandidates.length; i += 8) {
+      const batch = mirpoCandidates.slice(i, i + 8);
       const details = await Promise.all(batch.map(async po => {
         try {
           const detail = await zohoGet(`/purchaseorders/${po.purchaseorder_id}`);
-          const full = (detail.purchaseorder || po) as AnyObj;
-          return isMirpo(po, full) ? full : null;
-        } catch { return isMirpo(po) ? po : null; }
+          return (detail.purchaseorder || po) as AnyObj;
+        } catch { return po; }
       }));
       mirpoDetails.push(...details.filter(Boolean) as AnyObj[]);
     }
@@ -198,12 +201,14 @@ export async function GET(req: NextRequest) {
     const invoiceHeaders = await fetchAllPages(
       `/invoices?date_start=${earliestPoDate}&date_end=${todayYmd()}&sort_column=date&sort_order=A`,
       'invoices',
-      20
+      8
     );
 
+    // Cap invoice detail fetches at 120 to stay within Hostinger's proxy timeout.
+    // First 120 (oldest) are most relevant for FIFO allocation starting from MIRPO date.
     const invoiceDetails: AnyObj[] = [];
-    for (let i = 0; i < invoiceHeaders.length; i += 10) {
-      const batch = invoiceHeaders.slice(i, i + 10);
+    for (let i = 0; i < Math.min(invoiceHeaders.length, 120); i += 15) {
+      const batch = invoiceHeaders.slice(i, i + 15);
       const details = await Promise.all(batch.map(async inv => {
         try { const d = await zohoGet(`/invoices/${inv.invoice_id}`); return (d.invoice || inv) as AnyObj; }
         catch { return inv; }
