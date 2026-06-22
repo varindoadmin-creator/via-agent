@@ -208,6 +208,14 @@ async function getTotalReceivables() {
 }
 
 export async function GET() {
+  try {
+    return await getDashboard();
+  } catch (err) {
+    return NextResponse.json({ success: false, errors: [String(err)], _fatal: true }, { status: 500 });
+  }
+}
+
+async function getDashboard() {
   const errors: string[] = [];
 
   let itemMaps: Awaited<ReturnType<typeof getItemsSummaryAndPurchaseRates>> | null = null;
@@ -275,3 +283,4 @@ export async function GET() {
     },
   });
 }
+
