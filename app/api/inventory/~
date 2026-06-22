@@ -1,0 +1,181 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+
+// Location ID → display name mapping
+const LOCATION_MAP: Record<string, string> = {
+  '8607767000000093103': 'HEAD OFFICE',
+  '8607767000000093565': 'HUB-BDG',
+  '8607767000000221577': 'HUB-MDN',
+};
+
+// Env override support
+function getLocationMap(): Record<string, string> {
+  return {
+    [process.env.ZOHO_LOCATION_HO  || '8607767000000093103']: 'HEAD OFFICE',
+    [process.env.ZOHO_LOCATION_BDG || '8607767000000093565']: 'HUB-BDG',
+    [process.env.ZOHO_LOCATION_MDN || '8607767000000221577']: 'HUB-MDN',
+  };
+}
+
+async function zohoGet(path: string) {
+  const token = await getZohoAccessToken();
+  const base = getZohoApiBaseUrl();
+  const orgId = getZohoOrgId();
+  const sep = path.includes('?') ? '&' : '?';
+  const url = `${base}${path}${sep}organization_id=${orgId}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    next: { revalidate: 300 }, // Cache 5 min
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
+  return body;
+}
+
+export interface InventoryItem {
+  item_id: string;
+  item_name: string;
+  item_code: string;
+  brand: string;
+  sku: string;
+  unit: string;
+  location_id: string;
+  location_name: string;
+  stock_on_hand: number;
+  committed_stock: number;
+  available_for_sale: number;
+}
+
+// Detect brand from item name or SKU
+function detectBrand(name: string, sku: string): string {
+  const upper = (name + ' ' + sku).toUpperCase();
+  if (upper.includes('LAMITAK') || /\b(SCT|SCA|SCM|SCX|WY|WYA|WG|WHG|DXO|DXP|DXN|TSP|TSW|ATS|ATP|ATW|CATS|CATP|ART|ARTE|MTA|MEP|CC |CCM|CCP|CCX|CES|PCA|SHG|EAS|EAW|EAP|EMS|EMP|EMW)\b/.test(upper)) return 'LAMITAK';
+  if (upper.includes('EDL') || upper.includes(' EDL')) return 'EDL';
+  if (upper.includes('AICA')) return 'AICA';
+  if (upper.includes('TACO')) return 'TACO';
+  if (upper.includes('CARTA')) return 'CARTA';
+  if (upper.includes('AIDI')) return 'AIDI';
+  if (upper.includes('ECO')) return 'ECO';
+  return 'OTHER';
+}
+
+// Extract clean item code from name (e.g. "DXO 5338D - LAMITAK..." → "DXO 5338D")
+function extractItemCode(name: string, sku: string): string {
+  if (sku) {
+    // Remove brand prefix from SKU e.g. "LAM-EAS1032D3/23" → "EAS 1032D3/23"
+    const clean = sku.replace(/^[A-Z]+-/, '').replace(/\//g, '/').trim();
+    if (clean) return clean;
+  }
+  // Extract from name: everything before " - "
+  const dash = name.indexOf(' - ');
+  if (dash > 0) return name.substring(0, dash).trim();
+  return name.split(' ').slice(0, 2).join(' ');
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const brand = searchParams.get('brand') || 'all';
+  const search = searchParams.get('search') || '';
+  const page = parseInt(searchParams.get('page') || '1');
+  const perPage = 200;
+
+  try {
+    const locationMap = getLocationMap();
+    const allItems: InventoryItem[] = [];
+
+    // Paginate through all items
+    let currentPage = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const res = await zohoGet(`/items?per_page=${perPage}&page=${currentPage}`);
+      const items = res.items || [];
+
+      for (const item of items) {
+        if (!item.locations?.length) continue;
+
+        const itemBrand = detectBrand(item.name || '', item.sku || '');
+        const itemCode = extractItemCode(item.name || '', item.sku || '');
+
+        for (const loc of item.locations) {
+          const locName = locationMap[String(loc.location_id)];
+          if (!locName) continue; // Skip unknown locations
+
+          const stockOnHand = Number(loc.location_stock_on_hand) || 0;
+          const committedStock = Number(loc.location_committed_stock) || 0;
+          const availableForSale = Number(loc.location_available_for_sale_stock) ||
+            Math.max(0, stockOnHand - committedStock);
+
+          // Skip zero/negative stock
+          if (stockOnHand <= 0) continue;
+
+          allItems.push({
+            item_id: String(item.item_id),
+            item_name: String(item.name || ''),
+            item_code: itemCode,
+            brand: itemBrand,
+            sku: String(item.sku || ''),
+            unit: String(item.unit || 'sht'),
+            location_id: String(loc.location_id),
+            location_name: locName,
+            stock_on_hand: stockOnHand,
+            committed_stock: committedStock,
+            available_for_sale: availableForSale,
+          });
+        }
+      }
+
+      hasMore = items.length === perPage;
+      currentPage++;
+      if (currentPage > 20) break; // Safety cap at 4000 items
+    }
+
+    // Apply brand filter
+    let filtered = allItems;
+    if (brand && brand !== 'all') {
+      filtered = filtered.filter(i => i.brand.toUpperCase() === brand.toUpperCase());
+    }
+
+    // Apply search filter
+    if (search.trim()) {
+      const q = search.trim().toUpperCase();
+      filtered = filtered.filter(i =>
+        i.item_code.toUpperCase().includes(q) ||
+        i.item_name.toUpperCase().includes(q) ||
+        i.brand.toUpperCase().includes(q)
+      );
+    }
+
+    // Group by location
+    const byLocation: Record<string, InventoryItem[]> = {
+      'HEAD OFFICE': [],
+      'HUB-BDG': [],
+      'HUB-MDN': [],
+    };
+
+    for (const item of filtered) {
+      if (byLocation[item.location_name]) {
+        byLocation[item.location_name].push(item);
+      }
+    }
+
+    // Sort each location: brand A-Z, then item_code A-Z
+    for (const loc of Object.keys(byLocation)) {
+      byLocation[loc].sort((a, b) => {
+        const brandCmp = a.brand.localeCompare(b.brand);
+        if (brandCmp !== 0) return brandCmp;
+        return a.item_code.localeCompare(b.item_code);
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      total_items: filtered.length,
+      by_location: byLocation,
+    });
+
+  } catch (err) {
+    console.error('[Inventory] Error:', err);
+    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+  }
+}

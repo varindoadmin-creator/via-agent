@@ -1,0 +1,818 @@
+[
+  {
+    "date": "2026-04-01",
+    "description": "TRSF E-BANKING CR 0104/FTSCY/WS95031 8547000.00 HERIYANTO",
+    "name_in_statement": "HERIYANTO",
+    "amount": 8547000.0
+  },
+  {
+    "date": "2026-04-01",
+    "description": "TRSF E-BANKING CR 0104/FTSCY/WS95051 33954900.00 ANUGERAH KREASI DE",
+    "name_in_statement": "ANUGERAH KREASI DE",
+    "amount": 33954900.0
+  },
+  {
+    "date": "2026-04-01",
+    "description": "TRSF E-BANKING CR 0104/FTSCY/WS95051 8857800.00 ANUGERAH KREASI DE",
+    "name_in_statement": "ANUGERAH KREASI DE",
+    "amount": 8857800.0
+  },
+  {
+    "date": "2026-04-01",
+    "description": "TRSF E-BANKING CR 0104/FTSCY/WS95271 42992100.00 HANDINATA",
+    "name_in_statement": "HANDINATA",
+    "amount": 42992100.0
+  },
+  {
+    "date": "2026-04-01",
+    "description": "TRSF E-BANKING CR 0104/FTSCY/WS95051 7942050.00 BELA 2680 PO 02314+02400 PANELASRI PERKASA",
+    "name_in_statement": "BELA 2680 PO 02314+02400 PANELASRI PERKASA",
+    "amount": 7942050.0
+  },
+  {
+    "date": "2026-04-02",
+    "description": "TRSF E-BANKING CR 0204/FTSCY/WS95271 1054500.00 A.n mario . Hpl+ed ging brunswick BERNARD THEODORE",
+    "name_in_statement": "A.n mario . Hpl+ed ging brunswick BERNARD THEODORE",
+    "amount": 1054500.0
+  },
+  {
+    "date": "2026-04-02",
+    "description": "TRSF E-BANKING CR 0204/FTSCY/WS95051 13919400.00 TARGET TEGUH PERKA",
+    "name_in_statement": "TARGET TEGUH PERKA",
+    "amount": 13919400.0
+  },
+  {
+    "date": "2026-04-03",
+    "description": "TRSF E-BANKING CR 0304/FTSCY/WS95051 4717500.00 P4VFvP  DPOD Sve I nterior 177510018 SINAR DIGITAL TERD",
+    "name_in_statement": "P4VFvP DPOD Sve I nterior 177510018 SINAR DIGITAL TERD",
+    "amount": 4717500.0
+  },
+  {
+    "date": "2026-04-04",
+    "description": "TRSF E-BANKING CR 0404/FTSCY/WS95271 777000.00 setra duta ETI ROHAETI",
+    "name_in_statement": "setra duta ETI ROHAETI",
+    "amount": 777000.0
+  },
+  {
+    "date": "2026-04-04",
+    "description": "TRSF E-BANKING CR 0404/FTSCY/WS95051 1159950.00 KURSI MERAH AMBRA",
+    "name_in_statement": "KURSI MERAH AMBRA",
+    "amount": 1159950.0
+  },
+  {
+    "date": "2026-04-04",
+    "description": "TRSF E-BANKING CR 0404/FTSCY/WS95271 55477800.00 inv 241865 ANDY WINATA",
+    "name_in_statement": "inv 241865 ANDY WINATA",
+    "amount": 55477800.0
+  },
+  {
+    "date": "2026-04-06",
+    "description": "TRSF E-BANKING CR 0604/FTSCY/WS95271 749250.00 GILBERT SUSANTO",
+    "name_in_statement": "GILBERT SUSANTO",
+    "amount": 749250.0
+  },
+  {
+    "date": "2026-04-06",
+    "description": "TRSF E-BANKING CR 0604/FTSCY/WS95051 21777090.00 PROFITTO INOVASI K",
+    "name_in_statement": "PROFITTO INOVASI K",
+    "amount": 21777090.0
+  },
+  {
+    "date": "2026-04-06",
+    "description": "TRSF E-BANKING CR 0604/FTSCY/WS95051 699300.00 04022 GIANDY JAYA ABADI",
+    "name_in_statement": "04022 GIANDY JAYA ABADI",
+    "amount": 699300.0
+  },
+  {
+    "date": "2026-04-06",
+    "description": "TRSF E-BANKING CR 0604/FTSCY/WS95051 5644350.00 09/PRO/IKD-WS/III/ 231/PRO/IKD-WS/II/ INOVASI KARYADINAM",
+    "name_in_statement": "09/PRO/IKD-WS/III/ 231/PRO/IKD-WS/II/ INOVASI KARYADINAM",
+    "amount": 5644350.0
+  },
+  {
+    "date": "2026-04-06",
+    "description": "TRSF E-BANKING CR 0604/FTSCY/WS95031 610500.00 JEFF GABRIEL YUWON",
+    "name_in_statement": "JEFF GABRIEL YUWON",
+    "amount": 610500.0
+  },
+  {
+    "date": "2026-04-07",
+    "description": "TRSF E-BANKING CR 04/07 390T1 KUSNADI SETIAWAN",
+    "name_in_statement": "TRSF E-BANKING CR 04/07 390T1 KUSNADI SETIAWAN",
+    "amount": 1298500.0
+  },
+  {
+    "date": "2026-04-07",
+    "description": "TRSF E-BANKING CR 0704/FTSCY/WS95031 22640115.00 bayar hpl KAHONO",
+    "name_in_statement": "bayar hpl KAHONO",
+    "amount": 22640115.0
+  },
+  {
+    "date": "2026-04-08",
+    "description": "TRSF E-BANKING CR 0804/FTSCY/WS95031 3552000.00 lamitak IR UTEP RAHMAT KOMARA",
+    "name_in_statement": "lamitak IR UTEP RAHMAT KOMARA",
+    "amount": 3552000.0
+  },
+  {
+    "date": "2026-04-08",
+    "description": "TRSF E-BANKING CR 0804/FTSCY/WS95051 3496500.00 VFH/PI-00117 MATERIAL FURNITURE",
+    "name_in_statement": "VFH/PI-00117 MATERIAL FURNITURE",
+    "amount": 3496500.0
+  },
+  {
+    "date": "2026-04-08",
+    "description": "TRSF E-BANKING CR 0804/FTSCY/WS95051 4551000.00 PO-IKR-MOZART-99 Lorong Lt 3 INTI KREASI REKAKA",
+    "name_in_statement": "PO-IKR-MOZART-99 Lorong Lt 3 INTI KREASI REKAKA",
+    "amount": 4551000.0
+  },
+  {
+    "date": "2026-04-08",
+    "description": "TRSF E-BANKING CR 0804/FTSCY/WS95051 23981550.00 PO 02543,02316 PANELASRI PERKASA",
+    "name_in_statement": "PO 02543,02316 PANELASRI PERKASA",
+    "amount": 23981550.0
+  },
+  {
+    "date": "2026-04-09",
+    "description": "TRSF E-BANKING CR 0904/FTSCY/WS95051 2519700.00 DPOD SVE Interior 1775573643PXKPW HARSYA REMITINDO P",
+    "name_in_statement": "DPOD SVE Interior 1775573643PXKPW HARSYA REMITINDO P",
+    "amount": 2519700.0
+  },
+  {
+    "date": "2026-04-09",
+    "description": "TRSF E-BANKING CR 0904/FTSCY/WS95031 3296700.00 JEFF GABRIEL YUWON",
+    "name_in_statement": "JEFF GABRIEL YUWON",
+    "amount": 3296700.0
+  },
+  {
+    "date": "2026-04-09",
+    "description": "TRSF E-BANKING CR 0904/FTSCY/WS95031 4059825.00 HPL PALEMBANG HENKY GUNAWAN BUNN",
+    "name_in_statement": "HPL PALEMBANG HENKY GUNAWAN BUNN",
+    "amount": 4059825.0
+  },
+  {
+    "date": "2026-04-09",
+    "description": "TRSF E-BANKING CR 0904/FTSCY/WS95051 17149500.00 PO 02426,02663 02614 PANELASRI PERKASA",
+    "name_in_statement": "PO 02426,02663 02614 PANELASRI PERKASA",
+    "amount": 17149500.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95031 9763000.00 psm SALSABILA SHAFA PU",
+    "name_in_statement": "psm SALSABILA SHAFA PU",
+    "amount": 9763000.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95031 16996875.00 FL PI 00124 TJUNG RIVIA GOZALI",
+    "name_in_statement": "FL PI 00124 TJUNG RIVIA GOZALI",
+    "amount": 16996875.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95051 15012750.00 PROFITTO INOVASI K",
+    "name_in_statement": "PROFITTO INOVASI K",
+    "amount": 15012750.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "KR OTOMATIS LLG-DBS INDONESIA NUSANTARA SEJAHTER 4-23 SEMARANG LAMI TAK HPL 260410001452287368",
+    "name_in_statement": "KR OTOMATIS LLG-DBS INDONESIA NUSANTARA SEJAHTER 4-23 SEMARANG LAMI TAK HPL 260410001452287368",
+    "amount": 152470710.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95051 749250.00 BERDIKARI LANCAR S",
+    "name_in_statement": "BERDIKARI LANCAR S",
+    "amount": 749250.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95031 4895100.00 psm SALSABILA SHAFA PU",
+    "name_in_statement": "psm SALSABILA SHAFA PU",
+    "amount": 4895100.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95051 24475500.00 LOGAM MAS GEMILANG",
+    "name_in_statement": "LOGAM MAS GEMILANG",
+    "amount": 24475500.0
+  },
+  {
+    "date": "2026-04-10",
+    "description": "TRSF E-BANKING CR 1004/FTSCY/WS95051 1398600.00 LEUWIH JAYA CV",
+    "name_in_statement": "LEUWIH JAYA CV",
+    "amount": 1398600.0
+  },
+  {
+    "date": "2026-04-11",
+    "description": "TRSF E-BANKING CR 1104/FTSCY/WS95031 44415540.00 lamitak cipete YEREMIA KENNETH",
+    "name_in_statement": "lamitak cipete YEREMIA KENNETH",
+    "amount": 44415540.0
+  },
+  {
+    "date": "2026-04-13",
+    "description": "TRSF E-BANKING CR 1304/FTSCY/WS95031 51431850.00 hpl bintaro YEREMIA KENNETH",
+    "name_in_statement": "hpl bintaro YEREMIA KENNETH",
+    "amount": 51431850.0
+  },
+  {
+    "date": "2026-04-13",
+    "description": "TRSF E-BANKING CR 1304/FTSCY/WS95271 4195800.00 bS STEVANUS LEOWIJAYA",
+    "name_in_statement": "bS STEVANUS LEOWIJAYA",
+    "amount": 4195800.0
+  },
+  {
+    "date": "2026-04-13",
+    "description": "TRSF E-BANKING CR 1304/FTSCY/WS95051 30863550.00 PROFITTO INOVASI K",
+    "name_in_statement": "PROFITTO INOVASI K",
+    "amount": 30863550.0
+  },
+  {
+    "date": "2026-04-13",
+    "description": "TRSF E-BANKING CR 1304/FTSCY/WS95271 2747250.00 Bayar nota JOHANES TARUNA KES",
+    "name_in_statement": "Bayar nota JOHANES TARUNA KES",
+    "amount": 2747250.0
+  },
+  {
+    "date": "2026-04-13",
+    "description": "TRSF E-BANKING CR 1304/FTSCY/WS95031 6543450.00 SITI JUBAEDAH",
+    "name_in_statement": "SITI JUBAEDAH",
+    "amount": 6543450.0
+  },
+  {
+    "date": "2026-04-13",
+    "description": "TRSF E-BANKING CR 04/13 ZU6U1 ROCHMAN",
+    "name_in_statement": "TRSF E-BANKING CR 04/13 ZU6U1 ROCHMAN",
+    "amount": 2200000.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95011 790875.00 Tirto NETTY SETIAWATI DR",
+    "name_in_statement": "Tirto NETTY SETIAWATI DR",
+    "amount": 790875.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1859250.00 Pqe1DY  DPOD Sve I nterior 177604794 SINAR DIGITAL TERD",
+    "name_in_statement": "Pqe1DY DPOD Sve I nterior 177604794 SINAR DIGITAL TERD",
+    "amount": 1859250.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 367410.00 IR-TW.CW1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-TW.CW1-HE hpl material PATIO LIVITY CV",
+    "amount": 367410.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 738150.00 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "amount": 738150.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1820000.04 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1820000.04 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "amount": 1820000.04
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 8383830.00 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "amount": 8383830.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 15600080.13 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 15600080.13 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "amount": 15600080.13
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 4297500.03 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 4297500.03 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "amount": 4297500.03
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 3716470.03 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 3716470.03 IR-IRW.MAY1-HE hpl material PATIO LIVITY CV",
+    "amount": 3716470.03
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 11054000.00 IR-SN.MT1-AN hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-SN.MT1-AN hpl material PATIO LIVITY CV",
+    "amount": 11054000.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 27043980.26 IR-SN.MT1-AN hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 27043980.26 IR-SN.MT1-AN hpl material PATIO LIVITY CV",
+    "amount": 27043980.26
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 4084800.00 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "amount": 4084800.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1040000.03 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1040000.03 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "amount": 1040000.03
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 3674100.00 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "amount": 3674100.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1280000.00 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "amount": 1280000.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 7645780.11 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 7645780.11 IR-TGH.HTA-AD hpl material PATIO LIVITY CV",
+    "amount": 7645780.11
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 590000.03 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 590000.03 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 590000.03
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 442500.02 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 442500.02 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 442500.02
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1475000.08 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 1475000.08 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 1475000.08
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 7381500.00 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 7381500.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 13681120.01 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 13681120.01 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 13681120.01
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 14524350.00 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 14524350.0
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 10520000.24 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 10520000.24 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 10520000.24
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 15899220.15 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 15899220.15 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 15899220.15
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 30525105.21 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "name_in_statement": "TRSF E-BANKING CR 1404/FTSCY/WS95051 30525105.21 IR-SN.MT1-AD hpl material PATIO LIVITY CV",
+    "amount": 30525105.21
+  },
+  {
+    "date": "2026-04-14",
+    "description": "TRSF E-BANKING CR 1404/FTSCY/WS95051 36591150.00 PROFITTO INOVASI K",
+    "name_in_statement": "PROFITTO INOVASI K",
+    "amount": 36591150.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95051 3690750.00 PULUNG MITRA BERSA",
+    "name_in_statement": "PULUNG MITRA BERSA",
+    "amount": 3690750.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95051 2730600.00 PO-IKR-MOZART-149 Panel Foyer lt. 1 INTI KREASI REKAKA",
+    "name_in_statement": "PO-IKR-MOZART-149 Panel Foyer lt. 1 INTI KREASI REKAKA",
+    "amount": 2730600.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95271 6271500.00 AGUS MARZUKI",
+    "name_in_statement": "AGUS MARZUKI",
+    "amount": 6271500.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95031 11188800.00 SITI JUBAEDAH",
+    "name_in_statement": "SITI JUBAEDAH",
+    "amount": 11188800.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95031 32767200.00 SITI JUBAEDAH",
+    "name_in_statement": "SITI JUBAEDAH",
+    "amount": 32767200.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95051 1739925.00 PsFxRI  DPOD Trend ku Co Id D H Pd H SINAR DIGITAL TERD",
+    "name_in_statement": "PsFxRI DPOD Trend ku Co Id D H Pd H SINAR DIGITAL TERD",
+    "amount": 1739925.0
+  },
+  {
+    "date": "2026-04-15",
+    "description": "TRSF E-BANKING CR 1504/FTSCY/WS95271 26789000.00 HANDINATA",
+    "name_in_statement": "HANDINATA",
+    "amount": 26789000.0
+  },
+  {
+    "date": "2026-04-16",
+    "description": "TRSF E-BANKING CR 1604/FTSCY/WS95031 699300.00 TJUNG RIVIA GOZALI",
+    "name_in_statement": "TJUNG RIVIA GOZALI",
+    "amount": 699300.0
+  },
+  {
+    "date": "2026-04-16",
+    "description": "TRSF E-BANKING CR 1604/FTSCY/WS95031 5905200.00 MUTMAINAH",
+    "name_in_statement": "MUTMAINAH",
+    "amount": 5905200.0
+  },
+  {
+    "date": "2026-04-16",
+    "description": "TRSF E-BANKING CR 1604/FTSCY/WS95031 3108000.00 psm SALSABILA SHAFA PU",
+    "name_in_statement": "psm SALSABILA SHAFA PU",
+    "amount": 3108000.0
+  },
+  {
+    "date": "2026-04-16",
+    "description": "TRSF E-BANKING CR 1604/FTSCY/WS95271 38073000.00 NANCY MULIADI",
+    "name_in_statement": "NANCY MULIADI",
+    "amount": 38073000.0
+  },
+  {
+    "date": "2026-04-16",
+    "description": "TRSF E-BANKING CR 1604/FTSCY/WS95271 222000.00 Edging brunswick 1 0m BERNARD THEODORE",
+    "name_in_statement": "Edging brunswick 1 0m BERNARD THEODORE",
+    "amount": 222000.0
+  },
+  {
+    "date": "2026-04-16",
+    "description": "TRSF E-BANKING CR 1604/FTSCY/WS95051 210900.00 KURSI MERAH AMBRA",
+    "name_in_statement": "KURSI MERAH AMBRA",
+    "amount": 210900.0
+  },
+  {
+    "date": "2026-04-17",
+    "description": "TRSF E-BANKING CR 1704/FTSCY/WS95031 760350.00 senopati, lamitak IVAN ROBIANTO",
+    "name_in_statement": "senopati, lamitak IVAN ROBIANTO",
+    "amount": 760350.0
+  },
+  {
+    "date": "2026-04-17",
+    "description": "TRSF E-BANKING CR 1704/FTSCY/WS95051 8910525.00 PULUNG MITRA BERSA",
+    "name_in_statement": "PULUNG MITRA BERSA",
+    "amount": 8910525.0
+  },
+  {
+    "date": "2026-04-17",
+    "description": "TRSF E-BANKING CR 1704/FTSCY/WS95271 5112660.00 Melani MELANI",
+    "name_in_statement": "Melani MELANI",
+    "amount": 5112660.0
+  },
+  {
+    "date": "2026-04-17",
+    "description": "TRSF E-BANKING CR 1704/FTSCY/WS95051 45765300.00 TARGET TEGUH PERKA",
+    "name_in_statement": "TARGET TEGUH PERKA",
+    "amount": 45765300.0
+  },
+  {
+    "date": "2026-04-17",
+    "description": "TRSF E-BANKING CR 1704/FTSCY/WS95051 7101780.00 Payment 23467 HENLEY MULTI KREAS",
+    "name_in_statement": "Payment 23467 HENLEY MULTI KREAS",
+    "amount": 7101780.0
+  },
+  {
+    "date": "2026-04-18",
+    "description": "TRSF E-BANKING CR 1804/FTSCY/WS95031 1110000.00 GANI JAMALUDIN AL",
+    "name_in_statement": "GANI JAMALUDIN AL",
+    "amount": 1110000.0
+  },
+  {
+    "date": "2026-04-19",
+    "description": "BI-FAST CR TRANSFER   DR 008 NIRRA RIANA",
+    "name_in_statement": "BI-FAST CR TRANSFER DR 008 NIRRA RIANA",
+    "amount": 10000000.0
+  },
+  {
+    "date": "2026-04-20",
+    "description": "SETORAN TUNAI HOH",
+    "name_in_statement": "SETORAN TUNAI HOH",
+    "amount": 549500.0
+  },
+  {
+    "date": "2026-04-20",
+    "description": "TRSF E-BANKING CR 2004/FTSCY/WS95051 13023075.00 HOME CENTRE CV",
+    "name_in_statement": "HOME CENTRE CV",
+    "amount": 13023075.0
+  },
+  {
+    "date": "2026-04-20",
+    "description": "BI-FAST CR TRANSFER   DR 008 DION NANDA PUTRA",
+    "name_in_statement": "BI-FAST CR TRANSFER DR 008 DION NANDA PUTRA",
+    "amount": 2442000.0
+  },
+  {
+    "date": "2026-04-20",
+    "description": "TRSF E-BANKING CR 2004/FTSCY/WS95031 738150.00 MUHAMMAD",
+    "name_in_statement": "MUHAMMAD",
+    "amount": 738150.0
+  },
+  {
+    "date": "2026-04-21",
+    "description": "TRSF E-BANKING CR 2104/FTSCY/WS95011 53391000.00 BNElokV/INT02 - HPLVFH/PI-00197 RUDY HARTADI SETIA",
+    "name_in_statement": "BNElokV/INT02 - HPLVFH/PI-00197 RUDY HARTADI SETIA",
+    "amount": 53391000.0
+  },
+  {
+    "date": "2026-04-21",
+    "description": "TRSF E-BANKING CR 2104/FTSCY/WS95011 3140000.00 BNElokV/INT02 - VFH/SO-232835 RUDY HARTADI SETIA",
+    "name_in_statement": "BNElokV/INT02 - VFH/SO-232835 RUDY HARTADI SETIA",
+    "amount": 3140000.0
+  },
+  {
+    "date": "2026-04-21",
+    "description": "BI-FAST CR TRANSFER   DR 008 KURNIASARI",
+    "name_in_statement": "BI-FAST CR TRANSFER DR 008 KURNIASARI",
+    "amount": 1831500.0
+  },
+  {
+    "date": "2026-04-21",
+    "description": "TRSF E-BANKING CR 2104/FTSCY/WS95031 799200.00 JEFF GABRIEL YUWON",
+    "name_in_statement": "JEFF GABRIEL YUWON",
+    "amount": 799200.0
+  },
+  {
+    "date": "2026-04-22",
+    "description": "TRSF E-BANKING CR 2204/FTSCY/WS95031 777000.00 hpl pinata lvl 21 I GST AG NGR ANOM",
+    "name_in_statement": "hpl pinata lvl 21 I GST AG NGR ANOM",
+    "amount": 777000.0
+  },
+  {
+    "date": "2026-04-22",
+    "description": "TRSF E-BANKING CR 2204/FTSCY/WS95051 4975575.00 DPOD SVE Interior 1776740417MAV3X HARSYA REMITINDO P",
+    "name_in_statement": "DPOD SVE Interior 1776740417MAV3X HARSYA REMITINDO P",
+    "amount": 4975575.0
+  },
+  {
+    "date": "2026-04-22",
+    "description": "TRSF E-BANKING CR 2204/FTSCY/WS95051 30936261.00 IR-SN.MT1-AD acc material PATIO LIVITY CV",
+    "name_in_statement": "IR-SN.MT1-AD acc material PATIO LIVITY CV",
+    "amount": 30936261.0
+  },
+  {
+    "date": "2026-04-23",
+    "description": "TRSF E-BANKING CR 2304/FTSCY/WS95031 7156029.00 HERIYANTO",
+    "name_in_statement": "HERIYANTO",
+    "amount": 7156029.0
+  },
+  {
+    "date": "2026-04-23",
+    "description": "TRSF E-BANKING CR 2304/FTSCY/WS95271 1398600.00 bS STEVANUS LEOWIJAYA",
+    "name_in_statement": "bS STEVANUS LEOWIJAYA",
+    "amount": 1398600.0
+  },
+  {
+    "date": "2026-04-23",
+    "description": "TRSF E-BANKING CR 2304/FTSCY/WS95271 1460760.00 Melani MELANI",
+    "name_in_statement": "Melani MELANI",
+    "amount": 1460760.0
+  },
+  {
+    "date": "2026-04-23",
+    "description": "TRSF E-BANKING CR 2304/FTSCY/WS95271 1221000.00 hpl unt Studio cip ete RADEN ACHMAD BUDIM",
+    "name_in_statement": "hpl unt Studio cip ete RADEN ACHMAD BUDIM",
+    "amount": 1221000.0
+  },
+  {
+    "date": "2026-04-23",
+    "description": "TRSF E-BANKING CR 2304/FTSCY/WS95051 7692300.00 PO-IKR-MOZART-198 Dining Wall Panel INTI KREASI REKAKA",
+    "name_in_statement": "PO-IKR-MOZART-198 Dining Wall Panel INTI KREASI REKAKA",
+    "amount": 7692300.0
+  },
+  {
+    "date": "2026-04-23",
+    "description": "TRSF E-BANKING CR 2304/FTSCY/WS95051 14962800.00 PROFITTO INOVASI K",
+    "name_in_statement": "PROFITTO INOVASI K",
+    "amount": 14962800.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "SETORAN TUNAI HOH",
+    "name_in_statement": "SETORAN TUNAI HOH",
+    "amount": 2747000.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95271 378510.00 YANUARTY MAULINA",
+    "name_in_statement": "YANUARTY MAULINA",
+    "amount": 378510.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95271 3052500.00 AGUS MARZUKI",
+    "name_in_statement": "AGUS MARZUKI",
+    "amount": 3052500.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95031 40254669.00 28feb sd 23april 2 026 frans edl MIKI SETIAWAN",
+    "name_in_statement": "28feb sd 23april 2 026 frans edl MIKI SETIAWAN",
+    "amount": 40254669.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95051 20826375.00 VARINDO INV 004297 SUMBER UNTUNG BERL",
+    "name_in_statement": "VARINDO INV 004297 SUMBER UNTUNG BERL",
+    "amount": 20826375.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95051 7770000.00 VARINDO INV 004302 SUMBER UNTUNG BERL",
+    "name_in_statement": "VARINDO INV 004302 SUMBER UNTUNG BERL",
+    "amount": 7770000.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95051 3885000.00 VARINDO INV 004329 SUMBER UNTUNG BERL",
+    "name_in_statement": "VARINDO INV 004329 SUMBER UNTUNG BERL",
+    "amount": 3885000.0
+  },
+  {
+    "date": "2026-04-24",
+    "description": "TRSF E-BANKING CR 2404/FTSCY/WS95031 1035630.00 MIKI SETIAWAN",
+    "name_in_statement": "MIKI SETIAWAN",
+    "amount": 1035630.0
+  },
+  {
+    "date": "2026-04-25",
+    "description": "TRSF E-BANKING CR 2504/FTSCY/WS95051 1739925.00 KURSI MERAH AMBRA",
+    "name_in_statement": "KURSI MERAH AMBRA",
+    "amount": 1739925.0
+  },
+  {
+    "date": "2026-04-27",
+    "description": "TRSF E-BANKING CR 2604/FTSCY/WS95031 738150.00 VALDY CHANDRA",
+    "name_in_statement": "VALDY CHANDRA",
+    "amount": 738150.0
+  },
+  {
+    "date": "2026-04-27",
+    "description": "TRSF E-BANKING CR 2704/FTSCY/WS95011 23700440.00 ANDY WINATA",
+    "name_in_statement": "ANDY WINATA",
+    "amount": 23700440.0
+  },
+  {
+    "date": "2026-04-27",
+    "description": "BI-FAST CR TRANSFER   DR 022 TOMMY LIMAS TANIMI",
+    "name_in_statement": "BI-FAST CR TRANSFER DR 022 TOMMY LIMAS TANIMI",
+    "amount": 1581750.0
+  },
+  {
+    "date": "2026-04-27",
+    "description": "BI-FAST CR TRANSFER   DR 022 TOMMY LIMAS TANIMI",
+    "name_in_statement": "BI-FAST CR TRANSFER DR 022 TOMMY LIMAS TANIMI",
+    "amount": 790875.0
+  },
+  {
+    "date": "2026-04-27",
+    "description": "TRSF E-BANKING CR 2704/FTSCY/WS95051 21978000.00 VARINDO FORMA HUTA 94/PRO/IKD-WS/II/2 INOVASI KARYADINAM",
+    "name_in_statement": "VARINDO FORMA HUTA 94/PRO/IKD-WS/II/2 INOVASI KARYADINAM",
+    "amount": 21978000.0
+  },
+  {
+    "date": "2026-04-28",
+    "description": "TRSF E-BANKING CR 2804/FTSCY/WS95031 378510.00 ENDANG MULYADI",
+    "name_in_statement": "ENDANG MULYADI",
+    "amount": 378510.0
+  },
+  {
+    "date": "2026-04-28",
+    "description": "TRSF E-BANKING CR 2804/FTSCY/WS95051 1581750.00 VFH PI 00230 SUMBER UNTUNG BERL",
+    "name_in_statement": "VFH PI 00230 SUMBER UNTUNG BERL",
+    "amount": 1581750.0
+  },
+  {
+    "date": "2026-04-29",
+    "description": "TRSF E-BANKING CR 2904/FTSCY/WS95271 2497500.00 Lamitax hpl 3 lb d epok NENENG SUMIATI",
+    "name_in_statement": "Lamitax hpl 3 lb d epok NENENG SUMIATI",
+    "amount": 2497500.0
+  },
+  {
+    "date": "2026-04-29",
+    "description": "TRSF E-BANKING CR 2904/FTSCY/WS95051 1159950.00 KURSI MERAH AMBRA",
+    "name_in_statement": "KURSI MERAH AMBRA",
+    "amount": 1159950.0
+  },
+  {
+    "date": "2026-04-29",
+    "description": "TRSF E-BANKING CR 2904/FTSCY/WS95051 1950825.00 VFH/PI-00250 MATERIAL FURNITURE",
+    "name_in_statement": "VFH/PI-00250 MATERIAL FURNITURE",
+    "amount": 1950825.0
+  },
+  {
+    "date": "2026-04-29",
+    "description": "TRSF E-BANKING CR 2904/FTSCY/WS95051 3848925.00 HOME CENTRE CV",
+    "name_in_statement": "HOME CENTRE CV",
+    "amount": 3848925.0
+  },
+  {
+    "date": "2026-04-29",
+    "description": "TRSF E-BANKING CR 2904/FTSCY/WS95031 738150.00 HPL Lamitax RIA MARDALENA",
+    "name_in_statement": "HPL Lamitax RIA MARDALENA",
+    "amount": 738150.0
+  },
+  {
+    "date": "2026-04-29",
+    "description": "TRSF E-BANKING CR 2904/FTSCY/WS95051 9121425.00 PO OF Lippo Material Furniture ATENTO KREASI NUSA",
+    "name_in_statement": "PO OF Lippo Material Furniture ATENTO KREASI NUSA",
+    "amount": 9121425.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 17715600.00 JAPHIAR TOPIC F. P",
+    "name_in_statement": "JAPHIAR TOPIC F. P",
+    "amount": 17715600.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 1159950.00 PO OF Lippo T Material Furniture ATENTO KREASI NUSA",
+    "name_in_statement": "PO OF Lippo T Material Furniture ATENTO KREASI NUSA",
+    "amount": 1159950.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 6513480.00 Kontra Bon CASA Maret 2026 SUGIARTO",
+    "name_in_statement": "Kontra Bon CASA Maret 2026 SUGIARTO",
+    "amount": 6513480.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 1748250.00 VFH/PI-00257 MATERIAL FURNITURE",
+    "name_in_statement": "VFH/PI-00257 MATERIAL FURNITURE",
+    "amount": 1748250.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95271 200000000.00 FRAN SISWANTO",
+    "name_in_statement": "FRAN SISWANTO",
+    "amount": 200000000.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 3479850.00 HOME CENTRE CV",
+    "name_in_statement": "HOME CENTRE CV",
+    "amount": 3479850.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95271 5000000.00 dp lamitak YULIANA NOVARITA",
+    "name_in_statement": "dp lamitak YULIANA NOVARITA",
+    "amount": 5000000.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 7381500.00 TARGET TEGUH PERKA",
+    "name_in_statement": "TARGET TEGUH PERKA",
+    "amount": 7381500.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "TRSF E-BANKING CR 3004/FTSCY/WS95051 6643350.00 PULUNG MITRA BERSA",
+    "name_in_statement": "PULUNG MITRA BERSA",
+    "amount": 6643350.0
+  },
+  {
+    "date": "2026-04-30",
+    "description": "BI-FAST CR TRANSFER   DR 535 MUHAMMAD UMAR",
+    "name_in_statement": "BI-FAST CR TRANSFER DR 535 MUHAMMAD UMAR",
+    "amount": 1000000.0
+  }
+]
