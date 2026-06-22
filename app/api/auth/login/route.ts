@@ -25,7 +25,10 @@ export async function POST(req: NextRequest) {
   }
 
   const expected = process.env.VIA_PASSWORD;
-  if (!expected || !password || password !== expected) {
+  if (!expected) {
+    return NextResponse.json({ error: 'VIA_PASSWORD is not configured on the server.' }, { status: 500 });
+  }
+  if (!password || password.trim() !== expected.trim()) {
     return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
   }
 
