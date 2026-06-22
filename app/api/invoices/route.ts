@@ -8,10 +8,16 @@ async function zohoGet(path: string) {
   const base = getZohoApiBaseUrl();
   const sep = path.includes('?') ? '&' : '?';
   const url = `${base}${path}${sep}organization_id=${ORG_ID()}`;
-  const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
-  const body = await res.json();
-  if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
-  return body;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
+    const body = await res.json();
+    if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // GET /api/invoices?customer=PATIO+LIVITY&from=2026-05-01&to=2026-05-31

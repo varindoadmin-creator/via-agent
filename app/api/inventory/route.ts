@@ -15,10 +15,16 @@ async function zohoGet(path: string) {
   const orgId = getZohoOrgId();
   const sep = path.includes('?') ? '&' : '?';
   const url = `${base}${path}${sep}organization_id=${orgId}`;
-  const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
-  const body = await res.json();
-  if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
-  return body;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
+    const body = await res.json();
+    if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface InventoryItem {
