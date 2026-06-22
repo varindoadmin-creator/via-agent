@@ -84,13 +84,14 @@ export default function HomePage() {
     setError(null);
     try {
       const res = await fetch('/api/dashboard', { cache: 'no-store' });
-      const isJson = res.headers.get('content-type')?.includes('application/json');
-      if (!isJson) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status} (non-JSON): ${text.slice(0, 300)}`);
+      const text = await res.text();
+      let json: DashboardData;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(`HTTP ${res.status} — server returned: ${text.slice(0, 200)}`);
       }
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error((json as any).error || `HTTP ${res.status}`);
       setData(json);
     } catch (err) {
       setError(String(err));
