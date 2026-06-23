@@ -197,23 +197,36 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, from, to, rows: [], summary: null, message: 'No MIRPO purchase orders found. VIA identifies MIRPO from PO reference containing MIRPO.' });
     }
 
-    const earliestPoDate = mirpoDetails.map(p => s(p.date)).filter(Boolean).sort()[0] || from;
-    const invoiceHeaders = await fetchAllPages(
-      `/invoices?date_start=${earliestPoDate}&date_end=${todayYmd()}&sort_column=date&sort_order=A`,
-      'invoices',
-      8
-    );
+    // Parallel per-MIRPO window fetches: each MIRPO's invoices from its PO date to today.
+    // All windows run concurrently — far faster than one sequential all-invoices scan.
+    // Older MIRPO windows insert their IDs first so the cap preserves FIFO-relevant invoices.
+    const windowFetches = await Promise.all(mirpoDetails.map(async (po) => {
+      const poDate = s(po.date) || from;
+      try {
+        const headers = await fetchAllPages(
+          `/invoices?date_start=${poDate}&date_end=${todayYmd()}&sort_column=date&sort_order=A`,
+          'invoices',
+          4  // 4 pages = up to 800 invoices per MIRPO window
+        );
+        return headers.map(h => s(h.invoice_id)).filter(Boolean);
+      } catch { return [] as string[]; }
+    }));
 
-    // Cap invoice detail fetches at 120 to stay within Hostinger's proxy timeout.
-    // First 120 (oldest) are most relevant for FIFO allocation starting from MIRPO date.
+    const relevantInvoiceIds = new Set<string>();
+    for (const ids of windowFetches) {
+      for (const id of ids) relevantInvoiceIds.add(id);
+    }
+
+    // Fetch invoice details in batches of 25 concurrent, cap at 300 total.
     const invoiceDetails: AnyObj[] = [];
-    for (let i = 0; i < Math.min(invoiceHeaders.length, 120); i += 15) {
-      const batch = invoiceHeaders.slice(i, i + 15);
-      const details = await Promise.all(batch.map(async inv => {
-        try { const d = await zohoGet(`/invoices/${inv.invoice_id}`); return (d.invoice || inv) as AnyObj; }
-        catch { return inv; }
+    const invoiceIdArray = [...relevantInvoiceIds].slice(0, 300);
+    for (let i = 0; i < invoiceIdArray.length; i += 25) {
+      const batch = invoiceIdArray.slice(i, i + 25);
+      const details = await Promise.all(batch.map(async (id) => {
+        try { const d = await zohoGet(`/invoices/${id}`); return (d.invoice || null) as AnyObj | null; }
+        catch { return null; }
       }));
-      invoiceDetails.push(...details.filter(Boolean));
+      invoiceDetails.push(...details.filter(Boolean) as AnyObj[]);
     }
 
     type MirpoLine = {
