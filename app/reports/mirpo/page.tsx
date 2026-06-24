@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Period = 'this_month' | 'prev_month' | 'this_year' | 'prev_year';
+type Period = 'this_month' | 'prev_month' | 'this_year' | 'prev_year' | 'custom';
 type View   = 'summary' | 'monthly' | 'yearly' | 'by-po' | 'by-item';
 
 type MirpoItem = {
@@ -90,11 +90,15 @@ const fQty = (v: number) => Math.round(v || 0).toLocaleString('id-ID');
 const fPct = (v: number) => `${(Number(v) || 0).toFixed(1)}%`;
 
 const PERIODS: { key: Period; label: string }[] = [
-  { key: 'this_month', label: 'This Month' },
-  { key: 'prev_month', label: 'Prev Month' },
-  { key: 'this_year',  label: 'This Year'  },
-  { key: 'prev_year',  label: 'Prev Year'  },
+  { key: 'this_month', label: 'This Month'    },
+  { key: 'prev_month', label: 'Prev Month'    },
+  { key: 'this_year',  label: 'This Year'     },
+  { key: 'prev_year',  label: 'Prev Year'     },
+  { key: 'custom',     label: 'Custom Range'  },
 ];
+
+// Default custom range starts from the MIRPO programme start date (1 March 2026).
+const MIRPO_START = '2026-03-01';
 
 const VIEWS: { key: View; label: string }[] = [
   { key: 'summary',  label: 'Summary'   },
@@ -133,12 +137,14 @@ function Card({ label, value, sub, accent }: { label: string; value: string; sub
 
 // ─── Page component ───────────────────────────────────────────────────────────
 export default function MirpoAnalysisPage() {
-  const [period, setPeriod]   = useState<Period>('this_year');
-  const [view, setView]       = useState<View>('summary');
-  const [rows, setRows]       = useState<MirpoRow[]>([]);
-  const [monthly, setMonthly] = useState<MonthGroup[]>([]);
-  const [yearly, setYearly]   = useState<YearGroup[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [period, setPeriod]       = useState<Period>('this_year');
+  const [customFrom, setCustomFrom] = useState(MIRPO_START);
+  const [customTo,   setCustomTo]   = useState(() => new Date().toISOString().slice(0, 10));
+  const [view, setView]           = useState<View>('summary');
+  const [rows, setRows]           = useState<MirpoRow[]>([]);
+  const [monthly, setMonthly]     = useState<MonthGroup[]>([]);
+  const [yearly, setYearly]       = useState<YearGroup[]>([]);
+  const [summary, setSummary]     = useState<Summary | null>(null);
   const [dateRange, setDateRange] = useState('');
   const [inventoryRecommendations, setInventoryRecommendations] = useState<MirpoItem[]>([]);
   const [expanded, setExpanded]   = useState('');
@@ -153,7 +159,10 @@ export default function MirpoAnalysisPage() {
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const res  = await fetch(`/api/reports/mirpo?period=${period}`);
+      const url = period === 'custom'
+        ? `/api/reports/mirpo?period=custom&from=${customFrom}&to=${customTo}`
+        : `/api/reports/mirpo?period=${period}`;
+      const res  = await fetch(url);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to load MIRPO analysis');
       setRows(data.rows || []);
@@ -167,6 +176,8 @@ export default function MirpoAnalysisPage() {
   }, [period]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  // Re-fetch when custom dates change (only relevant when period === 'custom')
+  useEffect(() => { if (period === 'custom') fetchData(); }, [customFrom, customTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allItems = useMemo(() =>
     rows.flatMap(r => r.items.map(i => ({ ...i, purchaseorder_number: r.purchaseorder_number, po_date: r.date }))),
@@ -206,13 +217,28 @@ export default function MirpoAnalysisPage() {
         </div>
 
         {/* Period selector */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           {PERIODS.map(p => (
             <button key={p.key} onClick={() => setPeriod(p.key)}
               className={`px-4 py-1.5 text-xs font-medium rounded-lg border transition-all ${period === p.key ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--surface-2)] text-[var(--text-3)] border-[var(--border)] hover:bg-[var(--surface-3)]'}`}>
               {p.label}
             </button>
           ))}
+          {period === 'custom' && (
+            <div className="flex items-center gap-2 ml-2">
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                className="px-2 py-1 text-xs bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                style={mono} />
+              <span className="text-[var(--text-4)] text-xs">to</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                className="px-2 py-1 text-xs bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                style={mono} />
+              <button onClick={fetchData} disabled={loading}
+                className="px-3 py-1 text-xs bg-[var(--accent)] text-white rounded-lg border border-[var(--accent)] disabled:opacity-50">
+                Apply
+              </button>
+            </div>
+          )}
         </div>
 
         {/* View tabs */}

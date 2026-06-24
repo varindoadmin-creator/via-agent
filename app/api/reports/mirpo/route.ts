@@ -394,8 +394,13 @@ function groupByYear(rows: MirpoRow[]) {
 
 // ─── Route handler ─────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
-  const period = req.nextUrl.searchParams.get('period') || 'this_year';
-  const { from, to } = getDateRange(period);
+  const period     = req.nextUrl.searchParams.get('period') || 'this_year';
+  const fromParam  = req.nextUrl.searchParams.get('from');
+  const toParam    = req.nextUrl.searchParams.get('to');
+  // Allow caller to pass explicit from/to dates (custom range), overriding the period preset.
+  const { from, to } = (fromParam && toParam)
+    ? { from: fromParam, to: toParam }
+    : getDateRange(period);
 
   try {
     await getZohoAccessToken();
