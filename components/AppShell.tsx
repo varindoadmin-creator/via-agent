@@ -418,7 +418,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // ── Tablet / Desktop layout ────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg)' }}>
-      <aside style={{
+      <aside data-build={_BUILD} style={{
         width: collapsed ? 52 : 210,
         flexShrink: 0, display: 'flex', flexDirection: 'column',
         background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)',
