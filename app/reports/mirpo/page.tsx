@@ -173,11 +173,9 @@ export default function MirpoAnalysisPage() {
       setDateRange(data.from && data.to ? `${data.from} – ${data.to}` : '');
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
-  }, [period]);
+  }, [period, customFrom, customTo]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  // Re-fetch when custom dates change (only relevant when period === 'custom')
-  useEffect(() => { if (period === 'custom') fetchData(); }, [customFrom, customTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allItems = useMemo(() =>
     rows.flatMap(r => r.items.map(i => ({ ...i, purchaseorder_number: r.purchaseorder_number, po_date: r.date }))),
