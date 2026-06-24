@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
+// Baked in at compile time — guarantees a unique client bundle hash on every deploy.
+const _BUILD = process.env.NEXT_PUBLIC_BUILD_TIME;
+
 interface NavItem {
   id: string;
   href: string;
