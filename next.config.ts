@@ -2,6 +2,13 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Each build gets a unique timestamp baked into NEXT_PUBLIC_BUILD_TIME.
+  // This constant is referenced in layout.tsx, so the layout chunk content
+  // changes every build → new layout chunk hash → webpack runtime content
+  // changes → new webpack runtime hash → new URL → CDN always misses.
+  env: {
+    NEXT_PUBLIC_BUILD_TIME: `${Date.now()}`,
+  },
   serverExternalPackages: ['pdfjs-dist', 'canvas'],
   eslint: {
     ignoreDuringBuilds: true,

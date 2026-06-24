@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })();
         ` }} />
       </head>
-      <body className="antialiased">
+      <body className="antialiased" data-v={process.env.NEXT_PUBLIC_BUILD_TIME}>
         <AppShell>{children}</AppShell>
       </body>
     </html>
