@@ -58,6 +58,8 @@ export default function SOApprovalCheckPage() {
   const [details, setDetails] = useState<Record<string, SODetail>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [files, setFiles] = useState<Record<string, File[]>>({});
+  const [customerOverride, setCustomerOverride] = useState<Record<string, string>>({});
+  const [customers, setCustomers] = useState<{ contact_id: string; contact_name: string }[]>([]);
   const [analysis, setAnalysis] = useState<Record<string, Analysis>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -78,7 +80,13 @@ export default function SOApprovalCheckPage() {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch('/api/approvals/so?customers=1')
+      .then(r => r.json())
+      .then(d => { if (d.success) setCustomers(d.customers || []); })
+      .catch(() => {});
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -114,6 +122,7 @@ export default function SOApprovalCheckPage() {
       const fd = new FormData();
       fd.append('salesorder_id', soId);
       selectedFiles.forEach(f => fd.append('files', f));
+      if (customerOverride[soId]) fd.append('customer_name_override', customerOverride[soId]);
       const res = await fetch('/api/approvals/so', { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'AI check failed');
@@ -244,6 +253,17 @@ export default function SOApprovalCheckPage() {
                               <input type="file" multiple accept="image/*,application/pdf,text/plain,text/csv" onChange={e => setFiles(prev => ({ ...prev, [so.salesorder_id]: Array.from(e.target.files || []) }))} style={{ width: '100%', background: 'var(--surface-1)', border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--text-2)', padding: 12 }} />
                               <div style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 8 }}>Supported: WhatsApp screenshots, images, PDFs, text/CSV. VIA reads the proof and compares item + quantity.</div>
                               {(files[so.salesorder_id] || []).length > 0 && <div style={{ marginTop: 10, color: 'var(--text-3)', fontSize: 12 }}>{files[so.salesorder_id].map(f => f.name).join(', ')}</div>}
+                              <div style={{ marginTop: 14 }}>
+                                <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 6 }}>Customer Name <span style={{ color: 'var(--text-4)' }}>(optional — select if proof has no customer info)</span></div>
+                                <select
+                                  value={customerOverride[so.salesorder_id] || ''}
+                                  onChange={e => setCustomerOverride(prev => ({ ...prev, [so.salesorder_id]: e.target.value }))}
+                                  style={{ width: '100%', background: 'var(--surface-1)', border: '1px solid var(--border)', color: customerOverride[so.salesorder_id] ? 'var(--text-1)' : 'var(--text-4)', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none' }}
+                                >
+                                  <option value=''>— auto-detect from proof —</option>
+                                  {customers.map(c => <option key={c.contact_id} value={c.contact_name}>{c.contact_name}</option>)}
+                                </select>
+                              </div>
                               <button onClick={() => checkSO(so.salesorder_id)} disabled={busyId === so.salesorder_id} style={{ marginTop: 12, width: '100%', border: '1px solid rgba(220,113,79,.35)', background: 'var(--accent)', color: 'white', borderRadius: 8, padding: '10px 12px', fontWeight: 700, cursor: 'pointer' }}>{busyId === so.salesorder_id ? 'Checking...' : 'Run VIA Approval Check'}</button>
                             </div>
                           </div>

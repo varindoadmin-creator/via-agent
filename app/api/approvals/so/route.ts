@@ -248,7 +248,7 @@ function findProofQtyForSOItem(analysis: Record<string, unknown>, soItem: SOItem
   return null;
 }
 
-function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<typeof normalizeSO>) {
+function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<typeof normalizeSO>, customerOverride?: string) {
   const analysis = (analysisInput && typeof analysisInput === 'object' ? analysisInput : {}) as Record<string, unknown>;
   const originalRows = Array.isArray(analysis.comparison) ? analysis.comparison as AIComparisonRow[] : [];
 
@@ -298,8 +298,8 @@ function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<type
 
   const aliasCustomer = customerNamesEquivalent(
     so.customer_name,
-    rawCustomerCheck.proof_customer,
-    analysis.proof_text
+    customerOverride || rawCustomerCheck.proof_customer,
+    customerOverride ? customerOverride : analysis.proof_text
   );
 
   const customerCheck = {
@@ -395,6 +395,7 @@ async function callOpenAIForProof(input: {
   textBlocks: string[];
   images: Array<{ mime: string; base64: string; name: string }>;
   pdfs?: Array<{ mime: string; base64: string; name: string }>;
+  customerOverride?: string;
 }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -414,6 +415,10 @@ async function callOpenAIForProof(input: {
     };
   }
 
+  const customerNote = input.customerOverride
+    ? `Customer name provided by user: "${input.customerOverride}". The proof may not show the customer name — treat this as the confirmed proof customer.`
+    : 'Customer alias rule: CASA INTERIOR is the same customer as CASA CIPTA ABADI / CASA CIPTA ABADI, PT.';
+
   const prompt = `You are VIA, an internal order approval checker for Varindo.
 
 Task:
@@ -422,7 +427,7 @@ Task:
 3. Compare the proof against the Zoho Sales Order below.
 4. Be strict and practical. If item code or qty is not clear, mark UNCLEAR. If qty differs, mark MISMATCH. If it matches, mark MATCH.
 5. Return ONLY valid JSON. No markdown.
-6. Customer alias rule: CASA INTERIOR is the same customer as CASA CIPTA ABADI / CASA CIPTA ABADI, PT.
+6. ${customerNote}
 
 Zoho Sales Order:
 ${JSON.stringify(input.so, null, 2)}
@@ -503,6 +508,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, salesorder: so });
     }
 
+    if (searchParams.get('customers') === '1') {
+      const res = await zohoRequest<{ contacts?: Record<string, unknown>[] }>('/contacts', {
+        queryParams: { contact_type: 'customer', status: 'active', per_page: 200, sort_column: 'contact_name', sort_order: 'A' },
+      });
+      const customers = (res.contacts || [])
+        .map(c => ({ contact_id: s(c.contact_id), contact_name: s(c.contact_name) }))
+        .filter(c => c.contact_name);
+      return NextResponse.json({ success: true, customers });
+    }
+
     const response = await zohoRequest<ZohoSalesOrderListResponse>('/salesorders', {
       queryParams: {
         status: 'pending_approval',
@@ -536,6 +551,8 @@ export async function POST(req: NextRequest) {
     const soId = s(formData.get('salesorder_id'));
     if (!soId) return NextResponse.json({ success: false, error: 'salesorder_id is required' }, { status: 400 });
 
+    const customerOverride = s(formData.get('customer_name_override')).trim() || undefined;
+
     const so = await getSODetail(soId);
     const files = formData.getAll('files').filter(Boolean) as File[];
     if (!files.length) return NextResponse.json({ success: false, error: 'Upload at least one proof file.' }, { status: 400 });
@@ -559,7 +576,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const rawAnalysis = await callOpenAIForProof({ so, textBlocks, images, pdfs });
+    const rawAnalysis = await callOpenAIForProof({ so, textBlocks, images, pdfs, customerOverride });
     const proofText = textBlocks.join('\n\n');
     const rawAnalysisWithText = (rawAnalysis && typeof rawAnalysis === 'object' ? rawAnalysis : {}) as Record<string, unknown>;
     rawAnalysisWithText.proof_text = proofText;
@@ -572,7 +589,7 @@ export async function POST(req: NextRequest) {
         })
         .filter(Boolean);
     }
-    const analysis = postProcessApprovalAnalysis(rawAnalysisWithText, so);
+    const analysis = postProcessApprovalAnalysis(rawAnalysisWithText, so, customerOverride);
     console.log('[SO Approval] final analysis', {
       so: so.salesorder_number,
       customer: so.customer_name,
