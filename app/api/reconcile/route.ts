@@ -207,6 +207,47 @@ function parseCsvLine(line: string): string[] {
   return out;
 }
 
+interface StatementPeriod {
+  startMonth: number;
+  startYear: number;
+  endMonth: number;
+  endYear: number;
+}
+
+// Some BCA exports (e.g. "Corporate Account Transaction") only print "DD/MM" in the
+// transaction date column, omitting the year entirely \u2014 the year only appears in a
+// "Periode : DD/MM/YYYY - DD/MM/YYYY" metadata line. Without this, date parsing falls
+// back to JS's ambiguous Date() parsing, which silently produces bogus ~2001 dates \u2014
+// corrupting both the reconciliation hash and the actual Zoho payment date on approval.
+function extractStatementPeriod(text: string): StatementPeriod | null {
+  const m = text.match(
+    /periode\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i,
+  );
+  if (!m) return null;
+  return {
+    startMonth: Number(m[2]),
+    startYear: Number(m[3]),
+    endMonth: Number(m[5]),
+    endYear: Number(m[6]),
+  };
+}
+
+// Resolves a "DD/MM"-only date (no year) against the statement period, and returns
+// a fully-qualified "DD/MM/YYYY" string. Non-matching input is returned unchanged.
+function resolveBareDayMonth(raw: string, period: StatementPeriod | null): string {
+  const bare = raw.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!bare || !period) return raw;
+  const day = bare[1];
+  const month = Number(bare[2]);
+  const year =
+    month === period.startMonth
+      ? period.startYear
+      : month === period.endMonth
+        ? period.endYear
+        : period.endYear;
+  return `${day}/${bare[2]}/${year}`;
+}
+
 function parseCsv(text: string): Record<string, string>[] {
   const normalized = text
     .replace(/^\uFEFF/, "")
@@ -448,8 +489,11 @@ async function upsertReconciliationLedger(
   });
 }
 
-function rowToTransaction(row: Record<string, string>): BankTransaction | null {
-  const date =
+function rowToTransaction(
+  row: Record<string, string>,
+  period: StatementPeriod | null = null,
+): BankTransaction | null {
+  const rawDate =
     findField(row, [
       "tanggal transaksi",
       "date",
@@ -460,6 +504,7 @@ function rowToTransaction(row: Record<string, string>): BankTransaction | null {
     ]) ||
     Object.values(row)[0] ||
     "";
+  const date = resolveBareDayMonth(rawDate, period);
   const description =
     findField(row, [
       "keterangan",
@@ -708,9 +753,10 @@ function makeZohoReferenceNumber(description: unknown, date: unknown): string {
 
 async function runCsvMatch(file: File) {
   const text = await file.text();
+  const period = extractStatementPeriod(text);
   const rows = parseCsv(text);
   const transactions = rows
-    .map(rowToTransaction)
+    .map((row) => rowToTransaction(row, period))
     .filter(Boolean) as BankTransaction[];
   console.log(
     `[Reconcile] CSV rows=${rows.length} incoming=${transactions.length}`,
