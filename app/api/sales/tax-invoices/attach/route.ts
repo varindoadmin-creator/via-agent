@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
 
 // Extract invoice number from PDF buffer using pdfjs-dist
-async function extractInvoiceNumber(buffer: Buffer): Promise<string | null> {
+async function extractInvoiceNumber(buffer: Buffer): Promise<{ invoiceNumber: string | null; debugError?: string }> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
@@ -23,10 +23,10 @@ async function extractInvoiceNumber(buffer: Buffer): Promise<string | null> {
     }
 
     const match = text.match(/Referensi[:\s]+(VFH\/INV-\d+)/);
-    return match ? match[1] : null;
+    return match ? { invoiceNumber: match[1] } : { invoiceNumber: null, debugError: `no match in extracted text (len=${text.length}): ${text.slice(0, 300)}` };
   } catch (e) {
     console.error('[PDF Extract]', e);
-    return null;
+    return { invoiceNumber: null, debugError: e instanceof Error ? `${e.name}: ${e.message}` : String(e) };
   }
 }
 
@@ -58,10 +58,10 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(await file.arrayBuffer());
 
         // Step 1: Extract invoice number from PDF
-        const invoiceNumber = await extractInvoiceNumber(buffer);
+        const { invoiceNumber, debugError } = await extractInvoiceNumber(buffer);
         if (!invoiceNumber) {
           results.push({ filename, invoice_number: null, invoice_id: null, customer_name: null,
-            success: false, error: 'Could not extract invoice number from PDF' });
+            success: false, error: `Could not extract invoice number from PDF${debugError ? ` — ${debugError}` : ''}` });
           continue;
         }
 
