@@ -6,10 +6,14 @@ async function extractInvoiceNumber(buffer: Buffer): Promise<{ invoiceNumber: st
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-    // An empty workerSrc makes pdfjs fall back to a fragile relative require()
-    // for the worker script, which fails to resolve in some deploy layouts.
-    // Resolving it explicitly via require.resolve() is the reliable Node recipe.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+    // pdfjs resolves its worker via an eval'd require(workerSrc), which breaks
+    // once webpack processes the require() path string. Pre-registering the
+    // worker module on globalThis lets pdfjs pick it up directly and skip
+    // path resolution (and workerSrc) entirely — see PDFWorker._mainThreadWorkerMessageHandler.
+    if (!(globalThis as { pdfjsWorker?: unknown }).pdfjsWorker) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = require('pdfjs-dist/legacy/build/pdf.worker.js');
+    }
 
     const doc = await pdfjsLib.getDocument({
       data: new Uint8Array(buffer),
