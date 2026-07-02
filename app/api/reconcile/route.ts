@@ -82,9 +82,12 @@ interface ZohoInvoice {
   balance: number;
 }
 
+// IDR has no meaningful sub-unit — invoices with a sub-Rupiah residual balance
+// (e.g. Rp 0.1 left over from prior payment rounding) are effectively paid and
+// display as "Rp 0", so they must not be treated as open for matching purposes.
 function hasPositiveBalance(inv: { balance?: unknown }): boolean {
   const balance = Number(inv.balance || 0);
-  return Number.isFinite(balance) && balance > 0;
+  return Number.isFinite(balance) && Math.round(balance) > 0;
 }
 
 interface BankTransaction {
@@ -580,9 +583,14 @@ async function fetchOpenInvoices(): Promise<ZohoInvoice[]> {
     zohoGet("/invoices?status=partially_paid&per_page=200"),
   ]);
 
-  return [...(invRes.invoices || []), ...(partialRes.invoices || [])]
-    .map((i: Record<string, unknown>) => ({
-      invoice_id: String(i.invoice_id),
+  const merged = new Map<string, ZohoInvoice>();
+  for (const i of [
+    ...(invRes.invoices || []),
+    ...(partialRes.invoices || []),
+  ] as Record<string, unknown>[]) {
+    const invoiceId = String(i.invoice_id);
+    merged.set(invoiceId, {
+      invoice_id: invoiceId,
       invoice_number: String(i.invoice_number),
       customer_name: String(i.customer_name),
       customer_id: String(i.customer_id),
@@ -590,8 +598,10 @@ async function fetchOpenInvoices(): Promise<ZohoInvoice[]> {
       due_date: String(i.due_date),
       total: parseFloat(String(i.total)) || 0,
       balance: parseFloat(String(i.balance)) || 0,
-    }))
-    .filter((i) => hasPositiveBalance(i));
+    });
+  }
+
+  return Array.from(merged.values()).filter((i) => hasPositiveBalance(i));
 }
 
 function findMultiInvoiceCombinations(
