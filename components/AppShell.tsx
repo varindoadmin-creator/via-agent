@@ -212,7 +212,7 @@ function NavContent({
                         {!collapsed && <span style={{ width: 4, height: 4, borderRadius: '50%', flexShrink: 0, background: active ? 'var(--accent)' : 'var(--sidebar-border)', marginLeft: 2 }} />}
                         {collapsed && <span style={{ fontSize: 11, color: active ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>}
                         {!collapsed && (
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                             <div style={{ fontSize: 12, fontWeight: active ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
                             {soon && <div style={{ fontSize: 9, color: 'var(--sidebar-section)', letterSpacing: '0.08em', fontFamily: 'JetBrains Mono, monospace' }}>SOON</div>}
                           </div>
@@ -258,9 +258,6 @@ function Logo({ collapsed }: { collapsed: boolean }) {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-
-  if (pathname === '/login') return <>{children}</>;
-
 
   const [mode, setMode] = useState<Mode>('desktop');
   const [userCollapsed, setUserCollapsed] = useState(false);
@@ -310,8 +307,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, [collapsed]);
-
-  const signOut = () => fetch('/api/auth/logout', { method: 'POST' }).then(() => { window.location.href = '/login'; });
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
   if (mode === 'mobile') {
@@ -389,21 +384,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClose={() => setMobileOpen(false)}
           />
 
-          <button
-            onClick={signOut}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
-              borderTop: '1px solid var(--sidebar-border)',
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--sidebar-section)', fontSize: 12,
-              fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, width: '100%',
-            }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-section)'}
-          >
-            <span style={{ fontSize: 12 }}>⎋</span>
-            <span>Sign Out</span>
-          </button>
         </aside>
 
         {/* Content */}
@@ -432,24 +412,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onNav={handleNav}
           onToggleSection={handleToggleSection}
         />
-
-        <button
-          onClick={signOut}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: 8, padding: collapsed ? '10px 0' : '10px 14px',
-            borderTop: '1px solid var(--sidebar-border)',
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--sidebar-section)', fontSize: 12,
-            fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, width: '100%',
-          }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-section)'}
-          title="Sign out"
-        >
-          <span style={{ fontSize: 12 }}>⎋</span>
-          {!collapsed && <span>Sign Out</span>}
-        </button>
 
         {mode === 'desktop' && (
           <button
