@@ -6,7 +6,10 @@ async function extractInvoiceNumber(buffer: Buffer): Promise<{ invoiceNumber: st
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    // An empty workerSrc makes pdfjs fall back to a fragile relative require()
+    // for the worker script, which fails to resolve in some deploy layouts.
+    // Resolving it explicitly via require.resolve() is the reliable Node recipe.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
 
     const doc = await pdfjsLib.getDocument({
       data: new Uint8Array(buffer),
