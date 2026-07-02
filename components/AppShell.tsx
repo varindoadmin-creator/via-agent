@@ -83,7 +83,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem } | { type: 'section'; sect
       items: [
         { id: 'sales-report',     href: '/reports/sales',     icon: '○', label: 'Sales'          },
         { id: 'purchases-report', href: '/reports/purchases',  icon: '○', label: 'Purchases'      },
-        { id: 'mirpo-report',     href: '/reports/mirpo',      icon: '○', label: 'MIRPO Analysis' },
       ],
     },
   },
@@ -193,7 +192,7 @@ function NavContent({
                   const active = isActive(item.href);
                   const soon = COMING_SOON.includes(item.href);
                   return (
-                    <div key={item.id} style={{ padding: collapsed ? '0' : '0 6px 0 18px' }}>
+                    <div key={item.id} style={{ padding: collapsed ? '0' : '0 6px' }}>
                       <button
                         onClick={() => { onNav(item.href); onClose?.(); }}
                         disabled={soon}
