@@ -66,7 +66,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem } | { type: 'section'; sect
     type: 'section',
     section: {
       id: 'approvals', label: 'Approvals', icon: '◆',
-      items: [{ id: 'approval-so', href: '/approvals/so', icon: '○', label: 'SO Approval Check' }],
+      items: [{ id: 'approval-so', href: '/approvals/so', icon: '○', label: 'Order Verification' }],
     },
   },
   {

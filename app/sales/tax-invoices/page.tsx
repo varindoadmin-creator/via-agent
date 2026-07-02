@@ -236,7 +236,6 @@ export default function TaxInvoicesPage() {
             <div>
               <div className="text-2xl mb-1">📎</div>
               <div className="text-[var(--text)] text-sm font-medium">Drop Tax Invoice PDFs here or click to upload</div>
-              <div className="text-[var(--text-4)] text-xs mt-1">VIA will extract the invoice number and attach each PDF to its Zoho invoice automatically</div>
             </div>
           )}
         </div>

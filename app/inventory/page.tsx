@@ -263,9 +263,6 @@ export default function InventoryPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--text)] tracking-tight">Inventory</h1>
-            <p className="text-[var(--text-4)] text-sm mt-1">
-              Stock on hand, committed stock, and available-for-sale by location.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             {lastFetched && (

@@ -167,8 +167,7 @@ export default function SOApprovalCheckPage() {
     <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 22 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>SO Approval Check</h1>
-          <p style={{ color: 'var(--text-3)', marginTop: 6, fontSize: 13 }}>Upload customer order proof and let VIA compare item and quantity against Pending Approval Sales Orders.</p>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Order Verification</h1>
         </div>
         <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻ Refresh</button>
       </div>
@@ -195,7 +194,6 @@ export default function SOApprovalCheckPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
           <div>
             <div style={{ color: 'var(--text-1)', fontWeight: 650 }}>Pending Approval Sales Orders</div>
-            <div style={{ color: 'var(--text-4)', fontSize: 12 }}>Click the arrow, upload proof, then run VIA check.</div>
           </div>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
         </div>

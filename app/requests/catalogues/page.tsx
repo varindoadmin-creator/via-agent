@@ -201,7 +201,6 @@ export default function CatalogueRequestsPage() {
         <div className="flex items-start justify-between mb-5">
           <div>
             <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Catalogue Requests</h1>
-            <p className="text-[var(--text-3)] text-sm mt-1">Requests from varindo.co.id — send Varindo product catalogue to customer.</p>
           </div>
           <div className="flex items-center gap-3">
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}

@@ -203,9 +203,7 @@ export default function MirpoAnalysisPage() {
         <div className="flex items-start justify-between mb-5">
           <div>
             <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">MIRPO Analysis</h1>
-            <p className="text-[var(--text-3)] text-sm mt-0.5">
-              Monthly Inventory Replenishment Purchase Orders · {dateRange || 'Loading…'}
-            </p>
+            <p className="text-[var(--text-3)] text-sm mt-0.5">{dateRange || 'Loading…'}</p>
           </div>
           <button onClick={fetchData} disabled={loading}
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50"

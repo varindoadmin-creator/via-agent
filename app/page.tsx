@@ -114,8 +114,8 @@ export default function HomePage() {
       <div style={{ maxWidth: 1500, margin: '0 auto' }}>
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">VIA Dashboard</h1>
-            <p className="text-[var(--muted)] text-sm mt-1">Operational summary · {periodLabel}</p>
+            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Dashboard</h1>
+            <p className="text-[var(--muted)] text-sm mt-1">{periodLabel}</p>
           </div>
           <button
             onClick={loadDashboard}

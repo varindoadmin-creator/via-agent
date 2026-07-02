@@ -343,9 +343,6 @@ export default function InvoicesPage() {
         <div className="flex items-start justify-between mb-5">
           <div>
             <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Invoices</h1>
-            <p className="text-[var(--text-3)] text-sm mt-1">
-              Review draft invoices, check stock readiness, follow up overdue, and print.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}

@@ -369,18 +369,13 @@ export default function ReconcilePage() {
           <h1 className="text-2xl font-bold text-[var(--text)]">
             Bank Reconciliation
           </h1>
-          <p className="text-[var(--text-3)] mt-1">
-            Upload a CSV bank statement, tick the matching invoice, then click
-            Receive Payment. Rows already recorded in VIA/Supabase are hidden
-            automatically.
-          </p>
         </div>
 
         <div className="border border-[var(--border)] rounded-xl p-4 mb-6 bg-[var(--surface)]/40">
           <div className="flex flex-col md:flex-row md:items-end gap-3">
             <div className="flex-1">
               <label className="block text-sm font-medium text-[var(--text-2)] mb-2">
-                Bank Statement CSV
+                Please Upload a Bank Statement
               </label>
               <input
                 ref={fileInputRef}
@@ -389,12 +384,6 @@ export default function ReconcilePage() {
                 onChange={(e) => setFileName(e.target.files?.[0]?.name || "")}
                 className="block w-full text-sm text-[var(--text-2)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:text-white hover:file:bg-[var(--accent-hover)]"
               />
-              <p className="text-xs text-[var(--text-4)] mt-2">
-                For BCA-style statements, VIA focuses on Column D/Jumlah: CR =
-                money in, DB = money out. Only CR transactions are reconciled.
-                If the sender name is different from the invoice customer, VIA
-                still shows invoices with the same amount as possible matches.
-              </p>
             </div>
 
             <button
@@ -402,7 +391,7 @@ export default function ReconcilePage() {
               disabled={loading}
               className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
-              {loading ? "Matching..." : "Upload & Match Invoices"}
+              {loading ? "Matching..." : "Upload"}
             </button>
 
             {selectedPayments.size > 0 && (
@@ -495,8 +484,8 @@ export default function ReconcilePage() {
               Payment Received Results
             </h3>
             <p className="text-xs text-[var(--text-3)] mb-2">
-              Successful or manually received bank rows are saved to Supabase
-              and hidden from this CSV going forward.
+              Processed transactions are recorded and will be automatically
+              excluded from future reconciliations.
             </p>
             {receiveResults.map((r, i) => {
               const rec = r as Record<string, unknown>;
@@ -599,8 +588,7 @@ export default function ReconcilePage() {
                               Manual Zoho payment already recorded?
                             </span>{" "}
                             Tick the checkbox on the row and click Mark Bank Row
-                            as Received. VIA will save the row hash to Supabase
-                            and hide it next time.
+                            as Received.
                           </div>
                         </div>
 
