@@ -203,6 +203,43 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Approved SOs mode
+  if (mode === 'approved') {
+    try {
+      const token = await getZohoAccessToken();
+      const base = getZohoApiBaseUrl();
+      const orgId = getZohoOrgId();
+      const res = await fetch(`${base}/salesorders?status=approved&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      });
+      const data = await res.json();
+      return NextResponse.json({ success: true, salesorders: data.salesorders || [] });
+    } catch (err) {
+      return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+    }
+  }
+
+  // Mark approved SO as confirmed
+  if (mode === 'mark_confirmed') {
+    const soId = searchParams.get('id');
+    if (!soId) return NextResponse.json({ error: 'id required' }, { status: 400 });
+    try {
+      const token = await getZohoAccessToken();
+      const base = getZohoApiBaseUrl();
+      const orgId = getZohoOrgId();
+      const res = await fetch(`${base}/salesorders/${soId}/status/confirmed?organization_id=${orgId}`, {
+        method: 'POST',
+        headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok && data.code !== 0) throw new Error(`Zoho ${res.status}: ${data.message}`);
+      return NextResponse.json({ success: true, message: data.message });
+    } catch (err) {
+      return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+    }
+  }
+
   // SO detail mode — returns line items with packed quantities
   if (mode === 'so_detail') {
     const soId = searchParams.get('id');

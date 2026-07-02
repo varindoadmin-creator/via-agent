@@ -134,8 +134,8 @@ function StatusBadge({ label, type }: { label: string; type: 'success' | 'warnin
   return <span className={'via-badge border text-xs ' + styles[type]}>{label}</span>;
 }
 
-function TableShell({ title, desc, count, loading, search, onSearch, extra, children }: {
-  title: string; desc: string; count?: number; loading: boolean;
+function TableShell({ title, count, loading, search, onSearch, extra, children }: {
+  title: string; count?: number; loading: boolean;
   search?: string; onSearch?: (v: string) => void;
   extra?: React.ReactNode; children: React.ReactNode;
 }) {
@@ -144,7 +144,6 @@ function TableShell({ title, desc, count, loading, search, onSearch, extra, chil
       <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
-          <p className="text-[var(--text-3)] text-xs mt-0.5">{desc}</p>
         </div>
         <div className="flex items-center gap-3">
           {!loading && count !== undefined && (
@@ -255,7 +254,7 @@ function PendingApprovalSOTable() {
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
   return (
-    <TableShell title="Pending Approval" desc="SOs submitted for approval — review items and tick to approve"
+    <TableShell title="Pending Approval"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={handleApprove} disabled={approving}
@@ -365,6 +364,129 @@ function PendingApprovalSOTable() {
   );
 }
 
+// ─── Table -0.5: Approved SOs ────────────────────────────────────────────────
+
+function ApprovedSOTable() {
+  const [items, setItems] = useState<DraftSO[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [confirmResults, setConfirmResults] = useState<{number: string; success: boolean; error?: string}[]>([]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const res = await fetch('/api/shipments?mode=approved');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setItems(data.salesorders || []);
+    } catch(e) { setError(String(e)); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return items.filter(i => !q || i.salesorder_number.toLowerCase().includes(q) || i.customer_name.toLowerCase().includes(q));
+  }, [items, search]);
+
+  async function handleMarkConfirmed() {
+    if (!selected.size) return;
+    setConfirming(true); setConfirmResults([]);
+    const results: {number: string; success: boolean; error?: string}[] = [];
+    for (const soId of selected) {
+      const item = items.find(i => i.salesorder_id === soId);
+      try {
+        const res = await fetch(`/api/shipments?mode=mark_confirmed&id=${soId}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        results.push({ number: item?.salesorder_number || soId, success: true });
+      } catch(e) {
+        results.push({ number: item?.salesorder_number || soId, success: false, error: String(e) });
+      }
+    }
+    setConfirmResults(results);
+    setSelected(new Set());
+    await fetchData();
+    setConfirming(false);
+  }
+
+  const mono = { fontFamily: 'JetBrains Mono, monospace' };
+
+  return (
+    <TableShell title="Approved"
+      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
+      extra={selected.size > 0 ? (
+        <button onClick={handleMarkConfirmed} disabled={confirming}
+          className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+          {confirming ? 'Confirming…' : `✓ Mark as Confirmed (${selected.size})`}
+        </button>
+      ) : undefined}>
+      {loading && <LoadingSkeleton />}
+      {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
+      {confirmResults.length > 0 && (
+        <div className="px-5 py-3 border-b border-[var(--border)] space-y-1">
+          {confirmResults.map((r, i) => (
+            <div key={i} className={`text-xs flex gap-2 ${r.success ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
+              <span>{r.success ? '✓' : '✗'}</span>
+              <span style={mono} className="font-medium">{r.number}</span>
+              <span>{r.success ? 'Confirmed' : r.error}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {!loading && !error && filtered.length === 0 && <EmptyState icon="✓" msg="No approved sales orders." />}
+      {!loading && !error && filtered.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="via-table">
+            <thead><tr>
+              <th className="w-8">
+                <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                  checked={selected.size === filtered.length && filtered.length > 0}
+                  onChange={() => selected.size === filtered.length ? setSelected(new Set()) : setSelected(new Set(filtered.map(i => i.salesorder_id)))} />
+              </th>
+              <th>SO Number</th><th>Customer</th><th>Date</th>
+              <th className="text-right">Aging</th><th>Location</th>
+              <th>Salesperson</th><th className="text-right">Total</th>
+            </tr></thead>
+            <tbody>
+              {filtered.map(item => {
+                const ageDays = Math.floor((Date.now() - new Date(item.created_time || item.date).getTime()) / 86400000);
+                const ageColor = ageDays >= 7 ? 'var(--danger)' : ageDays >= 3 ? 'var(--warning)' : 'var(--text-4)';
+                return (
+                  <tr key={item.salesorder_id} className={`transition-colors ${selected.has(item.salesorder_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}>
+                    <td onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                        checked={selected.has(item.salesorder_id)}
+                        onChange={() => setSelected(prev => { const n = new Set(prev); n.has(item.salesorder_id) ? n.delete(item.salesorder_id) : n.add(item.salesorder_id); return n; })} />
+                    </td>
+                    <td className="text-[var(--accent-text)] text-xs font-medium" style={mono}>{item.salesorder_number}</td>
+                    <td className="text-[var(--text)] text-xs font-medium max-w-[160px] truncate" title={item.customer_name}>{item.customer_name}</td>
+                    <td className="text-[var(--text-3)] text-xs">{item.date}</td>
+                    <td className="text-right"><span style={{ ...mono, fontSize:12, fontWeight:700, color:ageColor }}>{ageDays}d</span></td>
+                    <td className="text-[var(--text-3)] text-xs">{item.location_name||'—'}</td>
+                    <td className="text-[var(--text-3)] text-xs">{item.salesperson_name||'—'}</td>
+                    <td className="text-right text-[var(--text-2)] text-xs" style={mono}>{formatRp(item.total)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot style={{ borderTop:'1px solid var(--border)', background:'var(--surface-2)' }}>
+              <tr>
+                <td colSpan={7} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>TOTAL ({filtered.length} SOs)</td>
+                <td style={{ padding:'7px 12px', textAlign:'right', ...mono, color:'var(--text)', fontWeight:700 }}>{formatRp(filtered.reduce((s,i)=>s+i.total,0))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </TableShell>
+  );
+}
+
 // ─── Table 0: Draft ─────────────────────────────────────────────
 
 function DraftSOTable() {
@@ -438,7 +560,7 @@ function DraftSOTable() {
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
   return (
-    <TableShell title="Draft" desc="Draft SOs awaiting approval — tick to approve"
+    <TableShell title="Draft"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={handleApprove} disabled={approving}
@@ -608,7 +730,7 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
   }, [items, search]);
 
   return (
-    <TableShell title="Confirmed — Not Packaged" desc="Confirmed SOs not yet packaged"
+    <TableShell title="Confirmed — Not Packaged"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}>
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
@@ -747,7 +869,7 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
   }
 
   return (
-    <TableShell title="Shipment In-Transit" desc="SOs with active shipments in transit"
+    <TableShell title="Shipment In-Transit"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}>
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
@@ -983,7 +1105,6 @@ function DeliveredTable({ items, loading, error, onConverted }: {
 
   return (
     <TableShell title="Shipment Delivered — Not Invoiced"
-      desc="All shipments delivered. ✅ = ready to invoice. ⚠ = partially delivered, waiting for remaining shipments."
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={() => setShowConfirm(true)} disabled={converting}
@@ -1254,9 +1375,6 @@ export default function ShipmentsPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Sales Orders</h1>
-            <p className="text-[var(--text-3)] text-sm mt-1">
-              Track confirmed orders, active deliveries, and convert delivered orders to invoices.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             {lastRefreshed && (
@@ -1310,6 +1428,7 @@ export default function ShipmentsPage() {
         <div className="space-y-6">
           <DraftSOTable />
           <PendingApprovalSOTable />
+          <ApprovedSOTable />
           <NotReadyTable items={notReady} loading={loading} error={error} />
           <PendingDeliveryTable items={pending} loading={loading} error={error} />
           <DeliveredTable items={delivered} loading={loading} error={error} onConverted={handleConverted} />
