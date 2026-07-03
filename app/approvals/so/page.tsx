@@ -198,7 +198,7 @@ export default function SOApprovalCheckPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
