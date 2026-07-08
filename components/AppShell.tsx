@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, Landmark, BarChart2, Circle,
+  ClipboardCheck, Landmark, BarChart2, Circle, Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -26,6 +26,7 @@ interface NavSection {
 
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon } } | { type: 'section'; section: NavSection }> = [
   { type: 'standalone', item: { id: 'chat', href: '/', icon: LayoutDashboard, label: 'Dashboard' } },
+  { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' } },
   {
     type: 'section',
     section: {
