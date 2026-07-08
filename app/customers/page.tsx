@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import CustomerCleanupModal from '@/components/CustomerCleanupModal';
+import MissingAddressModal from '@/components/MissingAddressModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -430,8 +432,8 @@ function EditablePhone({ contactId, value, email }: {
   );
 }
 
-function CustomerTable({ title, desc, customers, loading, search, showActivity, showInactive, emptyIcon, emptyMsg, selectedIds, onToggleSelect }: {
-  title: string; desc: string; customers: Customer[];
+function CustomerTable({ title, customers, loading, search, showActivity, showInactive, emptyIcon, emptyMsg, selectedIds, onToggleSelect }: {
+  title: string; customers: Customer[];
   loading: boolean; search: string;
   showActivity: boolean; showInactive: boolean;
   emptyIcon: string; emptyMsg: string;
@@ -485,7 +487,6 @@ function CustomerTable({ title, desc, customers, loading, search, showActivity, 
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
-          <p className="text-[var(--text-3)] text-xs mt-0.5">{desc}</p>
         </div>
         {!loading && <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} customers</span>}
       </div>
@@ -675,6 +676,8 @@ export default function CustomersPage() {
   const [total, setTotal] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [printing, setPrinting] = useState(false);
+  const [showCleanupModal, setShowCleanupModal] = useState(false);
+  const [showMissingAddressModal, setShowMissingAddressModal] = useState(false);
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -787,12 +790,31 @@ export default function CustomersPage() {
                 {printing ? '…' : `🖨 Print Labels (${selectedIds.size})`}
               </button>
             )}
+            <button onClick={() => setShowMissingAddressModal(true)}
+              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors">
+              📋 Missing Address
+            </button>
+            <button onClick={() => setShowCleanupModal(true)}
+              className="px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors">
+              🧹 Repair Data
+            </button>
             <button onClick={() => setShowAddModal(true)}
               className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors flex items-center gap-1.5">
               <span>+</span> New Customer
             </button>
           </div>
         </div>
+
+        {showCleanupModal && (
+          <CustomerCleanupModal
+            onClose={() => setShowCleanupModal(false)}
+            onApplied={fetchAll}
+          />
+        )}
+
+        {showMissingAddressModal && (
+          <MissingAddressModal onClose={() => setShowMissingAddressModal(false)} />
+        )}
 
         {/* Summary cards */}
         <div className="grid grid-cols-4 gap-3 mb-5">
@@ -820,7 +842,7 @@ export default function CustomersPage() {
         {/* Search */}
         <div className="mb-5">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search customer name, company, mobile, region, tier…"
+            placeholder="Search customers"
             className="via-input text-xs py-1.5 px-3 w-80" />
         </div>
 
@@ -828,7 +850,6 @@ export default function CustomersPage() {
         <div className="space-y-6">
           <CustomerTable
             title="New Customers"
-            desc="Created in the last 7 days"
             customers={newCustomers} loading={loading} search={search}
             showActivity={false} showInactive={false}
             emptyIcon="○" emptyMsg="No new customers in the last 7 days."
@@ -836,7 +857,6 @@ export default function CustomersPage() {
           />
           <CustomerTable
             title="Active Customers"
-            desc="At least one Sales Order in the last 90 days — sorted by revenue"
             customers={activeCustomers} loading={loading} search={search}
             showActivity={true} showInactive={false}
             emptyIcon="○" emptyMsg="No active customers found."
@@ -844,7 +864,6 @@ export default function CustomersPage() {
           />
           <CustomerTable
             title="Inactive Customers"
-            desc="No Sales Orders for 90+ days — sorted by most recently active first"
             customers={inactiveCustomers} loading={loading} search={search}
             showActivity={false} showInactive={true}
             emptyIcon="○" emptyMsg="No inactive customers. Everyone is buying!"
