@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 async function zohoGet(path: string) {
   const token = await getZohoAccessToken();
@@ -10,7 +11,7 @@ async function zohoGet(path: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
+    const res = await fetchWithRetry(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
     const body = await res.json();
     if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
     return body;
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/salesorders?status=pending_approval&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/salesorders?status=pending_approval&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -172,7 +173,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/salesorders?status=draft&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/salesorders?status=draft&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -190,7 +191,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/salesorders/${soId}/approve?organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/salesorders/${soId}/approve?organization_id=${orgId}`, {
         method: 'POST',
         headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -209,7 +210,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/salesorders?status=approved&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/salesorders?status=approved&per_page=200&sort_column=date&sort_order=D&organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -227,7 +228,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/salesorders/${soId}/status/confirmed?organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/salesorders/${soId}/status/confirmed?organization_id=${orgId}`, {
         method: 'POST',
         headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -248,7 +249,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/salesorders/${soId}?organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/salesorders/${soId}?organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -481,6 +482,25 @@ export async function GET(request: NextRequest) {
             allDelivered = false;
           }
 
+          // A shipment can be marked "delivered" while only partially fulfilling a line
+          // item's ordered quantity (the rest still backordered) — Ready must mean every
+          // item's full quantity was actually packed/delivered, not just that whatever
+          // shipped has arrived.
+          if (allDelivered) {
+            const lineItems = (so.line_items || []) as Record<string, unknown>[];
+            if (lineItems.length === 0) {
+              allDelivered = false;
+            } else {
+              for (const li of lineItems) {
+                const qty = Number(li.quantity) || 0;
+                const packed = li.quantity_packed !== undefined
+                  ? Number(li.quantity_packed)
+                  : (li.quantity_shipped !== undefined ? Number(li.quantity_shipped) : 0);
+                if (packed < qty) { allDelivered = false; break; }
+              }
+            }
+          }
+
           // Total shipments = count of unique shipment_ids across all SO packages
           const allShipIds = new Set<string>();
           for (const s of deliveredShips) allShipIds.add(String(s.shipment_id));
@@ -597,7 +617,7 @@ export async function POST(request: NextRequest) {
         const orgId = getZohoOrgId();
         const url = base + '/invoices/fromsalesorder?salesorder_id=' + soId + '&organization_id=' + orgId;
 
-        const convertRes = await fetch(url, {
+        const convertRes = await fetchWithRetry(url, {
           method: 'POST',
           headers: {
             Authorization: 'Zoho-oauthtoken ' + token,

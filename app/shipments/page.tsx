@@ -3,6 +3,7 @@
 import React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SOStockCheckTable } from './stock-check-table';
+import { CopyWAButton } from '@/components/CopyWAButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -374,6 +375,9 @@ function ApprovedSOTable() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [confirmResults, setConfirmResults] = useState<{number: string; success: boolean; error?: string}[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [soLineItems, setSoLineItems] = useState<Record<string, Array<{name: string; quantity: number; unit: string; rate: number; item_total: number; location_name: string}>>>({});
+  const [loadingLines, setLoadingLines] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
@@ -392,6 +396,19 @@ function ApprovedSOTable() {
     const q = search.toLowerCase();
     return items.filter(i => !q || i.salesorder_number.toLowerCase().includes(q) || i.customer_name.toLowerCase().includes(q));
   }, [items, search]);
+
+  async function toggleExpand(id: string, soId: string) {
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    if (!soLineItems[id]) {
+      setLoadingLines(prev => new Set(prev).add(id));
+      try {
+        const res = await fetch('/api/shipments?mode=so_detail&id=' + soId);
+        const data = await res.json();
+        if (data.line_items) setSoLineItems(prev => ({ ...prev, [id]: data.line_items }));
+      } catch { /* ignore */ }
+      finally { setLoadingLines(prev => { const n = new Set(prev); n.delete(id); return n; }); }
+    }
+  }
 
   async function handleMarkConfirmed() {
     if (!selected.size) return;
@@ -448,35 +465,90 @@ function ApprovedSOTable() {
                   checked={selected.size === filtered.length && filtered.length > 0}
                   onChange={() => selected.size === filtered.length ? setSelected(new Set()) : setSelected(new Set(filtered.map(i => i.salesorder_id)))} />
               </th>
+              <th className="w-8"></th>
               <th>SO Number</th><th>Customer</th><th>Date</th>
               <th className="text-right">Aging</th><th>Location</th>
               <th>Salesperson</th><th className="text-right">Total</th>
             </tr></thead>
             <tbody>
               {filtered.map(item => {
+                const exp = expanded.has(item.salesorder_id);
                 const ageDays = Math.floor((Date.now() - new Date(item.created_time || item.date).getTime()) / 86400000);
                 const ageColor = ageDays >= 7 ? 'var(--danger)' : ageDays >= 3 ? 'var(--warning)' : 'var(--text-4)';
                 return (
-                  <tr key={item.salesorder_id} className={`transition-colors ${selected.has(item.salesorder_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}>
-                    <td onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                        checked={selected.has(item.salesorder_id)}
-                        onChange={() => setSelected(prev => { const n = new Set(prev); n.has(item.salesorder_id) ? n.delete(item.salesorder_id) : n.add(item.salesorder_id); return n; })} />
-                    </td>
-                    <td className="text-[var(--accent-text)] text-xs font-medium" style={mono}>{item.salesorder_number}</td>
-                    <td className="text-[var(--text)] text-xs font-medium max-w-[160px] truncate" title={item.customer_name}>{item.customer_name}</td>
-                    <td className="text-[var(--text-3)] text-xs">{item.date}</td>
-                    <td className="text-right"><span style={{ ...mono, fontSize:12, fontWeight:700, color:ageColor }}>{ageDays}d</span></td>
-                    <td className="text-[var(--text-3)] text-xs">{item.location_name||'—'}</td>
-                    <td className="text-[var(--text-3)] text-xs">{item.salesperson_name||'—'}</td>
-                    <td className="text-right text-[var(--text-2)] text-xs" style={mono}>{formatRp(item.total)}</td>
-                  </tr>
+                  <React.Fragment key={item.salesorder_id}>
+                    <tr className={`transition-colors ${selected.has(item.salesorder_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}>
+                      <td onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                          checked={selected.has(item.salesorder_id)}
+                          onChange={() => setSelected(prev => { const n = new Set(prev); n.has(item.salesorder_id) ? n.delete(item.salesorder_id) : n.add(item.salesorder_id); return n; })} />
+                      </td>
+                      <td className="text-center text-[var(--text-4)] text-xs select-none cursor-pointer w-8"
+                        onClick={() => toggleExpand(item.salesorder_id, item.salesorder_id)}>
+                        {exp ? '▾' : '▸'}
+                      </td>
+                      <td className="text-[var(--accent-text)] text-xs font-medium" style={mono}>{item.salesorder_number}</td>
+                      <td className="text-[var(--text)] text-xs font-medium max-w-[160px] truncate" title={item.customer_name}>{item.customer_name}</td>
+                      <td className="text-[var(--text-3)] text-xs">{item.date}</td>
+                      <td className="text-right"><span style={{ ...mono, fontSize:12, fontWeight:700, color:ageColor }}>{ageDays}d</span></td>
+                      <td className="text-[var(--text-3)] text-xs">{item.location_name||'—'}</td>
+                      <td className="text-[var(--text-3)] text-xs">{item.salesperson_name||'—'}</td>
+                      <td className="text-right text-[var(--text-2)] text-xs" style={mono}>{formatRp(item.total)}</td>
+                    </tr>
+                    {exp && (
+                      <tr>
+                        <td colSpan={9} className="p-0">
+                          <div className="bg-[var(--surface-2)] px-6 py-4">
+                            <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-2" style={mono}>Items</div>
+                            {loadingLines.has(item.salesorder_id) ? (
+                              <div className="text-[var(--text-4)] text-xs animate-pulse">Loading…</div>
+                            ) : soLineItems[item.salesorder_id] ? (
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                <thead>
+                                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                    {['Item', 'SKU', 'Location', 'Qty', 'Rate', 'Total'].map((h, i) => (
+                                      <th key={i} style={{ padding: '4px 10px', textAlign: i >= 3 ? 'right' : 'left',
+                                        color: 'var(--text-4)', fontWeight: 500, fontSize: 10, textTransform: 'uppercase' }}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {soLineItems[item.salesorder_id].map((li, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={li.name}>{li.name}</td>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text-3)', fontSize: 11, ...mono }}>{(li as Record<string, unknown>).sku as string || '—'}</td>
+                                      <td style={{ padding: '6px 10px', color: 'var(--text-3)', fontSize: 11 }}>{li.location_name || '—'}</td>
+                                      <td style={{ padding: '6px 10px', textAlign: 'right', ...mono, color: 'var(--text-2)' }}>{li.quantity} {li.unit}</td>
+                                      <td style={{ padding: '6px 10px', textAlign: 'right', ...mono, color: 'var(--text-3)' }}>
+                                        {formatRp((li as Record<string, unknown>).rate as number || 0)}
+                                      </td>
+                                      <td style={{ padding: '6px 10px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontWeight: 600 }}>
+                                        {formatRp((li as Record<string, unknown>).item_total as number || 0)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-3)' }}>
+                                  <tr>
+                                    <td colSpan={5} style={{ padding: '6px 10px', color: 'var(--text-3)', fontSize: 11, ...mono }}>SUBTOTAL</td>
+                                    <td style={{ padding: '6px 10px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 700 }}>
+                                      {formatRp(item.total)}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            ) : <div className="text-[var(--text-4)] text-xs animate-pulse">Loading…</div>}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
             <tfoot style={{ borderTop:'1px solid var(--border)', background:'var(--surface-2)' }}>
               <tr>
-                <td colSpan={7} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>TOTAL ({filtered.length} SOs)</td>
+                <td colSpan={8} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>TOTAL ({filtered.length} SOs)</td>
                 <td style={{ padding:'7px 12px', textAlign:'right', ...mono, color:'var(--text)', fontWeight:700 }}>{formatRp(filtered.reduce((s,i)=>s+i.total,0))}</td>
               </tr>
             </tfoot>
@@ -536,6 +608,13 @@ function DraftSOTable() {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
+  function buildFollowUpMessage() {
+    const lines = items
+      .filter(i => selected.has(i.salesorder_id))
+      .map((i, idx) => `${idx + 1}. ${i.salesorder_number} - ${i.customer_name}`);
+    return `Follow-Up SO Draft\n\n${lines.join('\n')}`;
+  }
+
   async function handleApprove() {
     if (!selected.size) return;
     setApproving(true); setApproveResults([]);
@@ -563,10 +642,13 @@ function DraftSOTable() {
     <TableShell title="Draft"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
-        <button onClick={handleApprove} disabled={approving}
-          className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
-          {approving ? 'Approving…' : `✓ Approve (${selected.size})`}
-        </button>
+        <div className="flex items-center gap-2">
+          <CopyWAButton message={buildFollowUpMessage()} label={`Follow Up (${selected.size})`} />
+          <button onClick={handleApprove} disabled={approving}
+            className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+            {approving ? 'Approving…' : `✓ Approve (${selected.size})`}
+          </button>
+        </div>
       ) : undefined}>
 
       {loading && <LoadingSkeleton />}

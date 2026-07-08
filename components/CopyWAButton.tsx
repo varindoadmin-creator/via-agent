@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 
-export function CopyWAButton({ message }: { message: string }) {
+export function CopyWAButton({ message, label = 'Copy WA Message' }: { message: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy(e: React.MouseEvent) {
@@ -21,7 +21,7 @@ export function CopyWAButton({ message }: { message: string }) {
           : 'bg-[var(--surface-3)] text-[var(--text-3)] border-[var(--border)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]'
       }`}
     >
-      {copied ? '✓ Copied!' : '📋 Copy WA Message'}
+      {copied ? '✓ Copied!' : `📋 ${label}`}
     </button>
   );
 }
