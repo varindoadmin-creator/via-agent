@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     const base = getZohoApiBaseUrl();
     const orgId = getZohoOrgId();
 
-    const res = await fetch(`${base}/purchaseorders/${poId}?organization_id=${orgId}`, {
+    const res = await fetchWithRetry(`${base}/purchaseorders/${poId}?organization_id=${orgId}`, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
     const data = await res.json();

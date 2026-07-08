@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, unlink, mkdir } from 'fs/promises';
@@ -14,7 +15,7 @@ async function fetchInvoicePdf(invoiceId: string): Promise<Buffer> {
   const token = await getZohoAccessToken();
   const base = getZohoApiBaseUrl();
   const url = `${base}/invoices/${invoiceId}?accept=pdf&organization_id=${ORG_ID()}`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
   if (!res.ok) throw new Error(`PDF fetch failed: ${res.status}`);

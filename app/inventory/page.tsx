@@ -7,7 +7,7 @@ const LOCATIONS = ['HEAD OFFICE', 'HUB-BDG', 'HUB-MDN'] as const;
 type Location = typeof LOCATIONS[number];
 
 const LOCATION_META: Record<Location, { label: string; city: string; color: string; border: string }> = {
-  'HEAD OFFICE': { label: 'Head Office',  city: 'Tangerang',  color: 'text-[var(--accent)]',   border: 'border-blue-900/50' },
+  'HEAD OFFICE': { label: 'Head Office',  city: 'Tangerang',  color: 'text-[var(--accent)]',   border: 'border-[var(--accent-border)]' },
   'HUB-BDG':    { label: 'Hub Bandung',   city: 'Bandung',    color: 'text-[var(--info)]',    border: 'border-[var(--border)]' },
   'HUB-MDN':    { label: 'Hub Medan',     city: 'Medan',      color: 'text-[var(--success)]', border: 'border-[var(--border)]' },
 };
@@ -33,7 +33,7 @@ interface LocationSort { field: SortField; dir: SortDir; }
 function formatNum(n: number) { return n.toLocaleString('id-ID'); }
 
 function SortIcon({ field, sort }: { field: SortField; sort: LocationSort }) {
-  if (sort.field !== field) return <span className="text-gray-700 ml-1">↕</span>;
+  if (sort.field !== field) return <span className="text-[var(--text-4)] ml-1">↕</span>;
   return <span className="text-[var(--accent)] ml-1">{sort.dir === 'asc' ? '↑' : '↓'}</span>;
 }
 
@@ -75,7 +75,7 @@ function LocationTable({
   const tdClass = "px-3 py-2.5 text-sm";
 
   return (
-    <div className={`rounded-xl border ${meta.border}  overflow-hidden`}>
+    <div className={`rounded-xl border ${meta.border} bg-[var(--surface)] overflow-hidden`}>
       {/* Table header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-3">
@@ -85,7 +85,7 @@ function LocationTable({
           </div>
           <div className="text-[var(--text-4)] text-xs">{meta.city}</div>
           {!loading && (
-            <div className="text-xs px-2 py-0.5 rounded-full  text-[var(--text-3)]">
+            <div className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--text-3)]">
               {items.length} items
             </div>
           )}
@@ -104,12 +104,12 @@ function LocationTable({
         <div className="p-4 space-y-2">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex gap-4 animate-pulse">
-              <div className="h-4  rounded w-24" />
-              <div className="h-4  rounded flex-1" />
-              <div className="h-4  rounded w-16" />
-              <div className="h-4  rounded w-16" />
-              <div className="h-4  rounded w-16" />
-              <div className="h-4  rounded w-16" />
+              <div className="h-4 bg-[var(--surface-3)] rounded w-24" />
+              <div className="h-4 bg-[var(--surface-3)] rounded flex-1" />
+              <div className="h-4 bg-[var(--surface-3)] rounded w-16" />
+              <div className="h-4 bg-[var(--surface-3)] rounded w-16" />
+              <div className="h-4 bg-[var(--surface-3)] rounded w-16" />
+              <div className="h-4 bg-[var(--surface-3)] rounded w-16" />
             </div>
           ))}
         </div>
@@ -127,7 +127,7 @@ function LocationTable({
       {!loading && items.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="">
+            <thead>
               <tr className="text-[var(--text-4)] border-b border-[var(--border)]">
                 <th className={thClass} onClick={() => toggleSort('item_code')}>
                   Item Code <SortIcon field="item_code" sort={sort} />
@@ -152,13 +152,13 @@ function LocationTable({
             <tbody className="divide-y divide-[var(--border-muted)]">
               {sorted.map((item, idx) => (
                 <tr key={`${item.item_id}-${idx}`}
-                  className="hover:/30 transition-colors group">
+                  className="hover:bg-[var(--surface-2)] transition-colors group">
                   <td className={`${tdClass} font-mono text-[var(--accent)] text-xs`}>{item.item_code}</td>
                   <td className={`${tdClass} text-[var(--text-2)] max-w-xs`}>
                     <div className="truncate" title={item.item_name}>{item.item_name}</div>
                   </td>
                   <td className={tdClass}>
-                    <span className="text-xs px-1.5 py-0.5 rounded  text-[var(--text-3)] font-mono">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-3)] font-mono">
                       {item.brand}
                     </span>
                   </td>
@@ -176,7 +176,7 @@ function LocationTable({
               ))}
             </tbody>
             {/* Totals footer */}
-            <tfoot className="border-t border-[var(--border)] ">
+            <tfoot className="border-t border-[var(--border)] bg-[var(--surface-2)]">
               <tr className="text-xs font-medium">
                 <td className="px-3 py-2.5 text-[var(--text-4)] font-mono" colSpan={3}>TOTAL</td>
                 <td className="px-3 py-2.5 text-right font-mono text-[var(--text-2)]">{formatNum(totals.stock)}</td>
@@ -255,7 +255,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className=" text-[var(--text)] p-6 pb-24 min-h-full"
+    <div className="bg-[var(--bg)] text-[var(--text)] p-6 pb-24 min-h-full"
       style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="max-w-7xl mx-auto">
 
@@ -271,7 +271,7 @@ export default function InventoryPage() {
               </span>
             )}
             <button onClick={() => fetchInventory(brand, search, true)} disabled={loading}
-              className="px-3 py-1.5 text-xs  hover:bg-[#222840] text-[var(--text-3)] hover:text-[var(--text-2)] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
+              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text-2)] border border-[var(--border)] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
               <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
               Refresh
             </button>
@@ -284,12 +284,12 @@ export default function InventoryPage() {
           <div className="flex items-center gap-2">
             <span className="text-[var(--text-4)] text-xs uppercase tracking-wider"
               style={{ fontFamily: "'DM Mono', monospace" }}>Brand</span>
-            <div className="flex items-center gap-1  border border-[var(--border)] rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg p-1">
               {BRANDS.map(b => (
                 <button key={b} onClick={() => handleBrandChange(b)}
                   className={`px-3 py-1 text-xs rounded-md transition-all font-medium
                     ${brand === b
-                      ? ' text-[var(--text)] shadow-sm'
+                      ? 'bg-[var(--surface)] text-[var(--text)] shadow-sm'
                       : 'text-[var(--text-4)] hover:text-[var(--text-2)]'
                     }`}>
                   {b === 'All Brands' ? 'All' : b}
@@ -307,7 +307,7 @@ export default function InventoryPage() {
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
                 placeholder="Search item code, name, brand…"
-                className="pl-8 pr-8 py-1.5 text-sm  border border-[var(--border)] rounded-lg text-[var(--text)] placeholder-gray-600 focus:outline-none focus:border-[var(--accent)] w-64"
+                className="pl-8 pr-8 py-1.5 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--text)] placeholder-[var(--text-4)] focus:outline-none focus:border-[var(--accent)] w-64"
                 style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px' }}
               />
               {searchInput && (
@@ -316,7 +316,7 @@ export default function InventoryPage() {
               )}
             </div>
             <button type="submit"
-              className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-[var(--text)] rounded-lg transition-colors">
+              className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors">
               Search
             </button>
           </form>
@@ -335,7 +335,7 @@ export default function InventoryPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-5 p-3 bg-[var(--danger-bg)] border border-red-900/50 rounded-lg text-[var(--danger)] text-sm">
+          <div className="mb-5 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-sm">
             {error}
           </div>
         )}

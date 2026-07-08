@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 async function zohoGet(path: string) {
   const token = await getZohoAccessToken();
@@ -10,7 +11,7 @@ async function zohoGet(path: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
+    const res = await fetchWithRetry(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
     const body = await res.json();
     if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
     return body;
@@ -264,7 +265,7 @@ export async function POST(request: NextRequest) {
         const base = getZohoApiBaseUrl();
         const orgId = getZohoOrgId();
         const url = `${base}/invoices/${invId}/status/sent?organization_id=${orgId}`;
-        const res = await fetch(url, {
+        const res = await fetchWithRetry(url, {
           method: 'POST',
           headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({}),

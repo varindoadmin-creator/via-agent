@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   // 1. Plain fetch page 1
   const url1 = `${base}/items?per_page=5&page=1&organization_id=${orgId}`;
-  const res1 = await fetch(url1, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
+  const res1 = await fetchWithRetry(url1, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
   const data1 = await res1.json();
   results.plain_fetch = {
     count: data1.items?.length,
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
   // 2. Search fetch
   if (search) {
     const url2 = `${base}/items?per_page=5&page=1&search_text=${encodeURIComponent(search)}&organization_id=${orgId}`;
-    const res2 = await fetch(url2, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
+    const res2 = await fetchWithRetry(url2, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
     const data2 = await res2.json();
     results.search_fetch = {
       query: search,
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
   const firstId = data1.items?.[0]?.item_id;
   if (firstId) {
     const url3 = `${base}/items/${firstId}?organization_id=${orgId}`;
-    const res3 = await fetch(url3, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
+    const res3 = await fetchWithRetry(url3, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
     const data3 = await res3.json();
     results.item_detail = {
       name: data3.item?.name,

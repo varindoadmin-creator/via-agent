@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
       pos = [{ purchaseorder_id: singleId, purchaseorder_number: singleId }];
     } else {
       // Fetch all pending approval POs
-      const res = await fetch(`${base}/purchaseorders?status=pending_approval&per_page=200&organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/purchaseorders?status=pending_approval&per_page=200&organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     for (const po of pos) {
       try {
         const tok = await getZohoAccessToken();
-        const approveRes = await fetch(`${base}/purchaseorders/${po.purchaseorder_id}/status/open?organization_id=${orgId}`, {
+        const approveRes = await fetchWithRetry(`${base}/purchaseorders/${po.purchaseorder_id}/status/open?organization_id=${orgId}`, {
           method: 'POST',
           headers: { Authorization: `Zoho-oauthtoken ${tok}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({}),

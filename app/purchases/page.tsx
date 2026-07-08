@@ -987,33 +987,36 @@ function generateMemoPDF(data: {
 <meta charset="UTF-8">
 <title>Goods Collection Memo</title>
 <style>
+  /* Standalone print document opened in its own window — cannot reference the
+     app's CSS custom properties, so the theme's hex values are inlined here
+     directly (kept in sync with app/globals.css: --text, --primary, --accent, etc). */
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a2e; padding: 24px 32px; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; padding: 24px 32px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
-  .company { font-size: 15px; font-weight: bold; color: #1a1a2e; }
-  .doc-title { font-size: 15px; font-weight: bold; color: #cc785c; text-align: right; }
-  .divider { border: none; border-top: 2.5px solid #cc785c; margin: 8px 0 12px; }
+  .company { font-size: 15px; font-weight: bold; color: #111827; }
+  .doc-title { font-size: 15px; font-weight: bold; color: #2563eb; text-align: right; }
+  .divider { border: none; border-top: 2.5px solid #2563eb; margin: 8px 0 12px; }
   .info-grid { display: grid; grid-template-columns: 90px 1fr 110px 1fr; gap: 4px 8px; margin-bottom: 16px; }
-  .info-label { color: #888; font-size: 10px; }
+  .info-label { color: #6b7280; font-size: 10px; }
   .info-value { font-weight: bold; }
-  .pickup-addr { grid-column: 4; grid-row: 1 / span 3; border-left: 2px solid #e0ddd8; padding-left: 10px; }
+  .pickup-addr { grid-column: 4; grid-row: 1 / span 3; border-left: 2px solid #e5e7eb; padding-left: 10px; }
   .pickup-addr .addr-name { font-weight: bold; font-size: 11px; }
-  .pickup-addr .addr-line { font-size: 10px; color: #555; line-height: 1.5; }
-  .section-title { font-size: 9px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-  .courier-box { background: #f8f6f3; border: 0.5px solid #e0ddd8; padding: 8px 12px; margin-bottom: 16px; }
+  .pickup-addr .addr-line { font-size: 10px; color: #374151; line-height: 1.5; }
+  .section-title { font-size: 9px; font-weight: bold; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .courier-box { background: #f9fafb; border: 0.5px solid #e5e7eb; padding: 8px 12px; margin-bottom: 16px; }
   .courier-grid { display: grid; grid-template-columns: 70px 1fr 80px 1fr; gap: 4px 8px; }
-  .cou-label { color: #888; font-size: 10px; }
+  .cou-label { color: #6b7280; font-size: 10px; }
   .cou-value { font-weight: bold; font-size: 11px; }
   table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 14px; }
-  thead tr { background: #1a1a2e; color: white; }
+  thead tr { background: #18181b; color: white; }
   th { padding: 6px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; }
   th:first-child, td:first-child { text-align: center; width: 30px; }
-  td { padding: 5px 8px; border-bottom: 0.4px solid #e0ddd8; }
-  tr:nth-child(even) td { background: #f8f6f3; }
+  td { padding: 5px 8px; border-bottom: 0.4px solid #e5e7eb; }
+  tr:nth-child(even) td { background: #f9fafb; }
   td:nth-child(2) { font-weight: bold; }
-  .notes { background: #fff8f5; border: 0.5px solid #cc785c; padding: 7px 10px; font-size: 9px; color: #666; margin-bottom: 14px; line-height: 1.5; }
-  .footer-bar { background: #f5f5f2; border: 0.5px solid #e0ddd8; text-align: center; padding: 8px; font-size: 10px; font-weight: bold; color: #444; }
-  .footer-line { text-align: center; font-size: 8px; color: #aaa; margin-top: 5px; }
+  .notes { background: #eff6ff; border: 0.5px solid #2563eb; padding: 7px 10px; font-size: 9px; color: #374151; margin-bottom: 14px; line-height: 1.5; }
+  .footer-bar { background: #f3f4f6; border: 0.5px solid #e5e7eb; text-align: center; padding: 8px; font-size: 10px; font-weight: bold; color: #111827; }
+  .footer-line { text-align: center; font-size: 8px; color: #9ca3af; margin-top: 5px; }
   @media print { body { padding: 16px 24px; } }
 </style>
 </head>
@@ -1027,7 +1030,7 @@ function generateMemoPDF(data: {
   <div class="info-grid">
     <span class="info-label">Date</span>
     <span class="info-value">${data.date}</span>
-    <span class="info-label" style="border-left:2px solid #e0ddd8; padding-left:10px;">Pickup Location</span>
+    <span class="info-label" style="border-left:2px solid #e5e7eb; padding-left:10px;">Pickup Location</span>
     <div class="pickup-addr">
       <div class="addr-name">TAK PRODUCTS AND SERVICES, PT</div>
       <div class="addr-line">Jl. Komp. Multi Guna No. 17 Blok C<br>Kec. Serpong Utara, Tangerang 15320, Banten</div>

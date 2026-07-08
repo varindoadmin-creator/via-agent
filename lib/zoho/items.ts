@@ -2,6 +2,7 @@
 // Server-side only. Never import in client components.
 
 import { getZohoAccessToken, getZohoApiBaseUrl } from './auth';
+import { fetchWithRetry } from './retry';
 import { ZohoItem } from '@/types/zoho';
 
 // Read lazily at call time so env vars are always fresh
@@ -39,7 +40,7 @@ async function zohoRequest(path: string) {
   const base = getZohoApiBaseUrl();
   const sep = path.includes('?') ? '&' : '?';
   const url = `${base}${path}${sep}organization_id=${getOrgId()}`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
   const body = await res.json();

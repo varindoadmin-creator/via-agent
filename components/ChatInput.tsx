@@ -153,7 +153,7 @@ export default function ChatInput({
 
       {/* Upload error */}
       {uploadError && (
-        <div className="mb-2 px-3 py-2 rounded bg-red-950/30 border border-red-800/40 text-xs text-[var(--danger)]">
+        <div className="mb-2 px-3 py-2 rounded bg-red-50 border border-red-200 text-xs text-[var(--danger)]">
           {uploadError}
         </div>
       )}
@@ -163,7 +163,7 @@ export default function ChatInput({
         {/* File upload button */}
         <label className={`shrink-0 p-2.5 rounded-lg border border-[var(--border)] cursor-pointer transition-colors ${
           isUploading
-            ? 'bg-[var(--accent)]/20 border-blue-700/30 text-[var(--accent)]'
+            ? 'bg-[var(--accent-light)] border-[var(--accent-border)] text-[var(--accent)]'
             : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:border-[var(--border)] hover:text-[var(--text-3)]'
         } ${disabled || isLoading ? 'opacity-40 pointer-events-none' : ''}`}>
           {isUploading ? (
@@ -192,7 +192,7 @@ export default function ChatInput({
             placeholder={placeholder}
             disabled={disabled || isLoading}
             rows={1}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm text-[var(--text)] placeholder:text-[var(--border)] resize-none focus:outline-none focus:border-blue-700/50 focus:ring-1 focus:ring-[var(--accent)]/20 transition-colors disabled:opacity-50 leading-relaxed"
+            className="w-full px-3.5 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm text-[var(--text)] placeholder:text-[var(--text-4)] resize-none focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-light)] transition-colors disabled:opacity-50 leading-relaxed"
             style={{ minHeight: '44px', maxHeight: '200px' }}
           />
         </div>
@@ -203,8 +203,8 @@ export default function ChatInput({
           disabled={!canSend}
           className={`shrink-0 p-2.5 rounded-lg transition-all ${
             canSend
-              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--text)] shadow-lg shadow-blue-600/20'
-              : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--border)]'
+              ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-sm'
+              : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-4)]'
           } disabled:cursor-not-allowed`}
         >
           {isLoading ? (

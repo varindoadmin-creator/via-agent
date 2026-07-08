@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 function getDateRange(period: string) {
   const now = new Date();
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     const allInvoices: Record<string, unknown>[] = [];
     let page = 1;
     while (true) {
-      const res = await fetch(
+      const res = await fetchWithRetry(
         `${base}/invoices?date_start=${from}&date_end=${to}&per_page=200&page=${page}&sort_column=date&sort_order=D&organization_id=${orgId}`,
         { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
       );

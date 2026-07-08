@@ -35,8 +35,8 @@ const REPORT_TYPES: { key: ReportType; label: string; desc: string; icon: string
 ];
 
 const brandColors: Record<string, string> = {
-  'Lamitak': '#cc785c', 'EDL': '#5c8acc', 'AICA': '#5cac6a',
-  'TACO': '#ac5c8a', 'CARTA': '#8a7c5c', 'AIDI': '#5c8aac',
+  'Lamitak': '#2563eb', 'EDL': '#16a34a', 'AICA': '#d97706',
+  'TACO': '#dc2626', 'CARTA': '#7c3aed', 'AIDI': '#0891b2',
 };
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {

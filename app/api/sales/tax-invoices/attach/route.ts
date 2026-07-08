@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 // Extract invoice number from PDF buffer using pdfjs-dist
 async function extractInvoiceNumber(buffer: Buffer): Promise<string | null> {
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 2: Find invoice in Zoho
-        const searchRes = await fetch(
+        const searchRes = await fetchWithRetry(
           `${base}/invoices?invoice_number=${encodeURIComponent(invoiceNumber)}&organization_id=${orgId}`,
           { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
         );
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
         const attachForm = new FormData();
         attachForm.append('attachment', new Blob([buffer], { type: 'application/pdf' }), filename);
 
-        const attachRes = await fetch(
+        const attachRes = await fetchWithRetry(
           `${base}/invoices/${invoice.invoice_id}/attachment?organization_id=${orgId}`,
           {
             method: 'POST',

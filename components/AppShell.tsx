@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import {
+  LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
+  ClipboardCheck, Landmark, BarChart2, Circle,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 // Baked in at compile time — guarantees a unique client bundle hash on every deploy.
 const _BUILD = process.env.NEXT_PUBLIC_BUILD_TIME;
@@ -9,80 +14,79 @@ const _BUILD = process.env.NEXT_PUBLIC_BUILD_TIME;
 interface NavItem {
   id: string;
   href: string;
-  icon: string;
   label: string;
 }
 
 interface NavSection {
   id: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   items: NavItem[];
 }
 
-const NAV: Array<{ type: 'standalone'; item: NavItem } | { type: 'section'; section: NavSection }> = [
-  { type: 'standalone', item: { id: 'chat', href: '/', icon: '◈', label: 'Dashboard' } },
+const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon } } | { type: 'section'; section: NavSection }> = [
+  { type: 'standalone', item: { id: 'chat', href: '/', icon: LayoutDashboard, label: 'Dashboard' } },
   {
     type: 'section',
     section: {
-      id: 'sales', label: 'Sales', icon: '⬡',
+      id: 'sales', label: 'Sales', icon: ShoppingCart,
       items: [
-        { id: 'customers',    href: '/customers',           icon: '○', label: 'Customers'     },
-        { id: 'salesorders',  href: '/shipments',           icon: '○', label: 'Sales Orders'  },
-        { id: 'invoices',     href: '/print',               icon: '○', label: 'Invoices'      },
-        { id: 'tax-invoices', href: '/sales/tax-invoices',  icon: '○', label: 'Tax Invoices'  },
+        { id: 'customers',    href: '/customers',           label: 'Customers'     },
+        { id: 'salesorders',  href: '/shipments',           label: 'Sales Orders'  },
+        { id: 'invoices',     href: '/print',               label: 'Invoices'      },
+        { id: 'tax-invoices', href: '/sales/tax-invoices',  label: 'Tax Invoices'  },
       ],
     },
   },
   {
     type: 'section',
     section: {
-      id: 'purchases', label: 'Purchases', icon: '◫',
+      id: 'purchases', label: 'Purchases', icon: Package,
       items: [
-        { id: 'purchaseorders', href: '/purchases', icon: '○', label: 'Purchase Orders' },
-        { id: 'bills',          href: '/bills',     icon: '○', label: 'Bills'           },
+        { id: 'purchaseorders', href: '/purchases', label: 'Purchase Orders' },
+        { id: 'bills',          href: '/bills',     label: 'Bills'           },
       ],
     },
   },
   {
     type: 'section',
     section: {
-      id: 'inventory', label: 'Inventory', icon: '▣',
-      items: [{ id: 'items', href: '/inventory', icon: '○', label: 'Items' }],
+      id: 'inventory', label: 'Inventory', icon: Boxes,
+      items: [{ id: 'items', href: '/inventory', label: 'Items' }],
     },
   },
   {
     type: 'section',
     section: {
-      id: 'requests', label: 'Requests', icon: '◻',
+      id: 'requests', label: 'Requests', icon: Inbox,
       items: [
-        { id: 'req-samples',    href: '/requests/samples',    icon: '○', label: 'Samples'    },
-        { id: 'req-quotes',     href: '/requests/quotes',     icon: '○', label: 'Quotes'     },
-        { id: 'req-catalogues', href: '/requests/catalogues', icon: '○', label: 'Catalogues' },
+        { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
+        { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
+        { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
       ],
     },
   },
   {
     type: 'section',
     section: {
-      id: 'approvals', label: 'Approvals', icon: '◆',
-      items: [{ id: 'approval-so', href: '/approvals/so', icon: '○', label: 'Order Verification' }],
+      id: 'approvals', label: 'Approvals', icon: ClipboardCheck,
+      items: [{ id: 'approval-so', href: '/approvals/so', label: 'Order Verification' }],
     },
   },
   {
     type: 'section',
     section: {
-      id: 'finance', label: 'Banking', icon: '⇌',
-      items: [{ id: 'recon', href: '/reconcile', icon: '○', label: 'Reconciliation' }],
+      id: 'finance', label: 'Banking', icon: Landmark,
+      items: [{ id: 'recon', href: '/reconcile', label: 'Reconciliation' }],
     },
   },
   {
     type: 'section',
     section: {
-      id: 'reports', label: 'Reports', icon: '◈',
+      id: 'reports', label: 'Reports', icon: BarChart2,
       items: [
-        { id: 'sales-report',     href: '/reports/sales',     icon: '○', label: 'Sales'          },
-        { id: 'purchases-report', href: '/reports/purchases',  icon: '○', label: 'Purchases'      },
+        { id: 'sales-report',     href: '/reports/sales',     label: 'Sales'          },
+        { id: 'purchases-report', href: '/reports/purchases',  label: 'Purchases'      },
       ],
     },
   },
@@ -117,21 +121,22 @@ function NavContent({
   }
 
   const btnBase: React.CSSProperties = {
-    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+    width: '100%', display: 'flex', alignItems: 'center', gap: 9,
     border: 'none', borderRadius: 6, transition: 'all 0.1s',
     position: 'relative', background: 'transparent',
     fontFamily: 'Inter, sans-serif', cursor: 'pointer',
   };
 
   return (
-    <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+    <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
       {NAV.map(entry => {
         if (entry.type === 'standalone') {
           const item = entry.item;
+          const Icon = item.icon;
           const active = isActive(item.href);
           const soon = COMING_SOON.includes(item.href);
           return (
-            <div key={item.id} style={{ padding: collapsed ? '0' : '0 6px', marginBottom: 1 }}>
+            <div key={item.id} style={{ padding: collapsed ? '0' : '0 8px', marginBottom: 2 }}>
               <button
                 onClick={() => { onNav(item.href); onClose?.(); }}
                 disabled={soon}
@@ -141,27 +146,27 @@ function NavContent({
                   padding: collapsed ? '8px 0' : '7px 10px',
                   justifyContent: collapsed ? 'center' : 'flex-start',
                   background: active ? 'var(--sidebar-active-bg)' : 'transparent',
-                  color: active ? '#f0ebe4' : soon ? 'var(--sidebar-border)' : 'var(--sidebar-text)',
+                  color: active ? 'var(--sidebar-active-text)' : soon ? 'var(--sidebar-section)' : 'var(--sidebar-text)',
                   cursor: soon ? 'default' : 'pointer',
                 }}
-                onMouseEnter={e => { if (!active && !soon) { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = '#c8c0b4'; } }}
-                onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = soon ? 'var(--sidebar-border)' : 'var(--sidebar-text)'; } }}
+                onMouseEnter={e => { if (!active && !soon) { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text)'; } }}
+                onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = soon ? 'var(--sidebar-section)' : 'var(--sidebar-text)'; } }}
               >
-                {active && !collapsed && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 2.5, height: 14, borderRadius: '0 2px 2px 0', background: 'var(--accent)' }} />}
-                <span style={{ fontSize: 13, flexShrink: 0, color: active ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>
-                {!collapsed && <span style={{ fontSize: 12.5, fontWeight: active ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
+                <Icon size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
+                {!collapsed && <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
               </button>
             </div>
           );
         }
 
         const { section } = entry;
+        const SectionIcon = section.icon;
         const sectionActive = isSectionActive(section);
         const isOpen = openSections.has(section.id) || collapsed;
 
         return (
-          <div key={section.id} style={{ marginBottom: 1 }}>
-            <div style={{ padding: collapsed ? '0' : '0 6px' }}>
+          <div key={section.id} style={{ marginBottom: 2 }}>
+            <div style={{ padding: collapsed ? '0' : '0 8px' }}>
               <button
                 onClick={() => onToggleSection(section.id)}
                 title={collapsed ? section.label : undefined}
@@ -169,18 +174,18 @@ function NavContent({
                   ...btnBase,
                   padding: collapsed ? '8px 0' : '7px 10px',
                   justifyContent: collapsed ? 'center' : 'flex-start',
-                  color: sectionActive ? '#f0ebe4' : 'var(--sidebar-text)',
+                  color: sectionActive ? 'var(--text)' : 'var(--sidebar-text)',
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = '#c8c0b4'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = sectionActive ? '#f0ebe4' : 'var(--sidebar-text)'; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = sectionActive ? 'var(--text)' : 'var(--sidebar-text)'; }}
               >
-                <span style={{ fontSize: 13, flexShrink: 0, color: sectionActive ? 'var(--accent)' : 'inherit' }}>{section.icon}</span>
+                <SectionIcon size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
                 {!collapsed && (
                   <>
-                    <span style={{ fontSize: 12.5, fontWeight: sectionActive ? 500 : 400, flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                    <span style={{ fontSize: 13, fontWeight: sectionActive ? 600 : 500, flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
                       {section.label}
                     </span>
-                    <span style={{ fontSize: 9, color: 'var(--sidebar-section)', flexShrink: 0, transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▸</span>
+                    <span style={{ fontSize: 10, color: 'var(--sidebar-section)', flexShrink: 0, transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▸</span>
                   </>
                 )}
               </button>
@@ -192,29 +197,27 @@ function NavContent({
                   const active = isActive(item.href);
                   const soon = COMING_SOON.includes(item.href);
                   return (
-                    <div key={item.id} style={{ padding: collapsed ? '0' : '0 6px' }}>
+                    <div key={item.id} style={{ padding: collapsed ? '0' : '0 8px' }}>
                       <button
                         onClick={() => { onNav(item.href); onClose?.(); }}
                         disabled={soon}
                         title={collapsed ? item.label : undefined}
                         style={{
                           ...btnBase,
-                          padding: collapsed ? '6px 0' : '5px 10px',
+                          padding: collapsed ? '6px 0' : '6px 10px 6px 30px',
                           justifyContent: collapsed ? 'center' : 'flex-start',
                           background: active ? 'var(--sidebar-active-bg)' : 'transparent',
-                          color: active ? '#f0ebe4' : soon ? 'var(--sidebar-border)' : 'var(--sidebar-section)',
+                          color: active ? 'var(--sidebar-active-text)' : soon ? 'var(--sidebar-section)' : 'var(--sidebar-text)',
                           cursor: soon ? 'default' : 'pointer',
                         }}
-                        onMouseEnter={e => { if (!active && !soon) { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = '#c8c0b4'; } }}
-                        onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = soon ? 'var(--sidebar-border)' : 'var(--sidebar-section)'; } }}
+                        onMouseEnter={e => { if (!active && !soon) { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text)'; } }}
+                        onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = soon ? 'var(--sidebar-section)' : 'var(--sidebar-text)'; } }}
                       >
-                        {active && !collapsed && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 2.5, height: 12, borderRadius: '0 2px 2px 0', background: 'var(--accent)' }} />}
-                        {!collapsed && <span style={{ width: 4, height: 4, borderRadius: '50%', flexShrink: 0, background: active ? 'var(--accent)' : 'var(--sidebar-border)', marginLeft: 2 }} />}
-                        {collapsed && <span style={{ fontSize: 11, color: active ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>}
+                        {collapsed && <Circle size={7} fill="currentColor" style={{ flexShrink: 0 }} />}
                         {!collapsed && (
                           <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                            <div style={{ fontSize: 12, fontWeight: active ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
-                            {soon && <div style={{ fontSize: 9, color: 'var(--sidebar-section)', letterSpacing: '0.08em', fontFamily: 'JetBrains Mono, monospace' }}>SOON</div>}
+                            <div style={{ fontSize: 12.5, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
+                            {soon && <div style={{ fontSize: 9, color: 'var(--sidebar-section)', letterSpacing: '0.08em' }}>SOON</div>}
                           </div>
                         )}
                       </button>
@@ -244,10 +247,7 @@ function Logo({ collapsed }: { collapsed: boolean }) {
         <span style={{ color: 'white', fontSize: 12, fontWeight: 600, letterSpacing: '-0.5px' }}>V</span>
       </div>
       {!collapsed && (
-        <div>
-          <div style={{ color: '#f0ebe4', fontSize: 13, fontWeight: 600, letterSpacing: '0.01em', fontFamily: 'Inter, sans-serif' }}>VIA</div>
-          <div style={{ color: 'var(--sidebar-section)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>Varindo Intelligence</div>
-        </div>
+        <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, letterSpacing: '0.01em', fontFamily: 'Inter, sans-serif' }}>VIA</div>
       )}
     </div>
   );
@@ -324,10 +324,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: 'white', fontSize: 12, fontWeight: 600 }}>V</span>
             </div>
-            <div>
-              <div style={{ color: '#f0ebe4', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>VIA</div>
-              <div style={{ color: 'var(--sidebar-section)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>Varindo Intelligence</div>
-            </div>
+            <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>VIA</div>
           </div>
           <button
             onClick={() => setMobileOpen(true)}
@@ -363,10 +360,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: 'white', fontSize: 12, fontWeight: 600 }}>V</span>
               </div>
-              <div>
-                <div style={{ color: '#f0ebe4', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>VIA</div>
-                <div style={{ color: 'var(--sidebar-section)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>Varindo Intelligence</div>
-              </div>
+              <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>VIA</div>
             </div>
             <button
               onClick={() => setMobileOpen(false)}
@@ -422,7 +416,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               borderTop: '1px solid var(--sidebar-border)',
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--sidebar-section)', fontSize: 12,
-              fontFamily: 'JetBrains Mono, monospace', flexShrink: 0,
+              fontFamily: 'Inter, sans-serif', flexShrink: 0,
             }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-text)'}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-section)'}

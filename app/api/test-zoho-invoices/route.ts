@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 export async function GET(request: NextRequest) {
   const token = await getZohoAccessToken();
@@ -7,7 +8,7 @@ export async function GET(request: NextRequest) {
   const orgId = getZohoOrgId();
 
   // VFH/INV-000456 has FP attached
-  const searchRes = await fetch(
+  const searchRes = await fetchWithRetry(
     `${base}/invoices?invoice_number=VFH/INV-000456&organization_id=${orgId}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
   );
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   const results: Record<string, unknown> = { invoice_id: invId };
 
   // 1. Try invoice PDF download
-  const pdfRes = await fetch(
+  const pdfRes = await fetchWithRetry(
     `${base}/invoices/${invId}?accept=pdf&organization_id=${orgId}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
   );
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   };
 
   // 2. Try attachment download
-  const attRes = await fetch(
+  const attRes = await fetchWithRetry(
     `${base}/invoices/${invId}/attachment?organization_id=${orgId}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
   );
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
   };
 
   // 3. Try print endpoint
-  const printRes = await fetch(
+  const printRes = await fetchWithRetry(
     `${base}/invoices/${invId}/print?organization_id=${orgId}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
   );

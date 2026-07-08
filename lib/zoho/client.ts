@@ -2,6 +2,7 @@
 // Server-side only.
 
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from './auth';
+import { fetchWithRetry } from './retry';
 
 export interface ZohoRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -44,7 +45,7 @@ export async function zohoRequest<T>(
     fetchOptions.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url.toString(), fetchOptions);
+  const response = await fetchWithRetry(url.toString(), fetchOptions);
 
   if (!response.ok) {
     const errorText = await response.text();

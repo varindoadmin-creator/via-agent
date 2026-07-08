@@ -307,7 +307,7 @@ export default function ChatInterface() {
               <div className="text-xs text-[var(--text-3)]">
                 {activeConversation?.messages.filter(m => !m.isLoading).length || 0} messages
                 {pendingAction && (
-                  <span className="ml-2 text-amber-400">
+                  <span className="ml-2 text-amber-700">
                     ⏳ Awaiting: {pendingAction.type === 'create_so' ? 'APPROVE CREATE SO' : 'APPROVE UPDATE SO'}
                   </span>
                 )}
@@ -321,7 +321,7 @@ export default function ChatInterface() {
               onClick={() => setShowDebug(!showDebug)}
               className={`p-1.5 rounded-md text-xs transition-colors flex items-center gap-1 ${
                 showDebug
-                  ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-blue-700/30'
+                  ? 'bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)]'
                   : 'text-[var(--text-3)] hover:text-[var(--text-3)] hover:bg-[var(--surface-3)]'
               }`}
               title="Toggle debug panel"
@@ -343,12 +343,12 @@ export default function ChatInterface() {
 
         {/* Pending action banner */}
         {pendingAction && (
-          <div className="px-4 py-2 bg-amber-950/30 border-b border-amber-800/30 shrink-0">
-            <div className="flex items-center gap-2 text-xs text-amber-300">
+          <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 shrink-0">
+            <div className="flex items-center gap-2 text-xs text-amber-800">
               <Sparkles className="w-3.5 h-3.5" />
               <span>
                 Pending action:{' '}
-                <code className="font-mono bg-amber-900/30 px-1.5 py-0.5 rounded">
+                <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">
                   {pendingAction.type === 'create_so' ? 'APPROVE CREATE SO' : 'APPROVE UPDATE SO'}
                 </code>{' '}
                 — Type the exact command to proceed, or continue chatting to cancel.
@@ -359,7 +359,7 @@ export default function ChatInterface() {
 
         {/* Error banner */}
         {error && (
-          <div className="px-4 py-2 bg-red-950/30 border-b border-red-800/40 shrink-0">
+          <div className="px-4 py-2 bg-red-50 border-b border-red-200 shrink-0">
             <div className="flex items-center gap-2 text-xs text-[var(--danger)]">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>{error}</span>
@@ -374,7 +374,7 @@ export default function ChatInterface() {
         >
           {activeConversation?.messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center text-[var(--border)]">
+              <div className="text-center text-[var(--text-4)]">
                 <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <div className="text-sm">Start a conversation</div>
               </div>

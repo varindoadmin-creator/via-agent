@@ -96,7 +96,7 @@ function ScoreBadge({ score }: { score: number }) {
       ? "text-[var(--success)]"
       : pct >= 60
         ? "text-[var(--warning)]"
-        : "text-orange-400";
+        : "text-orange-600";
   return <span className={`text-xs font-mono ${color}`}>{pct}%</span>;
 }
 
@@ -350,9 +350,9 @@ export default function ReconcilePage() {
 
   const statusColor = (s: string) =>
     s === "matched"
-      ? "text-[var(--success)] bg-green-400/10 border-green-800"
+      ? "text-[var(--success)] bg-[var(--success-bg)] border-[var(--success-border)]"
       : s === "possible"
-        ? "text-[var(--warning)] bg-yellow-400/10 border-yellow-800"
+        ? "text-[var(--warning)] bg-[var(--warning-bg)] border-[var(--warning-border)]"
         : "text-[var(--text-4)] border-[var(--border)]";
 
   const statusLabel = (s: string) =>
@@ -371,7 +371,7 @@ export default function ReconcilePage() {
           </h1>
         </div>
 
-        <div className="border border-[var(--border)] rounded-xl p-4 mb-6 bg-[var(--surface)]/40">
+        <div className="border border-[var(--border)] rounded-xl p-4 mb-6 bg-[var(--surface)]">
           <div className="flex flex-col md:flex-row md:items-end gap-3">
             <div className="flex-1">
               <label className="block text-sm font-medium text-[var(--text-2)] mb-2">
@@ -536,7 +536,7 @@ export default function ReconcilePage() {
                     <button
                       type="button"
                       onClick={() => toggleExpand(result)}
-                      className="w-full flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] text-left hover:bg-white/5"
+                      className="w-full flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] text-left hover:bg-[var(--surface-2)]"
                     >
                       <span
                         role="checkbox"
@@ -545,7 +545,7 @@ export default function ReconcilePage() {
                           e.stopPropagation();
                           toggleManualRow(result);
                         }}
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center text-xs flex-shrink-0 ${isSelectedManualRow(result) ? "bg-[var(--success)] border-[var(--success)] text-white" : "border-gray-600 text-transparent"}`}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center text-xs flex-shrink-0 ${isSelectedManualRow(result) ? "bg-[var(--success)] border-[var(--success)] text-white" : "border-[var(--border)] text-transparent"}`}
                         title="Tick this if this bank row was already manually recorded in Zoho Books"
                       >
                         ✓
@@ -576,7 +576,7 @@ export default function ReconcilePage() {
 
                     {isOpen && (
                       <div className="divide-y divide-[var(--border-muted)]">
-                        <div className="px-4 py-3 text-xs text-[var(--text-3)] bg-black/10">
+                        <div className="px-4 py-3 text-xs text-[var(--text-3)] bg-[var(--surface-2)]">
                           <div>
                             <span className="text-[var(--text-4)]">
                               Description:
@@ -608,10 +608,10 @@ export default function ReconcilePage() {
                               onClick={() =>
                                 togglePaymentSelection(result, match)
                               }
-                              className={`flex items-start gap-4 px-4 py-3 cursor-pointer transition-colors ${selected ? "bg-[var(--success-bg)] border-l-2 border-[var(--success)]" : "hover:bg-white/5"}`}
+                              className={`flex items-start gap-4 px-4 py-3 cursor-pointer transition-colors ${selected ? "bg-[var(--success-bg)] border-l-2 border-[var(--success)]" : "hover:bg-[var(--surface-2)]"}`}
                             >
                               <div
-                                className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selected ? "bg-[var(--success)] border-[var(--success)] text-white" : "border-gray-600"}`}
+                                className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selected ? "bg-[var(--success)] border-[var(--success)] text-white" : "border-[var(--border)]"}`}
                               >
                                 {selected && (
                                   <span className="text-xs font-bold">✓</span>
@@ -621,7 +621,7 @@ export default function ReconcilePage() {
                                 {isMulti ? (
                                   <>
                                     <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-[var(--accent)] rounded font-medium">
+                                      <span className="text-xs px-1.5 py-0.5 bg-[var(--accent-light)] text-[var(--accent)] rounded font-medium">
                                         {match.invoices.length} INVOICES
                                       </span>
                                       <span className="text-[var(--text-2)] text-sm font-medium">

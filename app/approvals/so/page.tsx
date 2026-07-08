@@ -42,10 +42,10 @@ const fmt = (n: number) => Number(n || 0).toLocaleString('id-ID');
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
 function badgeColor(status?: string) {
-  if (status === 'MATCH' || status === 'APPROVE') return { color: '#6ee7a8', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.25)' };
-  if (status === 'MISMATCH' || status === 'REJECT') return { color: '#fb7185', bg: 'rgba(244,63,94,0.12)', border: 'rgba(244,63,94,0.25)' };
-  if (status === 'PARTIAL_MATCH' || status === 'REVIEW') return { color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)' };
-  return { color: '#94a3b8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.20)' };
+  if (status === 'MATCH' || status === 'APPROVE') return { color: 'var(--success)', bg: 'var(--success-bg)', border: 'var(--success-border)' };
+  if (status === 'MISMATCH' || status === 'REJECT') return { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)' };
+  if (status === 'PARTIAL_MATCH' || status === 'REVIEW') return { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'var(--warning-border)' };
+  return { color: 'var(--text-3)', bg: 'var(--surface-3)', border: 'var(--border)' };
 }
 
 function Badge({ value }: { value?: string }) {
@@ -167,7 +167,7 @@ export default function SOApprovalCheckPage() {
     <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 22 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Order Verification</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Order Verification</h1>
         </div>
         <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻ Refresh</button>
       </div>
@@ -175,11 +175,11 @@ export default function SOApprovalCheckPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
           <div style={{ ...mono, color: 'var(--text-4)', fontSize: 11, letterSpacing: '0.08em' }}>PENDING SO</div>
-          <div style={{ color: 'var(--text-1)', fontSize: 22, fontWeight: 700 }}>{salesorders.length}</div>
+          <div style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700 }}>{salesorders.length}</div>
         </div>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
           <div style={{ ...mono, color: 'var(--text-4)', fontSize: 11, letterSpacing: '0.08em' }}>TOTAL VALUE</div>
-          <div style={{ color: 'var(--text-1)', fontSize: 22, fontWeight: 700 }}>{formatRp(totalValue)}</div>
+          <div style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700 }}>{formatRp(totalValue)}</div>
         </div>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
           <div style={{ ...mono, color: 'var(--text-4)', fontSize: 11, letterSpacing: '0.08em' }}>MODE</div>
@@ -187,15 +187,15 @@ export default function SOApprovalCheckPage() {
         </div>
       </div>
 
-      {error && <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'rgba(244,63,94,0.12)', color: '#fda4af', border: '1px solid rgba(244,63,94,0.25)', fontSize: 13 }}>{error}</div>}
-      {approveMessage && <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'rgba(34,197,94,0.12)', color: '#86efac', border: '1px solid rgba(34,197,94,0.25)', fontSize: 13 }}>{approveMessage}</div>}
+      {error && <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)', fontSize: 13 }}>{error}</div>}
+      {approveMessage && <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-border)', fontSize: 13 }}>{approveMessage}</div>}
 
       <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
           <div>
-            <div style={{ color: 'var(--text-1)', fontWeight: 650 }}>Pending Approval Sales Orders</div>
+            <div style={{ color: 'var(--text)', fontWeight: 650 }}>Pending Approval Sales Orders</div>
           </div>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
         </div>
 
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -222,8 +222,8 @@ export default function SOApprovalCheckPage() {
               return (
                 <Fragment key={so.salesorder_id}>
                   <tr key={so.salesorder_id} onClick={() => toggle(so)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-2)' }}>
-                    <td style={{ padding: '12px' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'rgba(220,113,79,.20)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
-                    <td style={{ padding: '12px', ...mono, color: 'var(--text-1)', fontSize: 12 }}>{so.salesorder_number}</td>
+                    <td style={{ padding: '12px' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
+                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 12 }}>{so.salesorder_number}</td>
                     <td style={{ padding: '12px', fontWeight: 600 }}>{so.customer_name}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{so.date}</td>
                     <td style={{ padding: '12px' }}>{so.salesperson_name || '—'}</td>
@@ -233,11 +233,11 @@ export default function SOApprovalCheckPage() {
 
                   {isOpen && (
                     <tr key={so.salesorder_id + '-detail'}>
-                      <td colSpan={7} style={{ padding: 0, background: 'rgba(255,255,255,0.025)', borderTop: '1px solid var(--border)' }}>
+                      <td colSpan={7} style={{ padding: 0, background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
                         <div style={{ padding: '18px 22px 22px 54px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
                             <div>
-                              <h3 style={{ margin: '0 0 10px', color: 'var(--text-1)', fontSize: 15 }}>SO Items</h3>
+                              <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>SO Items</h3>
                               {!detail || busyId === so.salesorder_id && !detail ? <div style={{ color: 'var(--text-3)' }}>Loading SO detail...</div> : (
                                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                                   <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 9, textAlign: 'left' }}>ITEM</th><th style={{ padding: 9, textAlign: 'left' }}>SKU</th><th style={{ padding: 9, textAlign: 'right' }}>QTY</th><th style={{ padding: 9, textAlign: 'right' }}>RATE</th></tr></thead>
@@ -247,8 +247,8 @@ export default function SOApprovalCheckPage() {
                             </div>
 
                             <div>
-                              <h3 style={{ margin: '0 0 10px', color: 'var(--text-1)', fontSize: 15 }}>Upload Proof</h3>
-                              <input type="file" multiple accept="image/*,application/pdf,text/plain,text/csv" onChange={e => setFiles(prev => ({ ...prev, [so.salesorder_id]: Array.from(e.target.files || []) }))} style={{ width: '100%', background: 'var(--surface-1)', border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--text-2)', padding: 12 }} />
+                              <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>Upload Proof</h3>
+                              <input type="file" multiple accept="image/*,application/pdf,text/plain,text/csv" onChange={e => setFiles(prev => ({ ...prev, [so.salesorder_id]: Array.from(e.target.files || []) }))} style={{ width: '100%', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--text-2)', padding: 12 }} />
                               <div style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 8 }}>Supported: WhatsApp screenshots, images, PDFs, text/CSV. VIA reads the proof and compares item + quantity.</div>
                               {(files[so.salesorder_id] || []).length > 0 && <div style={{ marginTop: 10, color: 'var(--text-3)', fontSize: 12 }}>{files[so.salesorder_id].map(f => f.name).join(', ')}</div>}
                               <div style={{ marginTop: 14 }}>
@@ -256,20 +256,20 @@ export default function SOApprovalCheckPage() {
                                 <select
                                   value={customerOverride[so.salesorder_id] || ''}
                                   onChange={e => setCustomerOverride(prev => ({ ...prev, [so.salesorder_id]: e.target.value }))}
-                                  style={{ width: '100%', background: 'var(--surface-1)', border: '1px solid var(--border)', color: customerOverride[so.salesorder_id] ? 'var(--text-1)' : 'var(--text-4)', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none' }}
+                                  style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', color: customerOverride[so.salesorder_id] ? 'var(--text)' : 'var(--text-4)', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none' }}
                                 >
                                   <option value=''>— auto-detect from proof —</option>
                                   {customers.map(c => <option key={c.contact_id} value={c.contact_name}>{c.contact_name}</option>)}
                                 </select>
                               </div>
-                              <button onClick={() => checkSO(so.salesorder_id)} disabled={busyId === so.salesorder_id} style={{ marginTop: 12, width: '100%', border: '1px solid rgba(220,113,79,.35)', background: 'var(--accent)', color: 'white', borderRadius: 8, padding: '10px 12px', fontWeight: 700, cursor: 'pointer' }}>{busyId === so.salesorder_id ? 'Checking...' : 'Run VIA Approval Check'}</button>
+                              <button onClick={() => checkSO(so.salesorder_id)} disabled={busyId === so.salesorder_id} style={{ marginTop: 12, width: '100%', border: '1px solid var(--accent)', background: 'var(--accent)', color: 'white', borderRadius: 8, padding: '10px 12px', fontWeight: 700, cursor: 'pointer' }}>{busyId === so.salesorder_id ? 'Checking...' : 'Run VIA Approval Check'}</button>
                             </div>
                           </div>
 
                           {result && (
                             <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)' }}>
                               <div style={{ padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-                                <div><div style={{ color: 'var(--text-1)', fontWeight: 700 }}>VIA Check Result</div><div style={{ color: 'var(--text-3)', fontSize: 12 }}>{result.summary}</div></div>
+                                <div><div style={{ color: 'var(--text)', fontWeight: 700 }}>VIA Check Result</div><div style={{ color: 'var(--text-3)', fontSize: 12 }}>{result.summary}</div></div>
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                   <Badge value={result.overall_status} />
                                   <Badge value={result.approval_recommendation} />
@@ -278,9 +278,9 @@ export default function SOApprovalCheckPage() {
                                     disabled={approvingId === so.salesorder_id || (result.approval_recommendation !== 'APPROVE' && result.overall_status !== 'MATCH')}
                                     title={(result.approval_recommendation !== 'APPROVE' && result.overall_status !== 'MATCH') ? 'Approval is enabled only when VIA result is MATCH/APPROVE.' : 'Approve this Sales Order in Zoho'}
                                     style={{
-                                      border: '1px solid rgba(34,197,94,.35)',
-                                      background: (result.approval_recommendation === 'APPROVE' || result.overall_status === 'MATCH') ? 'rgba(34,197,94,.18)' : 'rgba(148,163,184,.10)',
-                                      color: (result.approval_recommendation === 'APPROVE' || result.overall_status === 'MATCH') ? '#86efac' : 'var(--text-4)',
+                                      border: (result.approval_recommendation === 'APPROVE' || result.overall_status === 'MATCH') ? '1px solid var(--success)' : '1px solid var(--border)',
+                                      background: (result.approval_recommendation === 'APPROVE' || result.overall_status === 'MATCH') ? 'var(--success)' : 'var(--surface-3)',
+                                      color: (result.approval_recommendation === 'APPROVE' || result.overall_status === 'MATCH') ? '#ffffff' : 'var(--text-4)',
                                       borderRadius: 8,
                                       padding: '7px 10px',
                                       fontWeight: 700,

@@ -52,7 +52,7 @@ function formatPercent(value: number) {
 }
 
 function MetricCard({ title, value, subtitle, tone = 'default' }: { title: string; value: string; subtitle: string; tone?: 'default' | 'accent' | 'warning' | 'good' }) {
-  const color = tone === 'accent' ? 'var(--accent)' : tone === 'warning' ? '#d8995f' : tone === 'good' ? '#75b798' : 'var(--text)';
+  const color = tone === 'accent' ? 'var(--accent)' : tone === 'warning' ? 'var(--warning)' : tone === 'good' ? 'var(--success)' : 'var(--text)';
   return (
     <div style={{
       background: 'var(--panel)',
@@ -128,13 +128,13 @@ export default function HomePage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg p-3 text-sm" style={{ background: 'rgba(220, 85, 70, 0.12)', border: '1px solid rgba(220, 85, 70, 0.35)', color: '#f0a39a' }}>
+          <div className="mb-4 rounded-lg p-3 text-sm" style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)' }}>
             {error}
           </div>
         )}
 
         {data?.errors?.length ? (
-          <div className="mb-4 rounded-lg p-3 text-xs" style={{ background: 'rgba(216, 153, 95, 0.10)', border: '1px solid rgba(216, 153, 95, 0.30)', color: '#d8995f' }}>
+          <div className="mb-4 rounded-lg p-3 text-xs" style={{ background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', color: 'var(--warning)' }}>
             Some dashboard sources could not load: {data.errors.join(' | ')}
           </div>
         ) : null}
@@ -206,12 +206,12 @@ export default function HomePage() {
               <p>Total Receivables uses unpaid invoice balance due.</p>
               <p>Inventory Summary uses stock on hand × item Purchase Rate.</p>
               {data?.gross_profit.missingCostLines ? (
-                <p style={{ color: '#d8995f' }}>
+                <p style={{ color: 'var(--warning)' }}>
                   Note: {data.gross_profit.missingCostLines} invoice lines had missing Purchase Rate, so GP may be understated.
                 </p>
               ) : null}
               {data?.inventory_summary.zeroOrMissingCostItems ? (
-                <p style={{ color: '#d8995f' }}>
+                <p style={{ color: 'var(--warning)' }}>
                   Note: {data.inventory_summary.zeroOrMissingCostItems} stocked items had missing Purchase Rate, so inventory value may be understated.
                 </p>
               ) : null}

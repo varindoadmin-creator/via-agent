@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 import { PDFDocument } from 'pdf-lib';
 
 export async function POST(request: NextRequest) {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     for (const invId of invoice_ids) {
       // 1. Fetch invoice PDF
-      const invRes = await fetch(
+      const invRes = await fetchWithRetry(
         `${base}/invoices/${invId}?accept=pdf&organization_id=${orgId}`,
         { headers }
       );
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Fetch attachment (FP) if exists
-      const attRes = await fetch(
+      const attRes = await fetchWithRetry(
         `${base}/invoices/${invId}/attachment?organization_id=${orgId}`,
         { headers }
       );

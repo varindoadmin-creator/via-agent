@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 type AnyObj = Record<string, unknown>;
 
@@ -25,7 +26,7 @@ async function zohoGet(path: string) {
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res  = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: ctrl.signal });
+    const res  = await fetchWithRetry(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: ctrl.signal });
     const body = await res.json();
     if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
     return body;

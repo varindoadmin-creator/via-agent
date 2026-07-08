@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
+import { fetchWithRetry } from '@/lib/zoho/retry';
 
 async function zohoGet(path: string) {
   const token = await getZohoAccessToken();
@@ -10,7 +11,7 @@ async function zohoGet(path: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
+    const res = await fetchWithRetry(url, { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: controller.signal });
     const body = await res.json();
     if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
     return body;
@@ -180,7 +181,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/purchaseorders?status=pending_approval&per_page=100&organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/purchaseorders?status=pending_approval&per_page=100&organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -194,7 +195,7 @@ export async function GET(request: NextRequest) {
       const token = await getZohoAccessToken();
       const base = getZohoApiBaseUrl();
       const orgId = getZohoOrgId();
-      const res = await fetch(`${base}/purchaseorders?status=open&billed_status=to_be_billed&per_page=100&organization_id=${orgId}`, {
+      const res = await fetchWithRetry(`${base}/purchaseorders?status=open&billed_status=to_be_billed&per_page=100&organization_id=${orgId}`, {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
@@ -346,7 +347,7 @@ export async function POST(request: NextRequest) {
 
         // Approve = change status from pending_approval to open (issued)
         const url = `${base}/purchaseorders/${poId}/status/open?organization_id=${orgId}`;
-        const res = await fetch(url, {
+        const res = await fetchWithRetry(url, {
           method: 'POST',
           headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({}),

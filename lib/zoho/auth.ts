@@ -2,6 +2,7 @@
 // Server-side only. Never import this in client components.
 
 import { ZohoTokenResponse } from '@/types/zoho';
+import { fetchWithRetry } from './retry';
 
 // In-memory token cache (per server process)
 let cachedToken: string | null = null;
@@ -74,7 +75,7 @@ export async function getZohoAccessToken(): Promise<string> {
     refresh_token: refreshToken,
   });
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),

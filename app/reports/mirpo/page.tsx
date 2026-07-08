@@ -111,11 +111,11 @@ const VIEWS: { key: View; label: string }[] = [
 // ─── Stock status badge ───────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const cls: Record<string, string> = {
-    'Sold Out':        'bg-[var(--accent-bg,#e8f4fd)]   text-[var(--accent,#0ea5e9)]',
-    'Fast Moving':     'bg-[var(--success-bg,#dcfce7)]  text-[var(--success,#16a34a)]',
-    'Healthy':         'bg-[var(--info-bg,#e0f2fe)]     text-[var(--info,#0284c7)]',
-    'Slow Moving':     'bg-[var(--warning-bg,#fef9c3)]  text-[var(--warning,#ca8a04)]',
-    'Dead Stock Risk': 'bg-[var(--danger-bg,#fee2e2)]   text-[var(--danger,#dc2626)]',
+    'Sold Out':        'bg-[var(--accent-light)] text-[var(--accent)]',
+    'Fast Moving':     'bg-[var(--success-bg)]   text-[var(--success)]',
+    'Healthy':         'bg-[var(--info-bg)]      text-[var(--info)]',
+    'Slow Moving':     'bg-[var(--warning-bg)]   text-[var(--warning)]',
+    'Dead Stock Risk': 'bg-[var(--danger-bg)]    text-[var(--danger)]',
   };
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${cls[status] || 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>

@@ -16,9 +16,9 @@ interface ChatMessageProps {
 function LoadingDots() {
   return (
     <div className="flex items-center gap-1 py-1">
-      <span className="loading-dot w-2 h-2 rounded-full bg-[#3b82f6]" />
-      <span className="loading-dot w-2 h-2 rounded-full bg-[#3b82f6]" />
-      <span className="loading-dot w-2 h-2 rounded-full bg-[#3b82f6]" />
+      <span className="loading-dot w-2 h-2 rounded-full bg-[var(--accent)]" />
+      <span className="loading-dot w-2 h-2 rounded-full bg-[var(--accent)]" />
+      <span className="loading-dot w-2 h-2 rounded-full bg-[var(--accent)]" />
     </div>
   );
 }
@@ -141,7 +141,7 @@ function MessageContent({ content }: { content: string }) {
       elements.push(<div key={elements.length} className="h-1" />);
     } else {
       elements.push(
-        <p key={elements.length} className="text-sm text-[#c8d3e0] leading-relaxed my-0.5">
+        <p key={elements.length} className="text-sm text-[var(--text-2)] leading-relaxed my-0.5">
           {formatInlineMarkdown(line)}
         </p>
       );
@@ -191,7 +191,7 @@ function TypeIcon({ type }: { type: string }) {
     case 'warning':
     case 'so_preview':
     case 'so_update_preview':
-      return <AlertTriangle className="w-3 h-3 text-amber-400" />;
+      return <AlertTriangle className="w-3 h-3 text-amber-600" />;
     case 'action_result':
       return <CheckCircle className="w-3 h-3 text-[var(--success)]" />;
     case 'error':
@@ -257,7 +257,7 @@ function UpdateActions({ actions }: { actions: Action[] }) {
 
   return (
     <div className="mt-3 space-y-2">
-      <div className="text-[var(--text-4)] text-xs font-medium uppercase tracking-wider" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+      <div className="text-[var(--text-4)] text-xs font-medium uppercase tracking-wider">
         Available Actions
       </div>
       {actions.map(action => {
@@ -355,7 +355,7 @@ export default function ChatMessage({ message, showDebug = false }: ChatMessageP
               isUser
                 ? 'bg-[var(--accent-light)] border border-[var(--accent-border)]'
                 : message.isError
-                ? 'bg-red-950/30 border border-red-800/40'
+                ? 'bg-red-50 border border-red-200'
                 : 'bg-[var(--surface)] border border-[var(--border)] shadow-sm'
             }`}>
               {/* Attachments */}
