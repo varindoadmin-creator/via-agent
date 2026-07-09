@@ -52,13 +52,10 @@ function detectBrand(name: string, sku: string): string {
   const n = name.toUpperCase();
   const sk = sku.toUpperCase();
   if (n.includes('LAMITAK') || sk.startsWith('LAM-')) return 'LAMITAK';
-  if (n.includes('GREENLAM') || sk.startsWith('GREEN-')) return 'GREENLAM';
-  if (n.includes('GRASMERINO') || sk.startsWith('GRS-')) return 'GRASMERINO';
   if (n.includes(' EDL ') || n.startsWith('EDL ') || sk.startsWith('EDL-')) return 'EDL';
   if (n.includes('AICA') || sk.startsWith('AICA-')) return 'AICA';
   if (n.includes('TACO') || sk.startsWith('TACO-')) return 'TACO';
   if (n.includes('CARTA') || sk.startsWith('CARTA-')) return 'CARTA';
-  if (n.includes('AIDI') || sk.startsWith('AIDI-')) return 'AIDI';
   if (n.includes('ECO') || sk.startsWith('ECO-')) return 'ECO';
   return 'OTHER';
 }

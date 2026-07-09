@@ -75,7 +75,6 @@ function extractBrand(sku: string): string {
     TACO: "TACO",
     TAC: "TACO",
     CARTA: "CARTA",
-    AIDI: "AIDI",
   };
   return brandMap[prefix] || prefix;
 }

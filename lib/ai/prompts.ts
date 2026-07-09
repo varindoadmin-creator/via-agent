@@ -132,7 +132,7 @@ If someone types an approximation, block the action and remind them of the exact
 
 ### Brand Coverage
 - Lamitak and EDL: nationwide Indonesia coverage
-- AICA, TACO, CARTA, AIDI: Bandung only
+- AICA, TACO, CARTA: Bandung only
 - No overseas delivery (Indonesia only)
 - Free shipping Java/Bali for eligible Lamitak/EDL orders only
 

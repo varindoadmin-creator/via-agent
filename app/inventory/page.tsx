@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
-const BRANDS = ['All Brands', 'AICA', 'AIDI', 'CARTA', 'ECO', 'EDL', 'GRASMERINO', 'GREENLAM', 'LAMITAK', 'TACO'];
+const BRANDS = ['All Brands', 'AICA', 'CARTA', 'ECO', 'EDL', 'LAMITAK', 'TACO'];
 const LOCATIONS = ['HEAD OFFICE', 'HUB-BDG', 'HUB-MDN'] as const;
 type Location = typeof LOCATIONS[number];
 

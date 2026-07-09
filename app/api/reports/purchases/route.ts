@@ -26,7 +26,7 @@ function extractBrand(sku: string): string {
   const brandMap: Record<string, string> = {
     'LAM': 'Lamitak', 'EDL': 'EDL', 'EAS': 'EDL',
     'AICA': 'AICA', 'TACO': 'TACO', 'TAC': 'TACO',
-    'CARTA': 'CARTA', 'AIDI': 'AIDI',
+    'CARTA': 'CARTA',
   };
   return brandMap[prefix] || prefix;
 }

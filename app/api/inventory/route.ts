@@ -45,13 +45,10 @@ function detectBrand(name: string, sku: string): string {
   const n = name.toUpperCase();
   const s = sku.toUpperCase();
   if (n.includes('LAMITAK') || s.startsWith('LAM-')) return 'LAMITAK';
-  if (n.includes('GREENLAM') || s.startsWith('GREEN-')) return 'GREENLAM';
-  if (n.includes('GRASMERINO') || s.startsWith('GRS-')) return 'GRASMERINO';
   if (n.includes(' EDL ') || s.startsWith('EDL-')) return 'EDL';
   if (n.includes('AICA') || s.startsWith('AICA-')) return 'AICA';
   if (n.includes('TACO') || s.startsWith('TACO-')) return 'TACO';
   if (n.includes('CARTA') || s.startsWith('CARTA-')) return 'CARTA';
-  if (n.includes('AIDI') || s.startsWith('AIDI-')) return 'AIDI';
   if (n.includes('ECO') || s.startsWith('ECO-')) return 'ECO';
   return 'OTHER';
 }
@@ -103,13 +100,10 @@ async function fetchDetailBatch(ids: string[]): Promise<Record<string, unknown>[
 // Using brand name as search term finds all items with that brand in name
 const BRAND_KEYWORDS: Record<string, string[]> = {
   'LAMITAK':    ['LAMITAK'],
-  'GREENLAM':   ['GREENLAM'],
-  'GRASMERINO': ['GRASMERINO'],
   'EDL':        ['EDL'],
   'AICA':       ['AICA'],
   'TACO':       ['TACO'],
   'CARTA':      ['CARTA'],
-  'AIDI':       ['AIDI'],
   'ECO':        ['ECO'],
 };
 

@@ -130,7 +130,7 @@ export function checkBrandCoverage(brand: string, location: string): {
   covered: boolean;
   warning: string | null;
 } {
-  const bandungOnlyBrands = ['AICA', 'TACO', 'CARTA', 'AIDI'];
+  const bandungOnlyBrands = ['AICA', 'TACO', 'CARTA'];
   const brandUpper = brand.toUpperCase();
   const locationLower = location.toLowerCase();
 

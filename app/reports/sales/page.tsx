@@ -259,7 +259,6 @@ export default function SalesReportsPage() {
     AICA: "#d97706",
     TACO: "#dc2626",
     CARTA: "#7c3aed",
-    AIDI: "#0891b2",
   };
 
   const thStyle: React.CSSProperties = {
@@ -673,7 +672,6 @@ export default function SalesReportsPage() {
                     TACO: "TACO",
                     TAC: "TACO",
                     CARTA: "CARTA",
-                    AIDI: "AIDI",
                   };
                   const itemColor =
                     brandColors[brandLookup[brand] || ""] || "var(--accent)";

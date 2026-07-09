@@ -36,7 +36,7 @@ const REPORT_TYPES: { key: ReportType; label: string; desc: string; icon: string
 
 const brandColors: Record<string, string> = {
   'Lamitak': '#2563eb', 'EDL': '#16a34a', 'AICA': '#d97706',
-  'TACO': '#dc2626', 'CARTA': '#7c3aed', 'AIDI': '#0891b2',
+  'TACO': '#dc2626', 'CARTA': '#7c3aed',
 };
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -237,7 +237,7 @@ export default function PurchasesReportsPage() {
                 const brandLookup: Record<string, string> = {
                   'LAM': 'Lamitak', 'EDL': 'EDL', 'EAS': 'EDL',
                   'AICA': 'AICA', 'TACO': 'TACO', 'TAC': 'TACO',
-                  'CARTA': 'CARTA', 'AIDI': 'AIDI',
+                  'CARTA': 'CARTA',
                 };
                 const itemColor = brandColors[brandLookup[skuPrefix] || ''] || 'var(--accent)';
 
