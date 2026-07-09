@@ -237,7 +237,7 @@ export function provinceForCity(city: string | undefined | null): string | null 
   return hit ? hit.province : null;
 }
 
-function getCustomFieldValue(contact: RawContact, apiName: string): string | undefined {
+export function getCustomFieldValue(contact: RawContact, apiName: string): string | undefined {
   if (contact.custom_field_hash && apiName in contact.custom_field_hash) {
     const v = contact.custom_field_hash[apiName];
     return v == null ? undefined : String(v);

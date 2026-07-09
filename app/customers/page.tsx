@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import CustomerCleanupModal from '@/components/CustomerCleanupModal';
 import MissingAddressModal from '@/components/MissingAddressModal';
+import CustomerDuplicatesModal from '@/components/CustomerDuplicatesModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -678,6 +679,7 @@ export default function CustomersPage() {
   const [printing, setPrinting] = useState(false);
   const [showCleanupModal, setShowCleanupModal] = useState(false);
   const [showMissingAddressModal, setShowMissingAddressModal] = useState(false);
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -794,6 +796,10 @@ export default function CustomersPage() {
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors">
               📋 Missing Address
             </button>
+            <button onClick={() => setShowDuplicatesModal(true)}
+              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors">
+              🔎 Check Duplicates
+            </button>
             <button onClick={() => setShowCleanupModal(true)}
               className="px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors">
               🧹 Repair Data
@@ -814,6 +820,10 @@ export default function CustomersPage() {
 
         {showMissingAddressModal && (
           <MissingAddressModal onClose={() => setShowMissingAddressModal(false)} />
+        )}
+
+        {showDuplicatesModal && (
+          <CustomerDuplicatesModal onClose={() => setShowDuplicatesModal(false)} />
         )}
 
         {/* Summary cards */}
