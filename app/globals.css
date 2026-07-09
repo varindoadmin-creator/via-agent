@@ -27,12 +27,12 @@
   --panel:        var(--surface);
   --muted:        var(--text-3);
 
-  /* Accent — Zoho blue (links, focus, interactive) */
-  --accent:       #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-light: #eff6ff;
-  --accent-text:  #2563eb;
-  --accent-border:#bfdbfe;
+  /* Accent — Navy blue (links, focus, interactive) */
+  --accent:       #1e3a5f;
+  --accent-hover: #16293f;
+  --accent-light: #eaeef5;
+  --accent-text:  #1e3a5f;
+  --accent-border:#b8c4d9;
 
   /* Primary action — Zoho's near-black buttons */
   --primary:      #18181b;
@@ -49,9 +49,9 @@
   --danger:       #dc2626;
   --danger-bg:    #fef2f2;
   --danger-border:#fecaca;
-  --info:         #2563eb;
-  --info-bg:      #eff6ff;
-  --info-border:  #bfdbfe;
+  --info:         #1e3a5f;
+  --info-bg:      #eaeef5;
+  --info-border:  #b8c4d9;
 
   /* Sidebar — white with near-black active state */
   --sidebar-bg:     #ffffff;
@@ -82,7 +82,7 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
 /* ─── Selection ───────────────────────────────────────────────────────────── */
-::selection { background: #bfdbfe; color: #111827; }
+::selection { background: #b8c4d9; color: #111827; }
 
 /* ─── Focus ───────────────────────────────────────────────────────────────── */
 *:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

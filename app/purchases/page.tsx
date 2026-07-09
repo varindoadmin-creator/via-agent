@@ -994,8 +994,8 @@ function generateMemoPDF(data: {
   body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; padding: 24px 32px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
   .company { font-size: 15px; font-weight: bold; color: #111827; }
-  .doc-title { font-size: 15px; font-weight: bold; color: #2563eb; text-align: right; }
-  .divider { border: none; border-top: 2.5px solid #2563eb; margin: 8px 0 12px; }
+  .doc-title { font-size: 15px; font-weight: bold; color: #1e3a5f; text-align: right; }
+  .divider { border: none; border-top: 2.5px solid #1e3a5f; margin: 8px 0 12px; }
   .info-grid { display: grid; grid-template-columns: 90px 1fr 110px 1fr; gap: 4px 8px; margin-bottom: 16px; }
   .info-label { color: #6b7280; font-size: 10px; }
   .info-value { font-weight: bold; }
@@ -1014,7 +1014,7 @@ function generateMemoPDF(data: {
   td { padding: 5px 8px; border-bottom: 0.4px solid #e5e7eb; }
   tr:nth-child(even) td { background: #f9fafb; }
   td:nth-child(2) { font-weight: bold; }
-  .notes { background: #eff6ff; border: 0.5px solid #2563eb; padding: 7px 10px; font-size: 9px; color: #374151; margin-bottom: 14px; line-height: 1.5; }
+  .notes { background: #eaeef5; border: 0.5px solid #1e3a5f; padding: 7px 10px; font-size: 9px; color: #374151; margin-bottom: 14px; line-height: 1.5; }
   .footer-bar { background: #f3f4f6; border: 0.5px solid #e5e7eb; text-align: center; padding: 8px; font-size: 10px; font-weight: bold; color: #111827; }
   .footer-line { text-align: center; font-size: 8px; color: #9ca3af; margin-top: 5px; }
   @media print { body { padding: 16px 24px; } }

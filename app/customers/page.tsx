@@ -793,11 +793,11 @@ export default function CustomersPage() {
               </button>
             )}
             <button onClick={() => setShowMissingAddressModal(true)}
-              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors">
+              className="px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors">
               📋 Missing Address
             </button>
             <button onClick={() => setShowDuplicatesModal(true)}
-              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors">
+              className="px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors">
               🔎 Check Duplicates
             </button>
             <button onClick={() => setShowCleanupModal(true)}
