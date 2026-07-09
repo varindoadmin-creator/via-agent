@@ -95,6 +95,13 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon } } | 
 
 const COMING_SOON = ['/bills', '/orders', '/prices', '/reports'];
 
+// Nav item id -> API endpoint whose "New" status count should badge that item.
+const NEW_COUNT_ENDPOINTS: Record<string, string> = {
+  'req-samples':    '/api/requests/samples',
+  'req-quotes':     '/api/requests/quotes',
+  'req-catalogues': '/api/requests/catalogues',
+};
+
 type Mode = 'mobile' | 'tablet' | 'desktop';
 
 // ─── NavContent — shared between sidebar and mobile drawer ────────────────────
@@ -106,6 +113,7 @@ function NavContent({
   onNav,
   onToggleSection,
   onClose,
+  newCounts,
 }: {
   collapsed: boolean;
   openSections: Set<string>;
@@ -113,6 +121,7 @@ function NavContent({
   onNav: (href: string) => void;
   onToggleSection: (id: string) => void;
   onClose?: () => void;
+  newCounts: Record<string, number>;
 }) {
   function isActive(href: string) {
     return href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -197,6 +206,7 @@ function NavContent({
                 {section.items.map(item => {
                   const active = isActive(item.href);
                   const soon = COMING_SOON.includes(item.href);
+                  const newCount = newCounts[item.id] || 0;
                   return (
                     <div key={item.id} style={{ padding: collapsed ? '0' : '0 8px' }}>
                       <button
@@ -214,10 +224,21 @@ function NavContent({
                         onMouseEnter={e => { if (!active && !soon) { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text)'; } }}
                         onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = soon ? 'var(--sidebar-section)' : 'var(--sidebar-text)'; } }}
                       >
-                        {collapsed && <Circle size={7} fill="currentColor" style={{ flexShrink: 0 }} />}
+                        {collapsed && (
+                          newCount > 0
+                            ? <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
+                            : <Circle size={7} fill="currentColor" style={{ flexShrink: 0 }} />
+                        )}
                         {!collapsed && (
                           <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                            <div style={{ fontSize: 12.5, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
+                            <div style={{ fontSize: 12.5, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.label}
+                              {newCount > 0 && (
+                                <span style={{ marginLeft: 5, fontWeight: 700, color: active ? 'inherit' : 'var(--danger)' }}>
+                                  ({newCount})
+                                </span>
+                              )}
+                            </div>
                             {soon && <div style={{ fontSize: 9, color: 'var(--sidebar-section)', letterSpacing: '0.08em' }}>SOON</div>}
                           </div>
                         )}
@@ -263,6 +284,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<Mode>('desktop');
   const [userCollapsed, setUserCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [newCounts, setNewCounts] = useState<Record<string, number>>({});
 
   const allSectionIds = NAV
     .filter(n => n.type === 'section')
@@ -281,6 +303,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Close mobile drawer on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  // Poll "New" request counts to badge the Requests sub-items
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchCounts() {
+      const entries = await Promise.all(
+        Object.entries(NEW_COUNT_ENDPOINTS).map(async ([id, url]) => {
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const count = Array.isArray(data.requests)
+              ? data.requests.filter((r: { status?: string }) => (r.status || 'New') === 'New').length
+              : 0;
+            return [id, count] as const;
+          } catch {
+            return [id, 0] as const;
+          }
+        })
+      );
+      if (!cancelled) setNewCounts(Object.fromEntries(entries));
+    }
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [pathname]);
 
   // Auto-open section for active route
   useEffect(() => {
@@ -377,6 +424,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onNav={handleNav}
             onToggleSection={handleToggleSection}
             onClose={() => setMobileOpen(false)}
+            newCounts={newCounts}
           />
 
         </aside>
@@ -406,6 +454,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           pathname={pathname}
           onNav={handleNav}
           onToggleSection={handleToggleSection}
+          newCounts={newCounts}
         />
 
         {mode === 'desktop' && (
