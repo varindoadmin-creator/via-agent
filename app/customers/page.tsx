@@ -441,15 +441,49 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
 }) {
-  const [sortKey, setSortKey] = useState<'so_count_90d' | 'total_90d' | 'days_since_last_order' | null>(
-    showActivity ? 'total_90d' : null
-  );
+  type SortKey =
+    | 'contact_name' | 'contact' | 'cf_region' | 'cf_tier'
+    | 'so_count_90d' | 'total_90d' | 'last_so_date'
+    | 'days_since_last_order' | 'created_time'
+    | 'outstanding_receivable_amount';
+
+  const NUMERIC_KEYS = useMemo(() => new Set<SortKey>([
+    'so_count_90d', 'total_90d', 'days_since_last_order', 'outstanding_receivable_amount',
+  ]), []);
+
+  function getSortValue(c: Customer, key: SortKey): string | number {
+    switch (key) {
+      case 'contact_name': return c.contact_name.toLowerCase();
+      case 'contact': return (c.mobile || c.phone || c.email || '').toLowerCase();
+      case 'cf_region': return c.cf_region.toLowerCase();
+      case 'cf_tier': return c.cf_tier.toLowerCase();
+      case 'last_so_date': return c.last_so_date || '';
+      case 'created_time': return c.created_time || '';
+      default: return c[key] as number;
+    }
+  }
+
+  const [sortKey, setSortKey] = useState<SortKey | null>(showActivity ? 'total_90d' : null);
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
-  function handleSort(key: typeof sortKey) {
-    if (!key) return;
+  function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
-    else { setSortKey(key); setSortDir('desc'); }
+    else { setSortKey(key); setSortDir(NUMERIC_KEYS.has(key) ? 'desc' : 'asc'); }
+  }
+
+  function SortTh({ label, sortKeyName, align = 'left' }: { label: string; sortKeyName: SortKey; align?: 'left' | 'right' }) {
+    const active = sortKey === sortKeyName;
+    return (
+      <th style={{ ...thStyle, textAlign: align, cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => handleSort(sortKeyName)}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, float: align === 'right' ? 'right' : undefined }}>
+          {label}
+          <span style={{ color: active ? 'var(--accent)' : 'var(--border)', fontSize: 9 }}>
+            {active ? (sortDir === 'desc' ? '▼' : '▲') : '⇅'}
+          </span>
+        </span>
+      </th>
+    );
   }
 
   const filtered = useMemo(() => {
@@ -467,8 +501,11 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
     }
     if (sortKey) {
       result = [...result].sort((a, b) => {
-        const av = a[sortKey] ?? 0;
-        const bv = b[sortKey] ?? 0;
+        const av = getSortValue(a, sortKey);
+        const bv = getSortValue(b, sortKey);
+        if (typeof av === 'string' && typeof bv === 'string') {
+          return sortDir === 'desc' ? bv.localeCompare(av) : av.localeCompare(bv);
+        }
         return sortDir === 'desc' ? (bv as number) - (av as number) : (av as number) - (bv as number);
       });
     }
@@ -528,39 +565,23 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
                       });
                     }} />
                 </th>
-                <th style={thStyle}>Customer</th>
-                <th style={thStyle}>Contact</th>
-                <th style={thStyle}>Region</th>
-                <th style={thStyle}>Tier</th>
+                <SortTh label="Customer" sortKeyName="contact_name" />
+                <SortTh label="Contact" sortKeyName="contact" />
+                <SortTh label="Region" sortKeyName="cf_region" />
+                <SortTh label="Tier" sortKeyName="cf_tier" />
                 {showActivity && <>
-                  <th style={{ ...thStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('so_count_90d')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, float: 'right' }}>
-                      SOs (90d)
-                      <span style={{ color: sortKey === 'so_count_90d' ? 'var(--accent)' : 'var(--border)', fontSize: 9 }}>
-                        {sortKey === 'so_count_90d' ? (sortDir === 'desc' ? '▼' : '▲') : '⇅'}
-                      </span>
-                    </span>
-                  </th>
-                  <th style={{ ...thStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('total_90d')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, float: 'right' }}>
-                      Revenue (90d)
-                      <span style={{ color: sortKey === 'total_90d' ? 'var(--accent)' : 'var(--border)', fontSize: 9 }}>
-                        {sortKey === 'total_90d' ? (sortDir === 'desc' ? '▼' : '▲') : '⇅'}
-                      </span>
-                    </span>
-                  </th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Last Order</th>
+                  <SortTh label="SOs (90d)" sortKeyName="so_count_90d" align="right" />
+                  <SortTh label="Revenue (90d)" sortKeyName="total_90d" align="right" />
+                  <SortTh label="Last Order" sortKeyName="last_so_date" align="right" />
                 </>}
                 {showInactive && <>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Last Order</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Inactive</th>
+                  <SortTh label="Last Order" sortKeyName="last_so_date" align="right" />
+                  <SortTh label="Inactive" sortKeyName="days_since_last_order" align="right" />
                 </>}
                 {!showActivity && !showInactive && (
-                  <th style={thStyle}>Added</th>
+                  <SortTh label="Added" sortKeyName="created_time" />
                 )}
-                <th style={{ ...thStyle, textAlign: 'right' }}>Outstanding</th>
+                <SortTh label="Outstanding" sortKeyName="outstanding_receivable_amount" align="right" />
               </tr>
             </thead>
             <tbody>
