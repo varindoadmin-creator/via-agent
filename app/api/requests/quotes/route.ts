@@ -13,6 +13,21 @@ type Row = {
   notes: string | null;
 };
 
+// The `requests` table has a CHECK constraint allowing only these raw values —
+// each request-type page maps its own display labels on/off this fixed set.
+const RAW_TO_LABEL: Record<string, string> = {
+  new: 'New',
+  pending: 'In Progress',
+  completed: 'Sent to Customer',
+  cancelled: 'Cancelled',
+};
+const LABEL_TO_RAW: Record<string, string> = {
+  'New': 'new',
+  'In Progress': 'pending',
+  'Sent to Customer': 'completed',
+  'Cancelled': 'cancelled',
+};
+
 function sbHeaders() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
@@ -37,13 +52,19 @@ async function sbPatch(path: string, body: Record<string, unknown>) {
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
 }
 
+async function sbDelete(path: string) {
+  const res = await fetch(sbUrl(path), { method: 'DELETE', headers: { ...sbHeaders(), Prefer: 'return=minimal' } });
+  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+}
+
 function formatTs(isoStr: string): string {
   const d = new Date(new Date(isoStr).getTime() + 7 * 3600 * 1000);
   return `${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}, ${String(d.getUTCHours()).padStart(2, '0')}.${String(d.getUTCMinutes()).padStart(2, '0')}.${String(d.getUTCSeconds()).padStart(2, '0')}`;
 }
 
 function normalizeStatus(s: string | null): string {
-  return (s === 'new' || !s) ? 'New' : s;
+  if (!s) return 'New';
+  return RAW_TO_LABEL[s] || s;
 }
 
 function groupRows(rows: Row[]): { rep: Row; items: Row[] }[] {
@@ -67,6 +88,27 @@ function groupRows(rows: Row[]): { rep: Row; items: Row[] }[] {
   }
 
   return groups.reverse();
+}
+
+// Builds the PostgREST filter params matching every row in a representative
+// row's group (same customer/phone/address within the 5s creation window).
+async function groupFilterParams(id: string): Promise<URLSearchParams | null> {
+  const lookup = await sbGet(`requests?id=eq.${encodeURIComponent(id)}&select=customer_name,phone,address,created_at`);
+  if (!lookup.length) return null;
+
+  const ref = lookup[0];
+  const refTime = new Date(ref.created_at).getTime();
+  const windowStart = new Date(refTime - 5000).toISOString();
+  const windowEnd = new Date(refTime + 5000).toISOString();
+
+  const params = new URLSearchParams();
+  params.append('request_type', 'eq.quote');
+  if (ref.customer_name) params.append('customer_name', `eq.${ref.customer_name}`);
+  if (ref.phone) params.append('phone', `eq.${ref.phone}`);
+  if (ref.address) params.append('address', `eq.${ref.address}`);
+  params.append('created_at', `gte.${windowStart}`);
+  params.append('created_at', `lte.${windowEnd}`);
+  return params;
 }
 
 export async function GET() {
@@ -104,30 +146,34 @@ export async function POST(request: NextRequest) {
     const { id, status, notes } = await request.json() as { id: string; status?: string; notes?: string };
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-    const lookup = await sbGet(`requests?id=eq.${encodeURIComponent(id)}&select=customer_name,phone,address,created_at`);
-    if (!lookup.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-    const ref = lookup[0];
-    const refTime = new Date(ref.created_at).getTime();
-    const windowStart = new Date(refTime - 5000).toISOString();
-    const windowEnd = new Date(refTime + 5000).toISOString();
+    const params = await groupFilterParams(id);
+    if (!params) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const updates: Record<string, unknown> = {};
-    if (status !== undefined) updates.status = status;
+    if (status !== undefined) updates.status = LABEL_TO_RAW[status] || status;
     if (notes !== undefined) updates.notes = notes;
-
-    const params = new URLSearchParams();
-    params.append('request_type', 'eq.quote');
-    if (ref.customer_name) params.append('customer_name', `eq.${ref.customer_name}`);
-    if (ref.phone) params.append('phone', `eq.${ref.phone}`);
-    if (ref.address) params.append('address', `eq.${ref.address}`);
-    params.append('created_at', `gte.${windowStart}`);
-    params.append('created_at', `lte.${windowEnd}`);
 
     await sbPatch(`requests?${params.toString()}`, updates);
     return NextResponse.json({ success: true, message: 'Updated' });
   } catch (err) {
     console.error('[Quotes] POST error:', err);
+    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { ids } = await request.json() as { ids: string[] };
+    if (!Array.isArray(ids) || !ids.length) return NextResponse.json({ error: 'ids required' }, { status: 400 });
+
+    for (const id of ids) {
+      const params = await groupFilterParams(id);
+      if (params) await sbDelete(`requests?${params.toString()}`);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('[Quotes] DELETE error:', err);
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }
 }

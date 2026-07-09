@@ -18,13 +18,13 @@ interface SampleRequest {
 type SortKey = 'timestamp' | 'name' | 'total_samples' | 'status';
 type SortDir = 'asc' | 'desc';
 
-const STATUS_OPTIONS = ['New', 'Requested to Vendor', 'Delivered by Courier', 'Sent to Customer'];
+const STATUS_OPTIONS = ['New', 'Requested to Vendor', 'Sent to Customer', 'Cancelled'];
 
 const STATUS_STYLE: Record<string, string> = {
   'New':                    'bg-[var(--info-bg)] text-[var(--info)] border-[var(--info-border)]',
   'Requested to Vendor':    'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]',
-  'Delivered by Courier':   'bg-[var(--accent-light)] text-[var(--accent-text)] border-[var(--accent-border)]',
   'Sent to Customer':       'bg-[var(--success-bg)] text-[var(--success)] border-[var(--success-border)]',
+  'Cancelled':              'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]',
 };
 
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
@@ -70,18 +70,23 @@ function SortBtn({ label, k, sort, onSort }: { label: string; k: SortKey; sort: 
   );
 }
 
-function SampleRow({ req, onStatusChange, savingId }: {
+function SampleRow({ req, onStatusChange, savingId, selected, onToggleSelect }: {
   req: SampleRequest;
   onStatusChange: (id: string, status: string) => void;
   savingId: string | null;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <>
-      <tr className="hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
+      <tr className={`hover:bg-[var(--surface-2)] transition-colors cursor-pointer ${selected ? 'bg-[var(--accent-light)]' : ''}`}
         style={{ borderBottom: expanded ? 'none' : '1px solid var(--border-muted)' }}
         onClick={() => setExpanded(e => !e)}>
+        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" className="w-3.5 h-3.5 rounded" checked={selected} onChange={() => onToggleSelect(req.id)} />
+        </td>
         <td className="px-3 py-2.5 text-center text-[var(--text-4)] text-xs w-8 select-none">{expanded ? '▾' : '▸'}</td>
         <td className="px-3 py-2.5 text-xs text-[var(--text-3)]">{formatTs(req.timestamp)}</td>
         <td className="px-3 py-2.5">
@@ -110,7 +115,7 @@ function SampleRow({ req, onStatusChange, savingId }: {
       </tr>
       {expanded && (
         <tr style={{ borderBottom: '1px solid var(--border)' }}>
-          <td colSpan={8} className="p-0">
+          <td colSpan={9} className="p-0">
             <div className="bg-[var(--surface-2)] px-6 py-4">
               <div className="grid grid-cols-2 gap-6">
                 <div>
@@ -165,6 +170,8 @@ export default function SampleRequestsPage() {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'timestamp', dir: 'desc' });
   const [savingId, setSavingId] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -198,6 +205,28 @@ export default function SampleRequestsPage() {
       setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     } catch (e) { setError('Failed to update: ' + String(e)); }
     finally { setSavingId(null); }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  async function handleDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} sample request${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/requests/samples', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setRequests(prev => prev.filter(r => !selectedIds.has(r.id)));
+      setSelectedIds(new Set());
+    } catch (e) { setError('Failed to delete: ' + String(e)); }
+    finally { setDeleting(false); }
   }
 
   const filtered = useMemo(() => {
@@ -247,6 +276,12 @@ export default function SampleRequestsPage() {
           </div>
           <div className="flex items-center gap-3">
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}
+            {selectedIds.size > 0 && (
+              <button onClick={handleDelete} disabled={deleting}
+                className="px-3 py-1.5 text-xs bg-[var(--danger-bg)] hover:opacity-80 text-[var(--danger)] border border-[var(--danger-border)] rounded-lg font-medium transition-colors disabled:opacity-50">
+                {deleting ? 'Deleting…' : `🗑 Delete (${selectedIds.size})`}
+              </button>
+            )}
             <button onClick={fetchData} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
               {loading ? '…' : '↻ Refresh'}
@@ -309,6 +344,18 @@ export default function SampleRequestsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr>
+                    <th style={{ ...thStyle, width: 36 }}>
+                      <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                        checked={filtered.length > 0 && filtered.every(r => selectedIds.has(r.id))}
+                        onChange={() => {
+                          const allSel = filtered.every(r => selectedIds.has(r.id));
+                          setSelectedIds(prev => {
+                            const n = new Set(prev);
+                            filtered.forEach(r => allSel ? n.delete(r.id) : n.add(r.id));
+                            return n;
+                          });
+                        }} />
+                    </th>
                     <th style={{ ...thStyle, width: 32 }}></th>
                     <th style={thStyle}><SortBtn label="Timestamp" k="timestamp" sort={sort} onSort={handleSort} /></th>
                     <th style={thStyle}><SortBtn label="Name / Company" k="name" sort={sort} onSort={handleSort} /></th>
@@ -321,7 +368,8 @@ export default function SampleRequestsPage() {
                 </thead>
                 <tbody>
                   {filtered.map(req => (
-                    <SampleRow key={req.id} req={req} onStatusChange={handleStatusChange} savingId={savingId} />
+                    <SampleRow key={req.id} req={req} onStatusChange={handleStatusChange} savingId={savingId}
+                      selected={selectedIds.has(req.id)} onToggleSelect={toggleSelect} />
                   ))}
                 </tbody>
               </table>
