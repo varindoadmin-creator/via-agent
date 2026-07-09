@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import CustomerCleanupModal from '@/components/CustomerCleanupModal';
 import MissingAddressModal from '@/components/MissingAddressModal';
 import CustomerDuplicatesModal from '@/components/CustomerDuplicatesModal';
+import { CopyWAButton } from '@/components/CopyWAButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,31 @@ function agingColor(days: number) {
   if (days >= 30) return 'var(--warning)';
   if (days >= 14) return 'var(--accent-text)';
   return 'var(--text-3)';
+}
+
+function buildSingleFollowUpMessage(c: Customer): string {
+  const name = c.contact_name || c.company_name || 'Bapak/Ibu';
+  const lastOrderNote = c.last_so_date ? ` — terakhir order ${c.last_so_date}` : '';
+  return [
+    `Halo ${name},`,
+    '',
+    'Selamat siang! Kami dari *Varindo* (CV. Varindo Forma Hutama), Authorized Dealer resmi *Lamitak HPL* untuk wilayah Jawa & Bali.',
+    '',
+    `Sudah cukup lama kita tidak ada pesanan lagi${lastOrderNote} — kami ingin follow up sekaligus mengingatkan:`,
+    '',
+    '✅ 800+ motif Lamitak terbaru & terlengkap',
+    '✅ Harga khusus untuk pelanggan lama seperti Bapak/Ibu',
+    '✅ Stok selalu ready, pengiriman cepat ke seluruh Jawa & Bali',
+    '',
+    'Cek katalog lengkap kami di *varindo.co.id*, atau langsung balas chat ini kalau ada kebutuhan HPL untuk project berikutnya.',
+    '',
+    'Terima kasih, kami tunggu kabarnya! 🙏',
+    'Tim Varindo',
+  ].join('\n');
+}
+
+function buildFollowUpMessage(customers: Customer[]): string {
+  return customers.map(buildSingleFollowUpMessage).join('\n\n———————————\n\n');
 }
 
 function DaysBadge({ days, suffix }: { days: number; suffix: string }) {
@@ -512,6 +538,11 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
     return result;
   }, [customers, search, sortKey, sortDir]);
 
+  const selectedInTable = useMemo(
+    () => customers.filter(c => selectedIds.has(c.contact_id)),
+    [customers, selectedIds]
+  );
+
   const thStyle: React.CSSProperties = {
     padding: '8px 12px', textAlign: 'left',
     color: 'var(--text-3)', fontWeight: 500, fontSize: 11,
@@ -526,7 +557,15 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
         </div>
-        {!loading && <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} customers</span>}
+        <div className="flex items-center gap-2">
+          {showInactive && selectedInTable.length > 0 && (
+            <CopyWAButton
+              message={buildFollowUpMessage(selectedInTable)}
+              label={`Follow Up (${selectedInTable.length})`}
+            />
+          )}
+          {!loading && <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} customers</span>}
+        </div>
       </div>
 
       {loading && (
