@@ -208,7 +208,12 @@ export default function POApprovalCheckPage() {
                           )}
                           {po.status === 'PARTIAL' && (
                             <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid var(--warning-border)', fontSize: 12 }}>
-                              <strong>Partial coverage:</strong> one or more line items order less than the matched Sales Order(s) need. Approving this PO will not fully clear that demand — the remainder still needs a PO. See STATUS below and Sales Order Items Requests.
+                              <strong>Partial coverage:</strong> this PO orders less than the matched Sales Order needs. The remainder still needs a separate PO.
+                            </div>
+                          )}
+                          {po.line_items.some(li => li.stock_qty > 0) && (
+                            <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--info-bg)', color: 'var(--info)', border: '1px solid var(--info-border)', fontSize: 12 }}>
+                              <strong>Excess stock:</strong> some quantity ordered is beyond current Sales Order need. Double-check it wasn't a typo before approving.
                             </div>
                           )}
 

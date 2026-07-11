@@ -263,7 +263,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
   // For each group: the portion of demand within stock_on_hand is already covered;
   // everything beyond it is a shortfall queue, attributed to the specific SOs driving it
   // (oldest SOs get stock first — a reasonable, explainable FIFO allocation).
-  interface ShortfallEntry { salesorder_number: string; customer_name: string; customer_region: string; original_qty: number; qty: number }
+  interface ShortfallEntry { salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number }
   const shortfallByGroup = new Map<string, ShortfallEntry[]>();
   for (const [k, entries] of soByGroup) {
     const [itemId, locationId] = k.split('::');
@@ -280,6 +280,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
           salesorder_number: so.salesorder_number,
           customer_name: so.customer_name,
           customer_region: regionByCustomer.get(so.customer_id) || '',
+          location_name: item.location_name,
           original_qty: item.need,
           qty: shortfall,
         });
@@ -374,20 +375,47 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
       status = 'NEEDS_REVIEW';
     } else {
       const regionToSOs = new Map<string, Set<string>>();
+      const noteRegion = (region: string, soNumber?: string) => {
+        if (!region) return;
+        if (!regionToSOs.has(region)) regionToSOs.set(region, new Set());
+        if (soNumber) regionToSOs.get(region)!.add(soNumber);
+      };
+
+      // Directly matched demand — this PO's line items genuinely fulfill these SOs.
       for (const li of lineItems) {
         for (const m of li.matches) {
-          if (!m.customer_region) continue; // unknown region doesn't itself count as a "mix"
-          if (!regionToSOs.has(m.customer_region)) regionToSOs.set(m.customer_region, new Set());
-          regionToSOs.get(m.customer_region)!.add(m.salesorder_number);
+          noteRegion(m.customer_region, m.salesorder_number); // unknown region doesn't itself count as a "mix"
         }
       }
+
+      // Cross-region risk: a line item bought beyond local need (excess/for_stock) whose
+      // item still has unmet demand at a *different* warehouse. The excess may be intended
+      // to (incorrectly) serve that other region — same wrong-warehouse problem as a direct
+      // mix, just one hop removed, so it gets flagged the same way.
+      const crossRegionNotes: string[] = [];
+      for (const li of lineItems) {
+        if (li.stock_qty <= 0 || !li.item_id) continue;
+        for (const [otherKey, otherQueue] of remainingQueues) {
+          const [otherItemId] = otherKey.split('::');
+          if (otherItemId !== li.item_id) continue;
+          for (const slot of otherQueue) {
+            if (slot.remaining <= 0 || slot.entry.location_name === li.location_name) continue;
+            noteRegion(li.location_name);
+            noteRegion(slot.entry.customer_region || slot.entry.location_name, slot.entry.salesorder_number);
+            crossRegionNotes.push(
+              `${li.name} (${li.sku}) has ${li.stock_qty} ${li.unit} excess at ${li.location_name}, while ${slot.entry.salesorder_number} ${slot.entry.customer_name} still needs ${Math.min(li.stock_qty, slot.remaining)} ${li.unit} at ${slot.entry.location_name}.`
+            );
+          }
+        }
+      }
+
       if (regionToSOs.size > 1) {
         status = 'REGION_MIX';
         const regions = Array.from(regionToSOs.keys());
-        region_mix_warning = {
-          regions,
-          detail: regions.map(r => `${r}: ${Array.from(regionToSOs.get(r)!).join(', ')}`).join(' | '),
-        };
+        const matchDetail = regions
+          .map(r => { const sos = Array.from(regionToSOs.get(r)!); return sos.length ? `${r}: ${sos.join(', ')}` : r; })
+          .join(' | ');
+        region_mix_warning = { regions, detail: [matchDetail, ...crossRegionNotes].filter(Boolean).join(' | ') };
       } else if (lineItems.some(li => li.match_status === 'partial_so')) {
         // This PO only partially covers the SO(s) it's matched to — approving it does not
         // fully clear that demand. The remainder still shows up in uncovered_demand below,
