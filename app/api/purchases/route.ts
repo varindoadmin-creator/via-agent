@@ -345,8 +345,9 @@ export async function POST(request: NextRequest) {
         const base = getZohoApiBaseUrl();
         const orgId = getZohoOrgId();
 
-        // Approve = change status from pending_approval to open (issued)
-        const url = `${base}/purchaseorders/${poId}/status/open?organization_id=${orgId}`;
+        // Approve = pending_approval -> approved. Not /status/open, which jumps straight
+        // to Issued and skips the Approved step.
+        const url = `${base}/purchaseorders/${poId}/approve?organization_id=${orgId}`;
         const res = await fetchWithRetry(url, {
           method: 'POST',
           headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },

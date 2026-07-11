@@ -28,7 +28,7 @@ type PurchaseOrder = {
   date: string;
   location_name: string;
   total: number;
-  status: 'OK' | 'REGION_MIX' | 'NEEDS_REVIEW';
+  status: 'OK' | 'PARTIAL' | 'REGION_MIX' | 'NEEDS_REVIEW';
   region_mix_warning: RegionMixWarning | null;
   line_items: LineItem[];
 };
@@ -43,7 +43,7 @@ function badgeColor(status?: string) {
   const v = (status || '').toUpperCase();
   if (v === 'OK' || v === 'MATCHED' || v === 'MULTI_MATCH') return { color: 'var(--success)', bg: 'var(--success-bg)', border: 'var(--success-border)' };
   if (v === 'REGION_MIX' || v === 'NEEDS_REVIEW') return { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)' };
-  if (v === 'PARTIAL_SO' || v === 'EXCESS_STOCK') return { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'var(--warning-border)' };
+  if (v === 'PARTIAL' || v === 'PARTIAL_SO' || v === 'EXCESS_STOCK') return { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'var(--warning-border)' };
   return { color: 'var(--text-3)', bg: 'var(--surface-3)', border: 'var(--border)' };
 }
 
@@ -95,6 +95,8 @@ export default function POApprovalCheckPage() {
     if (po.status !== 'OK') {
       setError(po.status === 'REGION_MIX'
         ? 'Cannot approve: matched Sales Orders span multiple regions. Resolve the mix first.'
+        : po.status === 'PARTIAL'
+        ? 'Cannot approve: one or more line items only partially cover the matched Sales Order(s).'
         : 'Cannot approve: one or more line items need manual review.');
       return;
     }
@@ -204,13 +206,18 @@ export default function POApprovalCheckPage() {
                               One or more line items on this PO are missing a linked item and could not be checked automatically — review manually before approving.
                             </div>
                           )}
+                          {po.status === 'PARTIAL' && (
+                            <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid var(--warning-border)', fontSize: 12 }}>
+                              <strong>Partial coverage:</strong> one or more line items order less than the matched Sales Order(s) need. Approving this PO will not fully clear that demand — the remainder still needs a PO. See STATUS below and Sales Order Items Requests.
+                            </div>
+                          )}
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                             <h3 style={{ margin: 0, color: 'var(--text)', fontSize: 15 }}>Line Items</h3>
                             <button
                               onClick={(e) => { e.stopPropagation(); approvePO(po); }}
                               disabled={approvingId === po.purchaseorder_id || !canApprove}
-                              title={!canApprove ? 'Approval is disabled until the region mix / review issue is resolved.' : 'Approve this Purchase Order in Zoho'}
+                              title={!canApprove ? 'Approval is disabled until the region mix / partial coverage / review issue is resolved.' : 'Approve this Purchase Order in Zoho'}
                               style={{
                                 border: canApprove ? '1px solid var(--success)' : '1px solid var(--border)',
                                 background: canApprove ? 'var(--success)' : 'var(--surface-3)',
@@ -270,8 +277,7 @@ export default function POApprovalCheckPage() {
       {uncoveredDemand.length > 0 && (
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginTop: 20 }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text)', fontWeight: 650 }}>Uncovered Sales Order Demand</div>
-            <div style={{ color: 'var(--text-3)', fontSize: 12, marginTop: 2 }}>Confirmed Sales Order items with no stock and no Pending Approval Purchase Order covering them — a new PO is needed.</div>
+            <div style={{ color: 'var(--text)', fontWeight: 650 }}>Sales Order Items Requests</div>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

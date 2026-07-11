@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
     for (const po of pos) {
       try {
         const tok = await getZohoAccessToken();
-        const approveRes = await fetchWithRetry(`${base}/purchaseorders/${po.purchaseorder_id}/status/open?organization_id=${orgId}`, {
+        // Approve = pending_approval -> approved. Not /status/open, which jumps straight
+        // to Issued and skips the Approved step.
+        const approveRes = await fetchWithRetry(`${base}/purchaseorders/${po.purchaseorder_id}/approve?organization_id=${orgId}`, {
           method: 'POST',
           headers: { Authorization: `Zoho-oauthtoken ${tok}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({}),

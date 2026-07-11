@@ -193,7 +193,7 @@ interface ComputedPO {
   date: string;
   location_name: string;
   total: number;
-  status: 'OK' | 'REGION_MIX' | 'NEEDS_REVIEW';
+  status: 'OK' | 'PARTIAL' | 'REGION_MIX' | 'NEEDS_REVIEW';
   region_mix_warning: RegionMixWarning | null;
   line_items: Omit<ComputedLineItem, 'order'>[];
 }
@@ -362,7 +362,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
     }
   }
 
-  const STATUS_ORDER: Record<ComputedPO['status'], number> = { NEEDS_REVIEW: 0, REGION_MIX: 1, OK: 2 };
+  const STATUS_ORDER: Record<ComputedPO['status'], number> = { NEEDS_REVIEW: 0, REGION_MIX: 1, PARTIAL: 2, OK: 3 };
 
   const purchase_orders: ComputedPO[] = pendingPOs.map(po => {
     const lineItems = (lineItemsByPO.get(po.purchaseorder_id) || []).sort((a, b) => a.order - b.order);
@@ -388,6 +388,11 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
           regions,
           detail: regions.map(r => `${r}: ${Array.from(regionToSOs.get(r)!).join(', ')}`).join(' | '),
         };
+      } else if (lineItems.some(li => li.match_status === 'partial_so')) {
+        // This PO only partially covers the SO(s) it's matched to — approving it does not
+        // fully clear that demand. The remainder still shows up in uncovered_demand below,
+        // but the PO itself must not read as a clean "OK".
+        status = 'PARTIAL';
       }
     }
 
@@ -461,6 +466,9 @@ export async function POST(req: NextRequest) {
         if (po.status === 'NEEDS_REVIEW') {
           throw new Error('Cannot approve: one or more line items need manual review (missing item on the PO).');
         }
+        if (po.status === 'PARTIAL') {
+          throw new Error('Cannot approve: one or more line items only partially cover the matched Sales Order(s) — the remaining quantity needs a separate PO or a quantity fix on this one.');
+        }
 
         const detail = await zohoRequest<{ purchaseorder?: Record<string, unknown> }>(`/purchaseorders/${poId}`);
         if (!detail.purchaseorder) throw new Error('Purchase Order not found in Zoho.');
@@ -468,7 +476,10 @@ export async function POST(req: NextRequest) {
           throw new Error(`Only Pending Approval POs can be approved (current: ${s(detail.purchaseorder.status)})`);
         }
 
-        await zohoRequest(`/purchaseorders/${poId}/status/open`, { method: 'POST', body: {} });
+        // Approve = pending_approval -> approved (Zoho's actual approval-workflow endpoint,
+        // mirroring /salesorders/{id}/approve). Not /status/open, which jumps straight to
+        // Issued and skips the Approved step.
+        await zohoRequest(`/purchaseorders/${poId}/approve`, { method: 'POST', body: {} });
         results.push({ purchaseorder_id: poId, purchaseorder_number: po.purchaseorder_number, success: true });
       } catch (e) {
         results.push({ purchaseorder_id: poId, purchaseorder_number: po?.purchaseorder_number || poId, success: false, error: e instanceof Error ? e.message : String(e) });
