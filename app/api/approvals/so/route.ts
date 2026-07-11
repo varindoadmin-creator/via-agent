@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { zohoRequest } from '@/lib/zoho/client';
+import { expectedWarehouseForCustomer, getCustomerRoutingInfo, normalizeWarehouse } from '@/lib/warehouseRouting';
 
 export const maxDuration = 60;
 
@@ -248,7 +249,7 @@ function findProofQtyForSOItem(analysis: Record<string, unknown>, soItem: SOItem
   return null;
 }
 
-function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<typeof normalizeSO>, customerOverride?: string) {
+function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<typeof normalizeSO>, warehouseCheck: WarehouseCheck, customerOverride?: string) {
   const analysis = (analysisInput && typeof analysisInput === 'object' ? analysisInput : {}) as Record<string, unknown>;
   const originalRows = Array.isArray(analysis.comparison) ? analysis.comparison as AIComparisonRow[] : [];
 
@@ -324,15 +325,26 @@ function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<type
     approval_recommendation = 'REVIEW';
   }
 
+  let summary = allMatch
+    ? 'Uploaded proof matches the Sales Order item(s) and quantity. Recommended to approve.'
+    : s(analysis.summary) || 'VIA could not fully match the proof against the Sales Order.';
+
+  // A wrong warehouse means stock moves out of the wrong fulfillment location — this
+  // blocks approval regardless of how well the proof otherwise matches the SO.
+  if (warehouseCheck.status === 'MISMATCH') {
+    overall_status = 'MISMATCH';
+    approval_recommendation = 'REJECT';
+    summary = `${warehouseCheck.notes} ${summary}`.trim();
+  }
+
   return {
     ...analysis,
     comparison,
     customer_check: customerCheck,
+    warehouse_check: warehouseCheck,
     overall_status,
     approval_recommendation,
-    summary: allMatch
-      ? 'Uploaded proof matches the Sales Order item(s) and quantity. Recommended to approve.'
-      : s(analysis.summary) || 'VIA could not fully match the proof against the Sales Order.',
+    summary,
   };
 }
 
@@ -360,6 +372,7 @@ function normalizeSO(so: Record<string, unknown>) {
     total: n(so.total),
     sub_total: n(so.sub_total),
     notes: s(so.notes),
+    location_name: s(so.location_name),
     line_items: lineItems,
   };
 }
@@ -368,6 +381,65 @@ async function getSODetail(id: string) {
   const response = await zohoRequest<ZohoSalesOrderResponse>(`/salesorders/${id}`);
   if (!response.salesorder) throw new Error('Zoho did not return salesorder detail');
   return normalizeSO(response.salesorder);
+}
+
+// ─── Warehouse / region routing check ──────────────────────────────────────────
+// Fulfillment rule: customers in Bandung/Cimahi must be served by HUB-BDG, customers
+// in Medan by HUB-MDN, everyone else by HEAD OFFICE. Wrong warehouse on the SO means
+// stock moves out of the wrong location, so this is flagged as a hard mismatch.
+// (See lib/warehouseRouting.ts — shared with PO Approval.)
+type WarehouseCheck = {
+  customer_city: string;
+  customer_region: string;
+  expected_warehouse: string;
+  so_warehouse: string;
+  status: 'MATCH' | 'MISMATCH' | 'UNCLEAR';
+  notes: string;
+};
+
+// Every line item carries its own warehouse/hub location — check each one individually
+// rather than a single "dominant" location, so a SO split across two warehouses (e.g. one
+// item correctly on HUB-BDG, another left on HEAD OFFICE) is caught as a mismatch too.
+function buildWarehouseCheck(so: ReturnType<typeof normalizeSO>, customerCity: string, cfRegion: string): WarehouseCheck {
+  const itemLocations = so.line_items.map(item => item.location_name).filter(Boolean);
+  const distinctLocations = Array.from(new Set(itemLocations));
+  const soWarehouse = distinctLocations.length ? distinctLocations.join(', ') : so.location_name || '';
+  const expectedWarehouse = expectedWarehouseForCustomer(customerCity, cfRegion);
+  const customerLabel = cfRegion || customerCity;
+
+  if (!expectedWarehouse) {
+    return { customer_city: customerCity, customer_region: cfRegion, expected_warehouse: '', so_warehouse: soWarehouse, status: 'UNCLEAR', notes: 'Customer Region/City is not set in Zoho, so the expected warehouse could not be determined.' };
+  }
+
+  if (!distinctLocations.length) {
+    return { customer_city: customerCity, customer_region: cfRegion, expected_warehouse: expectedWarehouse, so_warehouse: '', status: 'UNCLEAR', notes: 'Sales Order line items do not specify a warehouse.' };
+  }
+
+  const wrongItems = so.line_items.filter(item => item.location_name && normalizeWarehouse(item.location_name) !== normalizeWarehouse(expectedWarehouse));
+
+  if (!wrongItems.length) {
+    return {
+      customer_city: customerCity,
+      customer_region: cfRegion,
+      expected_warehouse: expectedWarehouse,
+      so_warehouse: soWarehouse,
+      status: 'MATCH',
+      notes: `Customer (${customerLabel}) is correctly routed to ${expectedWarehouse}.`,
+    };
+  }
+
+  const notes = distinctLocations.length > 1
+    ? `Sales Order items are split across warehouses (${distinctLocations.join(', ')}). Customer (${customerLabel}) should be served entirely by ${expectedWarehouse}. Wrong warehouse on: ${wrongItems.map(i => `${i.name} (${i.location_name})`).join('; ')}.`
+    : `Customer (${customerLabel}) should be served by ${expectedWarehouse}, but this Sales Order is set to ${soWarehouse}. Fix the warehouse to ensure correct stock movement.`;
+
+  return {
+    customer_city: customerCity,
+    customer_region: cfRegion,
+    expected_warehouse: expectedWarehouse,
+    so_warehouse: soWarehouse,
+    status: 'MISMATCH',
+    notes,
+  };
 }
 
 function tryJson(text: string): Record<string, unknown> | null {
@@ -505,7 +577,9 @@ export async function GET(req: NextRequest) {
 
     if (id) {
       const so = await getSODetail(id);
-      return NextResponse.json({ success: true, salesorder: so });
+      const { city, cfRegion } = await getCustomerRoutingInfo(so.customer_id);
+      const warehouse_check = buildWarehouseCheck(so, city, cfRegion);
+      return NextResponse.json({ success: true, salesorder: { ...so, warehouse_check } });
     }
 
     if (searchParams.get('customers') === '1') {
@@ -579,7 +653,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const rawAnalysis = await callOpenAIForProof({ so, textBlocks, images, pdfs, customerOverride });
+    const [rawAnalysis, routingInfo] = await Promise.all([
+      callOpenAIForProof({ so, textBlocks, images, pdfs, customerOverride }),
+      getCustomerRoutingInfo(so.customer_id),
+    ]);
+    const warehouseCheck = buildWarehouseCheck(so, routingInfo.city, routingInfo.cfRegion);
     const proofText = textBlocks.join('\n\n');
     const rawAnalysisWithText = (rawAnalysis && typeof rawAnalysis === 'object' ? rawAnalysis : {}) as Record<string, unknown>;
     rawAnalysisWithText.proof_text = proofText;
@@ -592,7 +670,7 @@ export async function POST(req: NextRequest) {
         })
         .filter(Boolean);
     }
-    const analysis = postProcessApprovalAnalysis(rawAnalysisWithText, so, customerOverride);
+    const analysis = postProcessApprovalAnalysis(rawAnalysisWithText, so, warehouseCheck, customerOverride);
     console.log('[SO Approval] final analysis', {
       so: so.salesorder_number,
       customer: so.customer_name,

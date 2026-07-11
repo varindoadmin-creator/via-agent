@@ -22,10 +22,13 @@ type SOItem = {
   location_name: string;
 };
 
+type WarehouseCheck = { customer_city?: string; customer_region?: string; expected_warehouse?: string; so_warehouse?: string; status?: string; notes?: string };
+
 type SODetail = SOList & {
   sub_total: number;
   notes: string;
   line_items: SOItem[];
+  warehouse_check?: WarehouseCheck;
 };
 
 type Analysis = {
@@ -33,6 +36,7 @@ type Analysis = {
   summary?: string;
   approval_recommendation?: string;
   customer_check?: { so_customer?: string; proof_customer?: string; status?: string; notes?: string };
+  warehouse_check?: WarehouseCheck;
   extracted_items?: Array<{ item?: string; sku?: string; quantity?: number; unit?: string; price?: number | null; source_note?: string }>;
   comparison?: Array<{ so_item?: string; so_sku?: string; so_qty?: number; proof_item?: string; proof_sku?: string; proof_qty?: number | null; status?: string; notes?: string }>;
 };
@@ -275,6 +279,25 @@ export default function SOApprovalCheckPage() {
                             </div>
                           </div>
 
+                          {detail?.warehouse_check && (
+                            <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)' }}>
+                              <div style={{ padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>Warehouse Check</div>
+                                <Badge value={detail.warehouse_check.status} />
+                              </div>
+                              <div style={{ padding: '0 14px 14px', color: 'var(--text-2)', fontSize: 12 }}>
+                                <span style={mono}>Customer Region: {detail.warehouse_check.customer_region || '—'}</span>
+                                <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
+                                <span style={mono}>Customer City: {detail.warehouse_check.customer_city || '—'}</span>
+                                <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
+                                <span style={mono}>Expected Warehouse: {detail.warehouse_check.expected_warehouse || '—'}</span>
+                                <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
+                                <span style={mono}>SO Warehouse: {detail.warehouse_check.so_warehouse || '—'}</span>
+                                <div style={{ marginTop: 6, color: 'var(--text-3)' }}>{detail.warehouse_check.notes}</div>
+                              </div>
+                            </div>
+                          )}
+
                           {result && (
                             <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)' }}>
                               <div style={{ padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -301,6 +324,7 @@ export default function SOApprovalCheckPage() {
                               </div>
 
                               {result.customer_check && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>Customer check: <Badge value={result.customer_check.status} /> <span style={{ marginLeft: 8 }}>{result.customer_check.notes}</span></div>}
+                              {result.warehouse_check && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>Warehouse check: <Badge value={result.warehouse_check.status} /> <span style={{ marginLeft: 8 }}>{result.warehouse_check.notes}</span></div>}
 
                               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 10, textAlign: 'left' }}>SO ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>SO QTY</th><th style={{ padding: 10, textAlign: 'left' }}>PROOF ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>PROOF QTY</th><th style={{ padding: 10, textAlign: 'center' }}>STATUS</th><th style={{ padding: 10, textAlign: 'left' }}>NOTES</th></tr></thead>

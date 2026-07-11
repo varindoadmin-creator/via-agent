@@ -91,7 +91,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
   },
 ];
 
-const COMING_SOON = ['/bills', '/orders', '/prices', '/reports', '/approvals/po'];
+const COMING_SOON = ['/bills', '/orders', '/prices', '/reports'];
 
 // Nav item id -> API endpoint whose "New" status count should badge that item.
 const NEW_COUNT_ENDPOINTS: Record<string, string> = {
