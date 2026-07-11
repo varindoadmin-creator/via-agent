@@ -58,6 +58,7 @@ export default function SOApprovalCheckPage() {
   const [details, setDetails] = useState<Record<string, SODetail>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [files, setFiles] = useState<Record<string, File[]>>({});
+  const [waText, setWaText] = useState<Record<string, string>>({});
   const [customerOverride, setCustomerOverride] = useState<Record<string, string>>({});
   const [customers, setCustomers] = useState<{ contact_id: string; contact_name: string }[]>([]);
   const [analysis, setAnalysis] = useState<Record<string, Analysis>>({});
@@ -116,12 +117,14 @@ export default function SOApprovalCheckPage() {
 
   async function checkSO(soId: string) {
     const selectedFiles = files[soId] || [];
-    if (!selectedFiles.length) { setError('Please upload WhatsApp screenshot, image, PDF, or text proof first.'); return; }
+    const pastedText = (waText[soId] || '').trim();
+    if (!selectedFiles.length && !pastedText) { setError('Please upload WhatsApp screenshot, image, PDF, or text proof, or paste the WhatsApp message first.'); return; }
     setBusyId(soId); setError('');
     try {
       const fd = new FormData();
       fd.append('salesorder_id', soId);
       selectedFiles.forEach(f => fd.append('files', f));
+      if (pastedText) fd.append('whatsapp_text', pastedText);
       if (customerOverride[soId]) fd.append('customer_name_override', customerOverride[soId]);
       const res = await fetch('/api/approvals/so', { method: 'POST', body: fd });
       const data = await res.json();
@@ -167,14 +170,14 @@ export default function SOApprovalCheckPage() {
     <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 22 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Order Verification</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Sales Order Approval</h1>
         </div>
         <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻ Refresh</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
-          <div style={{ ...mono, color: 'var(--text-4)', fontSize: 11, letterSpacing: '0.08em' }}>PENDING SO</div>
+          <div style={{ ...mono, color: 'var(--text-4)', fontSize: 11, letterSpacing: '0.08em' }}>TOTAL PENDING SO</div>
           <div style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700 }}>{salesorders.length}</div>
         </div>
         <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
@@ -193,7 +196,7 @@ export default function SOApprovalCheckPage() {
       <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
           <div>
-            <div style={{ color: 'var(--text)', fontWeight: 650 }}>Pending Approval Sales Orders</div>
+            <div style={{ color: 'var(--text)', fontWeight: 650 }}>Pending Approval</div>
           </div>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
         </div>
@@ -205,16 +208,15 @@ export default function SOApprovalCheckPage() {
               <th style={{ padding: '11px 12px', textAlign: 'left' }}>SO NUMBER</th>
               <th style={{ padding: '11px 12px', textAlign: 'left' }}>CUSTOMER</th>
               <th style={{ padding: '11px 12px', textAlign: 'left' }}>DATE</th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>SALES PERSON</th>
               <th style={{ padding: '11px 12px', textAlign: 'right' }}>TOTAL</th>
               <th style={{ padding: '11px 12px', textAlign: 'center' }}>AI STATUS</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading pending approval SOs...</td></tr>
+              <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading pending approval SOs...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>No Pending Approval Sales Orders found.</td></tr>
+              <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>No Pending Approval Sales Orders found.</td></tr>
             ) : filtered.map(so => {
               const isOpen = expanded === so.salesorder_id;
               const detail = details[so.salesorder_id];
@@ -226,18 +228,17 @@ export default function SOApprovalCheckPage() {
                     <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 12 }}>{so.salesorder_number}</td>
                     <td style={{ padding: '12px', fontWeight: 600 }}>{so.customer_name}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{so.date}</td>
-                    <td style={{ padding: '12px' }}>{so.salesperson_name || '—'}</td>
                     <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700 }}>{formatRp(so.total)}</td>
                     <td style={{ padding: '12px', textAlign: 'center' }}><Badge value={result?.overall_status} /></td>
                   </tr>
 
                   {isOpen && (
                     <tr key={so.salesorder_id + '-detail'}>
-                      <td colSpan={7} style={{ padding: 0, background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
+                      <td colSpan={6} style={{ padding: 0, background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
                         <div style={{ padding: '18px 22px 22px 54px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
                             <div>
-                              <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>SO Items</h3>
+                              <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>Item Details</h3>
                               {!detail || busyId === so.salesorder_id && !detail ? <div style={{ color: 'var(--text-3)' }}>Loading SO detail...</div> : (
                                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                                   <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 9, textAlign: 'left' }}>ITEM</th><th style={{ padding: 9, textAlign: 'left' }}>SKU</th><th style={{ padding: 9, textAlign: 'right' }}>QTY</th><th style={{ padding: 9, textAlign: 'right' }}>RATE</th></tr></thead>
@@ -249,20 +250,28 @@ export default function SOApprovalCheckPage() {
                             <div>
                               <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>Upload Proof</h3>
                               <input type="file" multiple accept="image/*,application/pdf,text/plain,text/csv" onChange={e => setFiles(prev => ({ ...prev, [so.salesorder_id]: Array.from(e.target.files || []) }))} style={{ width: '100%', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--text-2)', padding: 12 }} />
-                              <div style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 8 }}>Supported: WhatsApp screenshots, images, PDFs, text/CSV. VIA reads the proof and compares item + quantity.</div>
                               {(files[so.salesorder_id] || []).length > 0 && <div style={{ marginTop: 10, color: 'var(--text-3)', fontSize: 12 }}>{files[so.salesorder_id].map(f => f.name).join(', ')}</div>}
                               <div style={{ marginTop: 14 }}>
-                                <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 6 }}>Customer Name <span style={{ color: 'var(--text-4)' }}>(optional — select if proof has no customer info)</span></div>
+                                <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 6 }}>Paste WhatsApp Message <span style={{ color: 'var(--text-4)' }}>(optional)</span></div>
+                                <textarea
+                                  value={waText[so.salesorder_id] || ''}
+                                  onChange={e => setWaText(prev => ({ ...prev, [so.salesorder_id]: e.target.value }))}
+                                  rows={4}
+                                  style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                                />
+                              </div>
+                              <div style={{ marginTop: 14 }}>
+                                <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 6 }}>Customer Name <span style={{ color: 'var(--text-4)' }}>(optional)</span></div>
                                 <select
                                   value={customerOverride[so.salesorder_id] || ''}
                                   onChange={e => setCustomerOverride(prev => ({ ...prev, [so.salesorder_id]: e.target.value }))}
                                   style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', color: customerOverride[so.salesorder_id] ? 'var(--text)' : 'var(--text-4)', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none' }}
                                 >
-                                  <option value=''>— auto-detect from proof —</option>
+                                  <option value=''>Select Customer Name</option>
                                   {customers.map(c => <option key={c.contact_id} value={c.contact_name}>{c.contact_name}</option>)}
                                 </select>
                               </div>
-                              <button onClick={() => checkSO(so.salesorder_id)} disabled={busyId === so.salesorder_id} style={{ marginTop: 12, width: '100%', border: '1px solid var(--accent)', background: 'var(--accent)', color: 'white', borderRadius: 8, padding: '10px 12px', fontWeight: 700, cursor: 'pointer' }}>{busyId === so.salesorder_id ? 'Checking...' : 'Run VIA Approval Check'}</button>
+                              <button onClick={() => checkSO(so.salesorder_id)} disabled={busyId === so.salesorder_id} style={{ marginTop: 12, width: '100%', border: '1px solid var(--accent)', background: 'var(--accent)', color: 'white', borderRadius: 8, padding: '10px 12px', fontWeight: 700, cursor: 'pointer' }}>{busyId === so.salesorder_id ? 'Checking...' : 'Check'}</button>
                             </div>
                           </div>
 

@@ -552,14 +552,17 @@ export async function POST(req: NextRequest) {
     if (!soId) return NextResponse.json({ success: false, error: 'salesorder_id is required' }, { status: 400 });
 
     const customerOverride = s(formData.get('customer_name_override')).trim() || undefined;
+    const whatsappText = s(formData.get('whatsapp_text')).trim();
 
     const so = await getSODetail(soId);
     const files = formData.getAll('files').filter(Boolean) as File[];
-    if (!files.length) return NextResponse.json({ success: false, error: 'Upload at least one proof file.' }, { status: 400 });
+    if (!files.length && !whatsappText) return NextResponse.json({ success: false, error: 'Upload at least one proof file or paste the WhatsApp message.' }, { status: 400 });
 
     const textBlocks: string[] = [];
     const images: Array<{ mime: string; base64: string; name: string }> = [];
     const pdfs: Array<{ mime: string; base64: string; name: string }> = [];
+
+    if (whatsappText) textBlocks.push(`[Pasted WhatsApp message]\n${whatsappText}`);
 
     for (const file of files.slice(0, 8)) {
       const buffer = Buffer.from(await file.arrayBuffer());

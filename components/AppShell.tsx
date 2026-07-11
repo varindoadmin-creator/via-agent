@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, Landmark, BarChart2, Circle, Target,
+  ClipboardCheck, BarChart2, Circle, Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -24,36 +24,16 @@ interface NavSection {
   items: NavItem[];
 }
 
-const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon } } | { type: 'section'; section: NavSection }> = [
-  { type: 'standalone', item: { id: 'chat', href: '/', icon: LayoutDashboard, label: 'Dashboard' } },
-  { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' } },
+const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
+  { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }, hidden: true },
   {
     type: 'section',
     section: {
-      id: 'sales', label: 'Sales', icon: ShoppingCart,
+      id: 'approvals', label: 'Approvals', icon: ClipboardCheck,
       items: [
-        { id: 'customers',    href: '/customers',           label: 'Customers'     },
-        { id: 'salesorders',  href: '/shipments',           label: 'Sales Orders'  },
-        { id: 'invoices',     href: '/print',               label: 'Invoices'      },
-        { id: 'tax-invoices', href: '/sales/tax-invoices',  label: 'Tax Invoices'  },
+        { id: 'approval-so', href: '/approvals/so', label: 'Sales Order'    },
+        { id: 'approval-po', href: '/approvals/po', label: 'Purchase Order' },
       ],
-    },
-  },
-  {
-    type: 'section',
-    section: {
-      id: 'purchases', label: 'Purchases', icon: Package,
-      items: [
-        { id: 'purchaseorders', href: '/purchases', label: 'Purchase Orders' },
-        { id: 'bills',          href: '/bills',     label: 'Bills'           },
-      ],
-    },
-  },
-  {
-    type: 'section',
-    section: {
-      id: 'inventory', label: 'Inventory', icon: Boxes,
-      items: [{ id: 'items', href: '/inventory', label: 'Items' }],
     },
   },
   {
@@ -67,19 +47,36 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon } } | 
       ],
     },
   },
+  { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
   {
     type: 'section',
     section: {
-      id: 'approvals', label: 'Approvals', icon: ClipboardCheck,
-      items: [{ id: 'approval-so', href: '/approvals/so', label: 'Order Verification' }],
+      id: 'sales', label: 'Sales', icon: ShoppingCart,
+      items: [
+        { id: 'salesorders',  href: '/shipments',           label: 'Sales Orders'  },
+        { id: 'invoices',     href: '/print',               label: 'Invoices'      },
+      ],
     },
+    hidden: true,
   },
   {
     type: 'section',
     section: {
-      id: 'finance', label: 'Banking', icon: Landmark,
-      items: [{ id: 'recon', href: '/reconcile', label: 'Reconciliation' }],
+      id: 'purchases', label: 'Purchases', icon: Package,
+      items: [
+        { id: 'purchaseorders', href: '/purchases', label: 'Purchase Orders' },
+        { id: 'bills',          href: '/bills',     label: 'Bills'           },
+      ],
     },
+    hidden: true,
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'inventory', label: 'Inventory', icon: Boxes,
+      items: [{ id: 'items', href: '/inventory', label: 'Items' }],
+    },
+    hidden: true,
   },
   {
     type: 'section',
@@ -90,10 +87,11 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon } } | 
         { id: 'purchases-report', href: '/reports/purchases',  label: 'Purchases'      },
       ],
     },
+    hidden: true,
   },
 ];
 
-const COMING_SOON = ['/bills', '/orders', '/prices', '/reports'];
+const COMING_SOON = ['/bills', '/orders', '/prices', '/reports', '/approvals/po'];
 
 // Nav item id -> API endpoint whose "New" status count should badge that item.
 const NEW_COUNT_ENDPOINTS: Record<string, string> = {
@@ -139,7 +137,7 @@ function NavContent({
 
   return (
     <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-      {NAV.map(entry => {
+      {NAV.filter(entry => !entry.hidden).map(entry => {
         if (entry.type === 'standalone') {
           const item = entry.item;
           const Icon = item.icon;

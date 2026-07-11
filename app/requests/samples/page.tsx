@@ -35,9 +35,6 @@ function buildSampleWAMessage(req: SampleRequest): string {
   const lines = [
     `*Sample Requests*`,
     ``,
-    `Name: ${req.name}`,
-    `Address: ${req.address || '—'}`,
-    `Phone: ${req.phone || '—'}`,
     `Samples:`,
     ...req.samples.map((s, i) => `${i + 1}. ${s}`),
   ];
@@ -258,6 +255,10 @@ export default function SampleRequestsPage() {
     return c;
   }, [requests]);
 
+  const selectedMessage = useMemo(() =>
+    requests.filter(r => selectedIds.has(r.id)).map(buildSampleWAMessage).join('\n\n—\n\n'),
+    [requests, selectedIds]);
+
   const thStyle: React.CSSProperties = {
     padding: '8px 12px', textAlign: 'left',
     color: 'var(--text-3)', fontWeight: 500, fontSize: 11,
@@ -276,6 +277,9 @@ export default function SampleRequestsPage() {
           </div>
           <div className="flex items-center gap-3">
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}
+            {selectedIds.size > 0 && (
+              <CopyWAButton message={selectedMessage} label={`Copy Message (${selectedIds.size})`} />
+            )}
             {selectedIds.size > 0 && (
               <button onClick={handleDelete} disabled={deleting}
                 className="px-3 py-1.5 text-xs bg-[var(--danger-bg)] hover:opacity-80 text-[var(--danger)] border border-[var(--danger-border)] rounded-lg font-medium transition-colors disabled:opacity-50">

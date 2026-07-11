@@ -1,5 +1,4 @@
 'use client';
-import { CopyWAButton } from '@/components/CopyWAButton';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
@@ -15,17 +14,6 @@ interface CatalogueRequest {
 
 type SortKey = 'timestamp' | 'name' | 'status';
 type SortDir = 'asc' | 'desc';
-
-function buildCatalogueWAMessage(req: { name: string; address?: string; phone?: string }): string {
-  const lines = [
-    `*Catalogue Requests*`,
-    ``,
-    `Name: ${req.name}`,
-    `Address: ${req.address || '—'}`,
-    `Phone: ${req.phone || '—'}`,
-  ];
-  return lines.join('\n');
-}
 
 const STATUS_OPTIONS = ['New', 'Sent', 'Done', 'Cancelled'];
 const STATUS_STYLE: Record<string, string> = {
@@ -116,7 +104,6 @@ function CatRow({ req, onStatusChange, savingId, selected, onToggleSelect }: {
                       onClick={e => e.stopPropagation()}>
                       💬 WhatsApp
                     </a>
-                    <CopyWAButton message={buildCatalogueWAMessage({ name: req.name, address: req.address, phone: req.phone })} />
                   </div>
                 )}
               </div>

@@ -25,3 +25,7 @@ tsconfig.tsbuildinfo
 .vscode/
 .idea/
 *.swp
+
+# Local tooling / scratch
+.claude/
+{app/

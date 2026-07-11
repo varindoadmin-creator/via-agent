@@ -1,5 +1,4 @@
 'use client';
-import { CopyWAButton } from '@/components/CopyWAButton';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
@@ -26,11 +25,10 @@ interface QuoteRequest {
 type SortKey = 'timestamp' | 'name' | 'total_items' | 'status';
 type SortDir = 'asc' | 'desc';
 
-const STATUS_OPTIONS = ['New', 'In Progress', 'Sent to Customer', 'Cancelled'];
+const STATUS_OPTIONS = ['New', 'Sent to Customer', 'Cancelled'];
 
 const STATUS_STYLE: Record<string, string> = {
   'New':              'bg-[var(--info-bg)] text-[var(--info)] border-[var(--info-border)]',
-  'In Progress':      'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]',
   'Sent to Customer': 'bg-[var(--success-bg)] text-[var(--success)] border-[var(--success-border)]',
   'Cancelled':        'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]',
 };
@@ -38,19 +36,6 @@ const STATUS_STYLE: Record<string, string> = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
-
-function buildQuoteWAMessage(req: { name: string; address?: string; phone?: string; items: { code: string; qty: string }[] }): string {
-  const lines = [
-    `*Quote Requests*`,
-    ``,
-    `Name: ${req.name}`,
-    `Address: ${req.address || '—'}`,
-    `Phone: ${req.phone || '—'}`,
-    `Items:`,
-    ...req.items.map((it, i) => `${i + 1}. ${it.code}${it.qty ? ' — Qty: ' + it.qty : ''}`),
-  ];
-  return lines.join('\n');
-}
 
 function formatTs(ts: string) {
   if (!ts) return '—';
@@ -173,7 +158,6 @@ function QuoteRow({ req, onStatusChange, savingId, selected, onToggleSelect }: {
                         onClick={e => e.stopPropagation()}>
                         <span>💬</span> WhatsApp
                       </a>
-                      <CopyWAButton message={buildQuoteWAMessage({ name: req.name, address: req.address, phone: req.phone, items: req.items })} />
                     </div>
                   )}
                 </div>
