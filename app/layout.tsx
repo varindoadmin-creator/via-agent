@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import './globals.css';
 import AppShell from '@/components/AppShell';
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'VIA — Varindo Intelligence Agent',
   description: 'Internal operations assistant for Varindo, connected to Zoho Books.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const role = await verifySessionToken(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+
   return (
     <html lang="en">
       <head>
@@ -23,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ` }} />
       </head>
       <body className="antialiased" data-v={process.env.NEXT_PUBLIC_BUILD_TIME}>
-        <AppShell>{children}</AppShell>
+        <AppShell role={role}>{children}</AppShell>
       </body>
     </html>
   );

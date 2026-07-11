@@ -7,6 +7,7 @@ import {
   ClipboardCheck, BarChart2, Circle, Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { Role } from '@/lib/auth';
 
 // Baked in at compile time — guarantees a unique client bundle hash on every deploy.
 const _BUILD = process.env.NEXT_PUBLIC_BUILD_TIME;
@@ -105,6 +106,7 @@ type Mode = 'mobile' | 'tablet' | 'desktop';
 // ─── NavContent — shared between sidebar and mobile drawer ────────────────────
 
 function NavContent({
+  nav,
   collapsed,
   openSections,
   pathname,
@@ -113,6 +115,7 @@ function NavContent({
   onClose,
   newCounts,
 }: {
+  nav: typeof NAV;
   collapsed: boolean;
   openSections: Set<string>;
   pathname: string;
@@ -137,7 +140,7 @@ function NavContent({
 
   return (
     <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-      {NAV.filter(entry => !entry.hidden).map(entry => {
+      {nav.filter(entry => !entry.hidden).map(entry => {
         if (entry.type === 'standalone') {
           const item = entry.item;
           const Icon = item.icon;
@@ -275,7 +278,7 @@ function Logo({ collapsed }: { collapsed: boolean }) {
 
 // ─── AppShell ─────────────────────────────────────────────────────────────────
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, role }: { children: React.ReactNode; role: Role | null }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -284,7 +287,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [newCounts, setNewCounts] = useState<Record<string, number>>({});
 
-  const allSectionIds = NAV
+  // Admin only sees the sections currently exposed for day-to-day approval work;
+  // Director sees everything. Server-side, middleware is what actually enforces
+  // this — this filter just keeps the sidebar honest about what's reachable.
+  const visibleNav = role === 'admin'
+    ? NAV.filter(entry => entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests'))
+    : NAV;
+
+  const allSectionIds = visibleNav
     .filter(n => n.type === 'section')
     .map(n => (n as { type: 'section'; section: NavSection }).section.id);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(allSectionIds));
@@ -354,6 +364,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, [collapsed]);
 
+  const handleLogout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  }, [router]);
+
+  // Login page renders its own full-screen layout — no sidebar chrome.
+  if (pathname === '/login') return <>{children}</>;
+
   // ── Mobile layout ──────────────────────────────────────────────────────────
   if (mode === 'mobile') {
     return (
@@ -416,6 +435,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <NavContent
+            nav={visibleNav}
             collapsed={false}
             openSections={openSections}
             pathname={pathname}
@@ -424,6 +444,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClose={() => setMobileOpen(false)}
             newCounts={newCounts}
           />
+
+          {role && (
+            <div style={{ padding: '10px 14px', borderTop: '1px solid var(--sidebar-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span style={{ color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', textTransform: 'capitalize' }}>{role}</span>
+              <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', padding: 0 }}>Logout</button>
+            </div>
+          )}
 
         </aside>
 
@@ -447,6 +474,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Logo collapsed={collapsed} />
 
         <NavContent
+          nav={visibleNav}
           collapsed={collapsed}
           openSections={openSections}
           pathname={pathname}
@@ -454,6 +482,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onToggleSection={handleToggleSection}
           newCounts={newCounts}
         />
+
+        {role && (
+          <div style={{ padding: collapsed ? '8px 0' : '10px 14px', borderTop: '1px solid var(--sidebar-border)', display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexShrink: 0 }}>
+            {!collapsed && <span style={{ color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', textTransform: 'capitalize' }}>{role}</span>}
+            <button onClick={handleLogout} title="Log out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', padding: 0 }}>{collapsed ? '⎋' : 'Logout'}</button>
+          </div>
+        )}
 
         {mode === 'desktop' && (
           <button
