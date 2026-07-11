@@ -292,6 +292,8 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   // this — this filter just keeps the sidebar honest about what's reachable.
   const visibleNav = role === 'admin'
     ? NAV.filter(entry => entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests'))
+    : role === 'director'
+    ? NAV.map(entry => ({ ...entry, hidden: false })) // Director sees every section, including WIP ones hidden from Admin
     : NAV;
 
   const allSectionIds = visibleNav
