@@ -164,6 +164,7 @@ async function getSODetailForMatching(id: string): Promise<ConfirmedSO | null> {
 // ─── Matching output shapes ─────────────────────────────────────────────────
 
 interface MatchRow {
+  salesorder_id: string;
   salesorder_number: string;
   customer_name: string;
   customer_region: string;
@@ -271,7 +272,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
   // For each group: the portion of demand within stock_on_hand is already covered;
   // everything beyond it is a shortfall queue, attributed to the specific SOs driving it
   // (oldest SOs get stock first — a reasonable, explainable FIFO allocation).
-  interface ShortfallEntry { salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number; already_ordered: boolean }
+  interface ShortfallEntry { salesorder_id: string; salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number; already_ordered: boolean }
   const shortfallByGroup = new Map<string, ShortfallEntry[]>();
   for (const [k, entries] of soByGroup) {
     const [itemId, locationId] = k.split('::');
@@ -285,6 +286,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
       const shortfall = item.need - coveredByStock;
       if (shortfall > 0) {
         queue.push({
+          salesorder_id: so.salesorder_id,
           salesorder_number: so.salesorder_number,
           customer_name: so.customer_name,
           customer_region: regionByCustomer.get(so.customer_id) || '',
@@ -332,6 +334,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
         if (slot.remaining <= 0) { qIdx++; continue; }
         const take = Math.min(remaining, slot.remaining);
         matches.push({
+          salesorder_id: slot.entry.salesorder_id,
           salesorder_number: slot.entry.salesorder_number,
           customer_name: slot.entry.customer_name,
           customer_region: slot.entry.customer_region,
@@ -541,6 +544,19 @@ export async function POST(req: NextRequest) {
         // Issued and skips the Approved step.
         await zohoRequest(`/purchaseorders/${poId}/approve`, { method: 'POST', body: {} });
         results.push({ purchaseorder_id: poId, purchaseorder_number: po.purchaseorder_number, success: true });
+
+        // Mark every SO this PO covers as "Ordered" in Zoho — best-effort, since the PO
+        // itself is already approved at this point and a failure here shouldn't undo that.
+        const matchedSOIds = Array.from(new Set(
+          po.line_items.flatMap(li => li.matches.map(m => m.salesorder_id)).filter(Boolean)
+        ));
+        await Promise.all(matchedSOIds.map(async soId => {
+          try {
+            await zohoRequest(`/salesorders/${soId}/status/${SO_SUB_STATUS_ORDERED}`, { method: 'POST', body: {} });
+          } catch (e) {
+            console.warn(`[PO Approval] Failed to mark SO ${soId} as Ordered:`, e);
+          }
+        }));
       } catch (e) {
         results.push({ purchaseorder_id: poId, purchaseorder_number: po?.purchaseorder_number || poId, success: false, error: e instanceof Error ? e.message : String(e) });
       }

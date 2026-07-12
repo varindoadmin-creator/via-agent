@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { zohoRequest } from '@/lib/zoho/client';
 import { expectedWarehouseForCustomer, getCustomerRoutingInfo, normalizeWarehouse } from '@/lib/warehouseRouting';
+import { normalizeProvince, extractProvinceFromText, extractZipFromText, provinceForCity } from '@/lib/customerCleanup/rules';
 
 export const maxDuration = 60;
 
@@ -249,7 +250,7 @@ function findProofQtyForSOItem(analysis: Record<string, unknown>, soItem: SOItem
   return null;
 }
 
-function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<typeof normalizeSO>, warehouseCheck: WarehouseCheck, customerOverride?: string) {
+function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<typeof normalizeSO>, warehouseCheck: WarehouseCheck, shippingAddressCheck: ShippingAddressCheck, customerOverride?: string) {
   const analysis = (analysisInput && typeof analysisInput === 'object' ? analysisInput : {}) as Record<string, unknown>;
   const originalRows = Array.isArray(analysis.comparison) ? analysis.comparison as AIComparisonRow[] : [];
 
@@ -337,17 +338,53 @@ function postProcessApprovalAnalysis(analysisInput: unknown, so: ReturnType<type
     summary = `${warehouseCheck.notes} ${summary}`.trim();
   }
 
+  // Missing shipping address/attention/phone means the goods can't actually be delivered —
+  // also blocks approval regardless of proof matching.
+  if (shippingAddressCheck.status === 'INCOMPLETE') {
+    overall_status = 'MISMATCH';
+    approval_recommendation = 'REJECT';
+    summary = `${shippingAddressCheck.notes} ${summary}`.trim();
+  }
+
   return {
     ...analysis,
     comparison,
     customer_check: customerCheck,
     warehouse_check: warehouseCheck,
+    shipping_address_check: shippingAddressCheck,
     overall_status,
     approval_recommendation,
     summary,
   };
 }
 
+
+interface RawShippingAddress {
+  address: string;
+  street2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  country_code: string;
+  attention: string;
+  phone: string;
+}
+
+function extractShippingAddress(so: Record<string, unknown>): RawShippingAddress {
+  const sa = (so.shipping_address || {}) as Record<string, unknown>;
+  return {
+    address: s(sa.address),
+    street2: s(sa.street2),
+    city: s(sa.city),
+    state: s(sa.state),
+    zip: s(sa.zip),
+    country: s(sa.country),
+    country_code: s(sa.country_code),
+    attention: s(sa.attention),
+    phone: s(sa.phone),
+  };
+}
 
 function normalizeSO(so: Record<string, unknown>) {
   const lineItems = ((so.line_items || []) as Record<string, unknown>[]).map((li): SOItem => ({
@@ -373,6 +410,7 @@ function normalizeSO(so: Record<string, unknown>) {
     sub_total: n(so.sub_total),
     notes: s(so.notes),
     location_name: s(so.location_name),
+    shipping_address: extractShippingAddress(so),
     line_items: lineItems,
   };
 }
@@ -439,6 +477,70 @@ function buildWarehouseCheck(so: ReturnType<typeof normalizeSO>, customerCity: s
     so_warehouse: soWarehouse,
     status: 'MISMATCH',
     notes,
+  };
+}
+
+// ─── Shipping address check ─────────────────────────────────────────────────
+// Address, Attention, and Phone Number are required before an SO can be approved —
+// without them the goods can't actually be delivered. Once present, State/Zip are
+// auto-corrected using the exact same inference rules as the Customer Data Repair
+// tool (lib/customerCleanup/rules.ts) — reused, not reimplemented — and written
+// back to the SO automatically on approve, no separate confirmation needed.
+type ShippingAddressCheck = {
+  status: 'OK' | 'INCOMPLETE';
+  notes: string;
+  missing_fields: string[];
+};
+
+function buildShippingAddressCheck(sa: RawShippingAddress): { check: ShippingAddressCheck; addressUpdates: Partial<RawShippingAddress> } {
+  const missing: string[] = [];
+  if (!sa.address.trim() || !sa.city.trim()) missing.push('Shipping Address');
+  if (!sa.attention.trim()) missing.push('Attention');
+  if (!sa.phone.trim()) missing.push('Phone Number');
+
+  if (missing.length) {
+    return {
+      check: {
+        status: 'INCOMPLETE',
+        notes: `Missing: ${missing.join(', ')}. Ask Admin to fill these in on the Sales Order in Zoho before approving.`,
+        missing_fields: missing,
+      },
+      addressUpdates: {},
+    };
+  }
+
+  const addressUpdates: Partial<RawShippingAddress> = {};
+  const changes: string[] = [];
+
+  if (sa.state.trim()) {
+    const normalized = normalizeProvince(sa.state);
+    if (normalized && normalized !== sa.state) {
+      addressUpdates.state = normalized;
+      changes.push(`State ${sa.state} -> ${normalized}`);
+    }
+  } else {
+    const foundState = provinceForCity(sa.city) || extractProvinceFromText(sa.address) || extractProvinceFromText(sa.street2);
+    if (foundState) {
+      addressUpdates.state = foundState;
+      changes.push(`State (blank) -> ${foundState}`);
+    }
+  }
+
+  if (!sa.zip.trim()) {
+    const foundZip = extractZipFromText(sa.address) || extractZipFromText(sa.street2);
+    if (foundZip) {
+      addressUpdates.zip = foundZip;
+      changes.push(`Zip (blank) -> ${foundZip}`);
+    }
+  }
+
+  return {
+    check: {
+      status: 'OK',
+      notes: changes.length ? `Shipping address complete. Will auto-correct on approve: ${changes.join(', ')}.` : 'Shipping address complete.',
+      missing_fields: [],
+    },
+    addressUpdates,
   };
 }
 
@@ -579,7 +681,8 @@ export async function GET(req: NextRequest) {
       const so = await getSODetail(id);
       const { city, cfRegion } = await getCustomerRoutingInfo(so.customer_id);
       const warehouse_check = buildWarehouseCheck(so, city, cfRegion);
-      return NextResponse.json({ success: true, salesorder: { ...so, warehouse_check } });
+      const { check: shipping_address_check } = buildShippingAddressCheck(so.shipping_address);
+      return NextResponse.json({ success: true, salesorder: { ...so, warehouse_check, shipping_address_check } });
     }
 
     if (searchParams.get('customers') === '1') {
@@ -658,6 +761,7 @@ export async function POST(req: NextRequest) {
       getCustomerRoutingInfo(so.customer_id),
     ]);
     const warehouseCheck = buildWarehouseCheck(so, routingInfo.city, routingInfo.cfRegion);
+    const { check: shippingAddressCheck } = buildShippingAddressCheck(so.shipping_address);
     const proofText = textBlocks.join('\n\n');
     const rawAnalysisWithText = (rawAnalysis && typeof rawAnalysis === 'object' ? rawAnalysis : {}) as Record<string, unknown>;
     rawAnalysisWithText.proof_text = proofText;
@@ -670,7 +774,7 @@ export async function POST(req: NextRequest) {
         })
         .filter(Boolean);
     }
-    const analysis = postProcessApprovalAnalysis(rawAnalysisWithText, so, warehouseCheck, customerOverride);
+    const analysis = postProcessApprovalAnalysis(rawAnalysisWithText, so, warehouseCheck, shippingAddressCheck, customerOverride);
     console.log('[SO Approval] final analysis', {
       so: so.salesorder_number,
       customer: so.customer_name,
@@ -707,6 +811,25 @@ export async function PUT(req: NextRequest) {
         success: false,
         error: `Only Pending Approval Sales Orders can be approved. Current status: ${so.status}`,
       }, { status: 400 });
+    }
+
+    // Re-validate shipping address completeness server-side — don't trust the client's
+    // cached check. Blocks the same way a warehouse mismatch does.
+    const { check: shippingAddressCheck, addressUpdates } = buildShippingAddressCheck(so.shipping_address);
+    if (shippingAddressCheck.status === 'INCOMPLETE') {
+      return NextResponse.json({
+        success: false,
+        error: `Cannot approve: ${shippingAddressCheck.notes}`,
+      }, { status: 400 });
+    }
+
+    // Address is complete — auto-correct State/Zip (same logic as Customer Data Repair)
+    // and write it back before approving. No separate confirmation needed for this part.
+    if (Object.keys(addressUpdates).length > 0) {
+      await zohoRequest(`/salesorders/${soId}`, {
+        method: 'PUT',
+        body: { shipping_address: { ...so.shipping_address, ...addressUpdates } },
+      });
     }
 
     const response = await zohoRequest<Record<string, unknown>>(`/salesorders/${soId}/approve`, {

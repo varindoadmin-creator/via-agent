@@ -160,7 +160,8 @@ export default function POApprovalCheckPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search PO/vendor..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', minWidth: 780, borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
@@ -236,7 +237,8 @@ export default function POApprovalCheckPage() {
                             >{approvingId === po.purchaseorder_id ? 'Approving...' : 'Approve PO'}</button>
                           </div>
 
-                          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                          <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}>
                                 <th style={{ padding: 9, textAlign: 'left' }}>ITEM</th>
@@ -268,6 +270,7 @@ export default function POApprovalCheckPage() {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -277,6 +280,7 @@ export default function POApprovalCheckPage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {uncoveredDemand.length > 0 && (
@@ -284,7 +288,8 @@ export default function POApprovalCheckPage() {
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ color: 'var(--text)', fontWeight: 650 }}>Sales Order Items Requests</div>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
                 <th style={{ padding: '10px 12px', textAlign: 'left' }}>ITEM</th>
@@ -306,6 +311,7 @@ export default function POApprovalCheckPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

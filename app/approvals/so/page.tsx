@@ -23,12 +23,14 @@ type SOItem = {
 };
 
 type WarehouseCheck = { customer_city?: string; customer_region?: string; expected_warehouse?: string; so_warehouse?: string; status?: string; notes?: string };
+type ShippingAddressCheck = { status?: string; notes?: string; missing_fields?: string[] };
 
 type SODetail = SOList & {
   sub_total: number;
   notes: string;
   line_items: SOItem[];
   warehouse_check?: WarehouseCheck;
+  shipping_address_check?: ShippingAddressCheck;
 };
 
 type Analysis = {
@@ -37,6 +39,7 @@ type Analysis = {
   approval_recommendation?: string;
   customer_check?: { so_customer?: string; proof_customer?: string; status?: string; notes?: string };
   warehouse_check?: WarehouseCheck;
+  shipping_address_check?: ShippingAddressCheck;
   extracted_items?: Array<{ item?: string; sku?: string; quantity?: number; unit?: string; price?: number | null; source_note?: string }>;
   comparison?: Array<{ so_item?: string; so_sku?: string; so_qty?: number; proof_item?: string; proof_sku?: string; proof_qty?: number | null; status?: string; notes?: string }>;
 };
@@ -46,8 +49,8 @@ const fmt = (n: number) => Number(n || 0).toLocaleString('id-ID');
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
 function badgeColor(status?: string) {
-  if (status === 'MATCH' || status === 'APPROVE') return { color: 'var(--success)', bg: 'var(--success-bg)', border: 'var(--success-border)' };
-  if (status === 'MISMATCH' || status === 'REJECT') return { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)' };
+  if (status === 'MATCH' || status === 'APPROVE' || status === 'OK') return { color: 'var(--success)', bg: 'var(--success-bg)', border: 'var(--success-border)' };
+  if (status === 'MISMATCH' || status === 'REJECT' || status === 'INCOMPLETE') return { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)' };
   if (status === 'PARTIAL_MATCH' || status === 'REVIEW') return { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'var(--warning-border)' };
   return { color: 'var(--text-3)', bg: 'var(--surface-3)', border: 'var(--border)' };
 }
@@ -205,7 +208,8 @@ export default function SOApprovalCheckPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
@@ -244,10 +248,12 @@ export default function SOApprovalCheckPage() {
                             <div>
                               <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>Item Details</h3>
                               {!detail || busyId === so.salesorder_id && !detail ? <div style={{ color: 'var(--text-3)' }}>Loading SO detail...</div> : (
-                                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                                <table style={{ width: '100%', minWidth: 420, borderCollapse: 'collapse' }}>
                                   <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 9, textAlign: 'left' }}>ITEM</th><th style={{ padding: 9, textAlign: 'left' }}>SKU</th><th style={{ padding: 9, textAlign: 'right' }}>QTY</th><th style={{ padding: 9, textAlign: 'right' }}>RATE</th></tr></thead>
                                   <tbody>{detail.line_items.map((li, idx) => <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 9 }}>{li.name}</td><td style={{ padding: 9, ...mono, fontSize: 11 }}>{li.sku}</td><td style={{ padding: 9, textAlign: 'right', ...mono }}>{fmt(li.quantity)} {li.unit}</td><td style={{ padding: 9, textAlign: 'right', ...mono }}>{formatRp(li.rate)}</td></tr>)}</tbody>
                                 </table>
+                                </div>
                               )}
                             </div>
 
@@ -298,6 +304,16 @@ export default function SOApprovalCheckPage() {
                             </div>
                           )}
 
+                          {detail?.shipping_address_check && (
+                            <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)' }}>
+                              <div style={{ padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                                <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>Shipping Address Check</div>
+                                <Badge value={detail.shipping_address_check.status} />
+                              </div>
+                              <div style={{ padding: '0 14px 14px', color: 'var(--text-3)', fontSize: 12 }}>{detail.shipping_address_check.notes}</div>
+                            </div>
+                          )}
+
                           {result && (
                             <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-2)' }}>
                               <div style={{ padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -325,11 +341,14 @@ export default function SOApprovalCheckPage() {
 
                               {result.customer_check && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>Customer check: <Badge value={result.customer_check.status} /> <span style={{ marginLeft: 8 }}>{result.customer_check.notes}</span></div>}
                               {result.warehouse_check && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>Warehouse check: <Badge value={result.warehouse_check.status} /> <span style={{ marginLeft: 8 }}>{result.warehouse_check.notes}</span></div>}
+                              {result.shipping_address_check && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12 }}>Shipping address check: <Badge value={result.shipping_address_check.status} /> <span style={{ marginLeft: 8 }}>{result.shipping_address_check.notes}</span></div>}
 
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                              <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
                                 <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 10, textAlign: 'left' }}>SO ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>SO QTY</th><th style={{ padding: 10, textAlign: 'left' }}>PROOF ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>PROOF QTY</th><th style={{ padding: 10, textAlign: 'center' }}>STATUS</th><th style={{ padding: 10, textAlign: 'left' }}>NOTES</th></tr></thead>
                                 <tbody>{(result.comparison || []).map((row, idx) => <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 10 }}>{row.so_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.so_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.so_qty}</td><td style={{ padding: 10 }}>{row.proof_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.proof_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.proof_qty ?? '—'}</td><td style={{ padding: 10, textAlign: 'center' }}><Badge value={row.status} /></td><td style={{ padding: 10, color: 'var(--text-3)', fontSize: 12 }}>{row.notes}</td></tr>)}</tbody>
                               </table>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -341,6 +360,7 @@ export default function SOApprovalCheckPage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <p style={{ color: 'var(--text-4)', fontSize: 12, marginTop: 12 }}>VIA gives a recommendation only. Final approval should still be reviewed by Admin/Manager before approving in Zoho.</p>

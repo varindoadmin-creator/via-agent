@@ -238,8 +238,8 @@ export default function GoodsCollectionMemoPage() {
             ) : eligiblePOs.length === 0 ? (
               <div className="text-[var(--text-4)] text-xs py-3">No POs within the last 7 days.</div>
             ) : (
-              <div className="border border-[var(--border)] rounded-lg overflow-hidden">
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <div className="border border-[var(--border)] rounded-lg overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ width: 36, padding: '6px 10px' }}>

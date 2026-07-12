@@ -9,6 +9,8 @@ const ADMIN_ALLOWED_PREFIXES = [
   '/approvals/so', '/approvals/po', '/api/approvals',
   '/requests', '/api/requests',
   '/documents', '/api/documents',
+  '/guide',
+  '/customers', '/api/customers',
 ];
 
 function isPublic(pathname: string): boolean {
