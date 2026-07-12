@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { zohoRequest } from '@/lib/zoho/client';
 import { getItemWithStock, type ItemStockSummary } from '@/lib/zoho/items';
-import { expectedWarehouseForCustomer, getCustomerRoutingInfo } from '@/lib/warehouseRouting';
+import { expectedWarehouseForCustomer, getCustomerRoutingInfo, normalizeWarehouse } from '@/lib/warehouseRouting';
 
 export const maxDuration = 60;
 
@@ -388,6 +388,25 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
         }
       }
 
+      // Warehouse mismatch: the PO's own Warehouse Location for a matched line item must
+      // equal the expected warehouse for the SO customer it's fulfilling (BDG-HUB -> HUB-BDG,
+      // MDN-HUB -> HUB-MDN, HEAD OFFICE -> HEAD OFFICE) — otherwise the purchased stock lands
+      // in the wrong location's inventory. This catches a mismatch even when the PO and the SO
+      // agree with each other (so the match itself "succeeded") but both point at a warehouse
+      // that's wrong for the customer's actual region.
+      const warehouseMismatchNotes: string[] = [];
+      for (const li of lineItems) {
+        for (const m of li.matches) {
+          if (!m.customer_region) continue;
+          if (normalizeWarehouse(m.customer_region) === normalizeWarehouse(li.location_name)) continue;
+          noteRegion(li.location_name);
+          noteRegion(m.customer_region, m.salesorder_number);
+          warehouseMismatchNotes.push(
+            `${li.name} (${li.sku}) is set to warehouse ${li.location_name}, but ${m.salesorder_number} ${m.customer_name} is region ${m.customer_region} and should be delivered to ${m.customer_region}.`
+          );
+        }
+      }
+
       // Cross-region risk: a line item bought beyond local need (excess/for_stock) whose
       // item still has unmet demand at a *different* warehouse. The excess may be intended
       // to (incorrectly) serve that other region — same wrong-warehouse problem as a direct
@@ -415,7 +434,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
         const matchDetail = regions
           .map(r => { const sos = Array.from(regionToSOs.get(r)!); return sos.length ? `${r}: ${sos.join(', ')}` : r; })
           .join(' | ');
-        region_mix_warning = { regions, detail: [matchDetail, ...crossRegionNotes].filter(Boolean).join(' | ') };
+        region_mix_warning = { regions, detail: [matchDetail, ...warehouseMismatchNotes, ...crossRegionNotes].filter(Boolean).join(' | ') };
       } else if (lineItems.some(li => li.match_status === 'partial_so')) {
         // This PO only partially covers the SO(s) it's matched to — approving it does not
         // fully clear that demand. The remainder still shows up in uncovered_demand below,
