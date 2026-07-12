@@ -91,8 +91,15 @@ interface ConfirmedSO {
   customer_id: string;
   customer_name: string;
   date: string;
+  current_sub_status: string;
   line_items: SODemandLine[];
 }
+
+// Zoho's own confirmed-SO sub-status codes (same as app/api/so-stock-check/route.ts).
+// 'cs_awaitin' ("Ordered") means a PO already exists for this SO's demand — even if that
+// PO isn't sitting in Pending Approval right now (it may already be open/issued), so this
+// demand shouldn't be re-flagged as uncovered.
+const SO_SUB_STATUS_ORDERED = 'cs_awaitin';
 
 async function getPODetail(id: string): Promise<PendingPO | null> {
   try {
@@ -146,6 +153,7 @@ async function getSODetailForMatching(id: string): Promise<ConfirmedSO | null> {
       customer_id: s(so.customer_id),
       customer_name: s(so.customer_name),
       date: s(so.date),
+      current_sub_status: s(so.current_sub_status),
       line_items: lineItems,
     };
   } catch {
@@ -263,7 +271,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
   // For each group: the portion of demand within stock_on_hand is already covered;
   // everything beyond it is a shortfall queue, attributed to the specific SOs driving it
   // (oldest SOs get stock first — a reasonable, explainable FIFO allocation).
-  interface ShortfallEntry { salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number }
+  interface ShortfallEntry { salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number; already_ordered: boolean }
   const shortfallByGroup = new Map<string, ShortfallEntry[]>();
   for (const [k, entries] of soByGroup) {
     const [itemId, locationId] = k.split('::');
@@ -283,6 +291,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
           location_name: item.location_name,
           original_qty: item.need,
           qty: shortfall,
+          already_ordered: so.current_sub_status === SO_SUB_STATUS_ORDERED,
         });
       }
     }
@@ -462,6 +471,10 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
     const sample = (soByGroup.get(k) || [])[0]?.item;
     for (const slot of queue) {
       if (slot.remaining <= 0) continue;
+      // Zoho already shows this SO as "Ordered" — a PO exists for it (possibly already
+      // approved/issued, so it's no longer in our Pending Approval set). Don't tell Admin
+      // to raise a new one.
+      if (slot.entry.already_ordered) continue;
       uncovered_demand.push({
         item_id: itemId,
         name: sample?.name || '',
