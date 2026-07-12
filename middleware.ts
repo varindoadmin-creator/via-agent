@@ -8,6 +8,7 @@ const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/ping'];
 const ADMIN_ALLOWED_PREFIXES = [
   '/approvals/so', '/approvals/po', '/api/approvals',
   '/requests', '/api/requests',
+  '/documents', '/api/documents',
 ];
 
 function isPublic(pathname: string): boolean {

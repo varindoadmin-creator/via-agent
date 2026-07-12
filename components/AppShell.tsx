@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target,
+  ClipboardCheck, BarChart2, Circle, Target, FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -45,6 +45,15 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
         { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
         { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
+      ],
+    },
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'documents', label: 'Documents', icon: FileText,
+      items: [
+        { id: 'goods-collection-memo', href: '/documents/goods-collection-memo', label: 'Goods Collection Memo' },
       ],
     },
   },
@@ -291,7 +300,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   // Director sees everything. Server-side, middleware is what actually enforces
   // this — this filter just keeps the sidebar honest about what's reachable.
   const visibleNav = role === 'admin'
-    ? NAV.filter(entry => entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests'))
+    ? NAV.filter(entry => entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'documents'))
     : role === 'director'
     ? NAV.map(entry => ({ ...entry, hidden: false })) // Director sees every section, including WIP ones hidden from Admin
     : NAV;
