@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/ping'];
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/ping'];
 
 // Path prefixes the 'admin' role may access — matches exactly what's visible
 // in today's sidebar (Approvals + Requests). Everything else is Director-only.

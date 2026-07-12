@@ -46,6 +46,7 @@ function LoginForm() {
         <input
           type="password"
           autoFocus
+          autoComplete="off"
           value={password}
           onChange={e => setPassword(e.target.value)}
           style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '10px 12px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
