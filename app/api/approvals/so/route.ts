@@ -512,15 +512,26 @@ function buildShippingAddressCheck(sa: RawShippingAddress): { check: ShippingAdd
   const addressUpdates: Partial<RawShippingAddress> = {};
   const changes: string[] = [];
 
+  // Zoho rejects an SO update once address+street2+city+state+zip+country combined
+  // reaches 100 characters ("shipping_address has less than 100 characters") — a
+  // real constraint hit live: 80(address)+7(city)+9(state)+5(zip) = 101, rejected.
+  // Only apply a field if doing so keeps the combined total under that limit.
+  const fitsUnderLimit = (candidate: Partial<RawShippingAddress>) => {
+    const merged = { ...sa, ...addressUpdates, ...candidate };
+    const total = [merged.address, merged.street2, merged.city, merged.state, merged.zip, merged.country]
+      .filter(Boolean).join('').length;
+    return total < 100;
+  };
+
   if (sa.state.trim()) {
     const normalized = normalizeProvince(sa.state);
-    if (normalized && normalized !== sa.state) {
+    if (normalized && normalized !== sa.state && fitsUnderLimit({ state: normalized })) {
       addressUpdates.state = normalized;
       changes.push(`State ${sa.state} -> ${normalized}`);
     }
   } else {
     const foundState = provinceForCity(sa.city) || extractProvinceFromText(sa.address) || extractProvinceFromText(sa.street2);
-    if (foundState) {
+    if (foundState && fitsUnderLimit({ state: foundState })) {
       addressUpdates.state = foundState;
       changes.push(`State (blank) -> ${foundState}`);
     }
@@ -528,7 +539,7 @@ function buildShippingAddressCheck(sa: RawShippingAddress): { check: ShippingAdd
 
   if (!sa.zip.trim()) {
     const foundZip = extractZipFromText(sa.address) || extractZipFromText(sa.street2);
-    if (foundZip) {
+    if (foundZip && fitsUnderLimit({ zip: foundZip })) {
       addressUpdates.zip = foundZip;
       changes.push(`Zip (blank) -> ${foundZip}`);
     }
@@ -825,11 +836,18 @@ export async function PUT(req: NextRequest) {
 
     // Address is complete — auto-correct State/Zip (same logic as Customer Data Repair)
     // and write it back before approving. No separate confirmation needed for this part.
+    // Best-effort: this is a cosmetic cleanup, not a gate — if Zoho rejects it for any
+    // reason (e.g. an address-length constraint the length check below didn't catch),
+    // that must never block the actual approval.
     if (Object.keys(addressUpdates).length > 0) {
-      await zohoRequest(`/salesorders/${soId}`, {
-        method: 'PUT',
-        body: { shipping_address: { ...so.shipping_address, ...addressUpdates } },
-      });
+      try {
+        await zohoRequest(`/salesorders/${soId}`, {
+          method: 'PUT',
+          body: { shipping_address: { ...so.shipping_address, ...addressUpdates } },
+        });
+      } catch (e) {
+        console.warn(`[SO Approval] Shipping address auto-fix failed for ${soId}, approving anyway:`, e);
+      }
     }
 
     const response = await zohoRequest<Record<string, unknown>>(`/salesorders/${soId}/approve`, {
