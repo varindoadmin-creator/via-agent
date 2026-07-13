@@ -470,11 +470,10 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
   type SortKey =
     | 'contact_name' | 'contact' | 'cf_region' | 'cf_tier'
     | 'so_count_90d' | 'total_90d' | 'last_so_date'
-    | 'days_since_last_order' | 'created_time'
-    | 'outstanding_receivable_amount';
+    | 'days_since_last_order' | 'created_time';
 
   const NUMERIC_KEYS = useMemo(() => new Set<SortKey>([
-    'so_count_90d', 'total_90d', 'days_since_last_order', 'outstanding_receivable_amount',
+    'so_count_90d', 'total_90d', 'days_since_last_order',
   ]), []);
 
   function getSortValue(c: Customer, key: SortKey): string | number {
@@ -620,7 +619,6 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
                 {!showActivity && !showInactive && (
                   <SortTh label="Added" sortKeyName="created_time" />
                 )}
-                <SortTh label="Outstanding" sortKeyName="outstanding_receivable_amount" align="right" />
               </tr>
             </thead>
             <tbody>
@@ -688,11 +686,6 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
                       <div className="text-[var(--text-3)] text-xs">{c.created_time.split('T')[0]}</div>
                     </td>
                   )}
-                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                    <span style={{ ...mono, fontSize: 12, color: c.outstanding_receivable_amount > 0 ? 'var(--warning)' : 'var(--text-4)' }}>
-                      {formatRp(c.outstanding_receivable_amount)}
-                    </span>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -706,10 +699,10 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
                     <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 600, fontSize: 12 }}>
                       {formatRp(filtered.reduce((s, c) => s + c.total_90d, 0))}
                     </td>
-                    <td colSpan={2} />
+                    <td colSpan={1} />
                   </>
                 ) : (
-                  <td colSpan={10} style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, ...mono }}>
+                  <td colSpan={9} style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, ...mono }}>
                     TOTAL ({filtered.length} customers)
                   </td>
                 )}
@@ -740,6 +733,33 @@ export default function CustomersPage() {
   const [showCleanupModal, setShowCleanupModal] = useState(false);
   const [showMissingAddressModal, setShowMissingAddressModal] = useState(false);
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+
+  const allCustomers = useMemo(
+    () => [...newCustomers, ...activeCustomers, ...inactiveCustomers],
+    [newCustomers, activeCustomers, inactiveCustomers]
+  );
+
+  const tierBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of allCustomers) {
+      const tier = c.cf_tier?.trim() || 'No Discount';
+      counts[tier] = (counts[tier] || 0) + 1;
+    }
+    return CF_TIER_OPTIONS.map(tier => ({ label: tier, value: counts[tier] || 0 }));
+  }, [allCustomers]);
+
+  const hubBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of allCustomers) {
+      const region = c.cf_region?.trim();
+      if (region) counts[region] = (counts[region] || 0) + 1;
+    }
+    const known = ['HEAD OFFICE', 'BDG-HUB', 'MDN-HUB'];
+    const rows = known.map(hub => ({ label: hub, value: counts[hub] || 0 }));
+    const otherCount = allCustomers.length - rows.reduce((s, r) => s + r.value, 0);
+    if (otherCount > 0) rows.push({ label: 'Other / Unassigned', value: otherCount });
+    return rows;
+  }, [allCustomers]);
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -891,6 +911,32 @@ export default function CustomersPage() {
               <div className="text-2xl font-semibold" style={{ ...mono, color: c.color }}>{c.value}</div>
             </div>
           ))}
+        </div>
+
+        {/* Tier / Hub breakdown */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="via-card px-4 py-3">
+            <div className="text-[var(--text-3)] text-xs mb-2.5">Customers by Tier</div>
+            <div className="flex items-center gap-5 flex-wrap">
+              {tierBreakdown.map(t => (
+                <div key={t.label}>
+                  <div className="text-lg font-semibold" style={mono}>{loading ? '…' : t.value}</div>
+                  <div className="text-[var(--text-4)] text-xs">{t.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="via-card px-4 py-3">
+            <div className="text-[var(--text-3)] text-xs mb-2.5">Customers by Hub</div>
+            <div className="flex items-center gap-5 flex-wrap">
+              {hubBreakdown.map(h => (
+                <div key={h.label}>
+                  <div className="text-lg font-semibold" style={mono}>{loading ? '…' : h.value}</div>
+                  <div className="text-[var(--text-4)] text-xs">{h.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {error && <div className="mb-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-sm">{error}</div>}
