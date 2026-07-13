@@ -211,7 +211,6 @@ function CustomersFromRequestsTable() {
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">Customers</h2>
-          <div className="text-[var(--text-3)] text-xs mt-0.5">People who submitted a Sample, Quote, or Catalogue request — not yet confirmed as Zoho customers.</div>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[var(--text-4)] text-xs" style={mono}>{leads.length} leads</span>
@@ -426,6 +425,10 @@ export default function LeadsPage() {
           </select>
         </div>
 
+        <div className="mb-5">
+          <CustomersFromRequestsTable />
+        </div>
+
         {/* Table */}
         <div className="via-card overflow-hidden mb-5">
           <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
@@ -539,8 +542,6 @@ export default function LeadsPage() {
             </div>
           )}
         </div>
-
-        <CustomersFromRequestsTable />
 
       </div>
     </div>
