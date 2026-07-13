@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import ItemDuplicatesModal from '@/components/ItemDuplicatesModal';
 
 const BRANDS = ['All Brands', 'AICA', 'CARTA', 'ECO', 'EDL', 'LAMITAK', 'TACO'];
 const LOCATIONS = ['HEAD OFFICE', 'HUB-BDG', 'HUB-MDN'] as const;
@@ -202,6 +203,7 @@ export default function InventoryPage() {
   const [error, setError] = useState('');
   const [totalItems, setTotalItems] = useState(0);
   const [lastFetched, setLastFetched] = useState('');
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
 
   const cache = useRef<Map<string, { data: Record<string, InventoryItem[]>; total: number; time: string }>>(new Map());
 
@@ -270,6 +272,10 @@ export default function InventoryPage() {
                 Updated {lastFetched}
               </span>
             )}
+            <button onClick={() => setShowDuplicatesModal(true)}
+              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text-2)] border border-[var(--border)] rounded-lg transition-colors">
+              🔎 Check Duplicates
+            </button>
             <button onClick={() => fetchInventory(brand, search, true)} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text-2)] border border-[var(--border)] rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
               <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
@@ -277,6 +283,10 @@ export default function InventoryPage() {
             </button>
           </div>
         </div>
+
+        {showDuplicatesModal && (
+          <ItemDuplicatesModal onClose={() => setShowDuplicatesModal(false)} />
+        )}
 
         {/* Filters */}
         <div className="flex items-center gap-3 mb-6 flex-wrap">

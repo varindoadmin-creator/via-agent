@@ -27,6 +27,7 @@ interface NavSection {
 
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
   { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }, hidden: true },
+  { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
   { type: 'standalone', item: { id: 'customers', href: '/customers', icon: Users, label: 'Customers' }, hidden: true },
   {
     type: 'section',
@@ -59,7 +60,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
     },
   },
   { type: 'standalone', item: { id: 'guide', href: '/guide', icon: BookOpen, label: 'Guide' } },
-  { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
   {
     type: 'section',
     section: {
