@@ -155,6 +155,137 @@ function RecruitmentPlanPanel() {
   );
 }
 
+// ─── Customers table (leads sourced from Requests: samples/quotes/catalogues) ──
+
+interface RequestLead {
+  name: string;
+  phone: string;
+  address: string;
+  types: string[];
+  total_requests: number;
+  first_at: string;
+  last_at: string;
+}
+
+function typeBadgeClass(type: string) {
+  switch (type) {
+    case 'Sample': return 'via-badge-info';
+    case 'Quote': return 'via-badge-warning';
+    case 'Catalogue': return 'via-badge-muted';
+    default: return 'via-badge-muted';
+  }
+}
+
+function CustomersFromRequestsTable() {
+  const [leads, setLeads] = useState<RequestLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchLeads = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/leads/customers');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load');
+      setLeads(data.customers || []);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  const thStyle: React.CSSProperties = {
+    padding: '8px 12px', textAlign: 'left',
+    color: 'var(--text-3)', fontWeight: 500, fontSize: 11,
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
+    whiteSpace: 'nowrap',
+  };
+
+  return (
+    <div className="via-card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+        <div>
+          <h2 className="text-[var(--text)] font-semibold text-sm">Customers</h2>
+          <div className="text-[var(--text-3)] text-xs mt-0.5">People who submitted a Sample, Quote, or Catalogue request — not yet confirmed as Zoho customers.</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[var(--text-4)] text-xs" style={mono}>{leads.length} leads</span>
+          <button onClick={fetchLeads} disabled={loading}
+            className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
+            {loading ? '…' : '↻ Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="m-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">{error}</div>
+      )}
+
+      {!loading && !error && leads.length === 0 && (
+        <div className="flex flex-col items-center py-10">
+          <div className="text-3xl mb-2 opacity-20">○</div>
+          <div className="text-[var(--text-3)] text-sm">No requests received yet.</div>
+        </div>
+      )}
+
+      {!error && leads.length > 0 && (
+        <div className="overflow-x-auto">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Contact</th>
+                <th style={thStyle}>Address</th>
+                <th style={thStyle}>Requested</th>
+                <th style={thStyle}>Total</th>
+                <th style={thStyle}>Last Request</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((l, i) => (
+                <tr key={`${l.phone}-${i}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                  <td style={{ padding: '8px 12px', maxWidth: 220 }}>
+                    <div className="text-[var(--text)] text-xs font-medium truncate" title={l.name}>{l.name || '(unnamed)'}</div>
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[var(--text-3)] text-xs" style={mono}>{l.phone || '—'}</span>
+                      {l.phone && <CopyIconButton value={l.phone} />}
+                    </div>
+                  </td>
+                  <td style={{ padding: '8px 12px', maxWidth: 260 }}>
+                    <div className="text-[var(--text-3)] text-xs truncate" title={l.address}>{l.address || '—'}</div>
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {l.types.map(t => (
+                        <span key={t} className={`via-badge border text-xs ${typeBadgeClass(t)}`}>{t}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <span className="text-[var(--text-2)] text-xs" style={mono}>{l.total_requests}</span>
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    <span className="text-[var(--text-4)] text-xs" style={mono}>
+                      {new Date(l.last_at).toLocaleDateString('id-ID')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main page ──────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
@@ -296,9 +427,9 @@ export default function LeadsPage() {
         </div>
 
         {/* Table */}
-        <div className="via-card overflow-hidden">
+        <div className="via-card overflow-hidden mb-5">
           <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-            <h2 className="text-[var(--text)] font-semibold text-sm">Sub-Dealer Targets</h2>
+            <h2 className="text-[var(--text)] font-semibold text-sm">Sub-Dealer</h2>
             <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} leads</span>
           </div>
 
@@ -408,6 +539,8 @@ export default function LeadsPage() {
             </div>
           )}
         </div>
+
+        <CustomersFromRequestsTable />
 
       </div>
     </div>

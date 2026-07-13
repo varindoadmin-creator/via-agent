@@ -273,7 +273,7 @@ export default function InventoryPage() {
               </span>
             )}
             <button onClick={() => setShowDuplicatesModal(true)}
-              className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text-2)] border border-[var(--border)] rounded-lg transition-colors">
+              className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors">
               🔎 Check Duplicates
             </button>
             <button onClick={() => fetchInventory(brand, search, true)} disabled={loading}
