@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { SOStockCheckTable } from './stock-check-table';
 import { CopyWAButton } from '@/components/CopyWAButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1516,8 +1515,6 @@ export default function ShipmentsPage() {
           <DeliveredTable items={delivered} loading={loading} error={error} onConverted={handleConverted} />
         </div>
 
-      {/* ── Table 4: SO Stock Check ── */}
-        <SOStockCheckTable />
       </div>
     </div>
   );
