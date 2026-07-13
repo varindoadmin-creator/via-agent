@@ -32,37 +32,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
   {
     type: 'section',
     section: {
-      id: 'approvals', label: 'Approvals', icon: ClipboardCheck,
-      items: [
-        { id: 'approval-so', href: '/approvals/so', label: 'Sales Order'    },
-        { id: 'approval-po', href: '/approvals/po', label: 'Purchase Order' },
-      ],
-    },
-  },
-  {
-    type: 'section',
-    section: {
-      id: 'requests', label: 'Requests', icon: Inbox,
-      items: [
-        { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
-        { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
-        { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
-      ],
-    },
-  },
-  {
-    type: 'section',
-    section: {
-      id: 'documents', label: 'Documents', icon: FileText,
-      items: [
-        { id: 'goods-collection-memo', href: '/documents/goods-collection-memo', label: 'Goods Collection Memo' },
-      ],
-    },
-  },
-  { type: 'standalone', item: { id: 'guide', href: '/guide', icon: BookOpen, label: 'Guide' } },
-  {
-    type: 'section',
-    section: {
       id: 'sales', label: 'Sales', icon: ShoppingCart,
       items: [
         { id: 'salesorders',  href: '/shipments',           label: 'Sales Orders'  },
@@ -94,6 +63,36 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
   {
     type: 'section',
     section: {
+      id: 'approvals', label: 'Approvals', icon: ClipboardCheck,
+      items: [
+        { id: 'approval-so', href: '/approvals/so', label: 'Sales Order'    },
+        { id: 'approval-po', href: '/approvals/po', label: 'Purchase Order' },
+      ],
+    },
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'requests', label: 'Requests', icon: Inbox,
+      items: [
+        { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
+        { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
+        { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
+      ],
+    },
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'documents', label: 'Documents', icon: FileText,
+      items: [
+        { id: 'goods-collection-memo', href: '/documents/goods-collection-memo', label: 'Goods Collection Memo' },
+      ],
+    },
+  },
+  {
+    type: 'section',
+    section: {
       id: 'reports', label: 'Reports', icon: BarChart2,
       items: [
         { id: 'sales-report',     href: '/reports/sales',     label: 'Sales'          },
@@ -102,6 +101,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
     },
     hidden: true,
   },
+  { type: 'standalone', item: { id: 'guide', href: '/guide', icon: BookOpen, label: 'Guide' } },
 ];
 
 const COMING_SOON = ['/bills', '/orders', '/prices', '/reports'];
