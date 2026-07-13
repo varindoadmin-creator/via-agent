@@ -67,6 +67,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
       items: [
         { id: 'salesorders',  href: '/shipments',           label: 'Sales Orders'  },
         { id: 'invoices',     href: '/print',               label: 'Invoices'      },
+        { id: 'tax-invoices', href: '/sales/tax-invoices',  label: 'Tax Invoices'  },
       ],
     },
     hidden: true,
