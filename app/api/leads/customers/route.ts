@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { formatBusinessName, normalizeSpaces } from '@/lib/customerCleanup/rules';
 
 type Row = {
   id: string;
@@ -120,7 +121,12 @@ export async function GET() {
     }
 
     const customers = Array.from(byKey.values())
-      .map(c => ({ ...c, types: Array.from(c.types) }))
+      .map(c => ({
+        ...c,
+        name: c.name ? formatBusinessName(c.name) : c.name,
+        address: c.address ? normalizeSpaces(c.address) : c.address,
+        types: Array.from(c.types),
+      }))
       .sort((a, b) => b.last_at.localeCompare(a.last_at));
 
     return NextResponse.json({ success: true, customers });

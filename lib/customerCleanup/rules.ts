@@ -127,7 +127,7 @@ export interface CustomerFixResult {
   payload: Record<string, unknown>; // Zoho PUT /contacts/{id} body — only the changed fields
 }
 
-function normalizeSpaces(s: string): string {
+export function normalizeSpaces(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 
