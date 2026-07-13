@@ -860,14 +860,6 @@ export default function CustomersPage() {
               className="px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors">
               🔎 Check Duplicates
             </button>
-            <button onClick={() => setShowCleanupModal(true)}
-              className="px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors">
-              🧹 Repair Data
-            </button>
-            <button onClick={() => setShowAddModal(true)}
-              className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors flex items-center gap-1.5">
-              <span>+</span> New Customer
-            </button>
           </div>
         </div>
 
