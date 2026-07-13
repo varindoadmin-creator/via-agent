@@ -39,6 +39,10 @@ type DashboardData = {
   };
 };
 
+type DailyBriefChange = { field: string; from: string; to: string };
+type DailyBriefCustomer = { contact_id: string; contact_name: string; changes: DailyBriefChange[]; fixed_at: string };
+type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[] };
+
 function formatRp(value: number) {
   return `Rp ${Math.round(Number(value || 0)).toLocaleString('id-ID')}`;
 }
@@ -70,6 +74,103 @@ function MetricCard({ title, value, subtitle, tone = 'default' }: { title: strin
       <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
         {subtitle}
       </div>
+    </div>
+  );
+}
+
+function DailyBriefPanel() {
+  const [days, setDays] = useState<DailyBriefDay[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/dashboard/daily-brief', { cache: 'no-store' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to load');
+      setDays(json.days || []);
+      setExpanded(prev => (prev.size ? prev : new Set((json.days || []).slice(0, 1).map((d: DailyBriefDay) => d.date))));
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function toggle(date: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date); else next.add(date);
+      return next;
+    });
+  }
+
+  return (
+    <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, marginBottom: 20 }}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-[var(--text)] font-semibold text-sm">Daily Brief</h2>
+          <p className="text-[var(--muted)] text-xs mt-0.5">Customers VIA automatically repaired, by day.</p>
+        </div>
+        <button onClick={load} disabled={loading}
+          className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+          {loading ? '…' : '↻ Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)' }}>
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && days && days.length === 0 && (
+        <div className="text-[var(--muted)] text-xs py-3">No customers have been auto-repaired in the last 14 days.</div>
+      )}
+
+      {!error && days && days.length > 0 && (
+        <div className="space-y-2">
+          {days.map(day => {
+            const isOpen = expanded.has(day.date);
+            return (
+              <div key={day.date} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                <button
+                  onClick={() => toggle(day.date)}
+                  className="w-full flex items-center justify-between px-3 py-2"
+                  style={{ background: 'var(--surface-2)' }}
+                >
+                  <span className="text-[var(--text)] text-xs font-medium">{day.label}</span>
+                  <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} {isOpen ? '▲' : '▼'}
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="divide-y" style={{ borderTop: '1px solid var(--border)' }}>
+                    {day.customers.map(c => (
+                      <div key={c.contact_id} className="px-3 py-2">
+                        <div className="text-[var(--text)] text-xs font-medium">{c.contact_name || '(unnamed)'}</div>
+                        <div className="text-[var(--muted)] text-xs mt-1 space-y-0.5">
+                          {c.changes.map((ch, i) => (
+                            <div key={i}>
+                              <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{ch.field}</span>: {ch.from || '(blank)'} → <span style={{ color: 'var(--success)' }}>{ch.to}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -138,6 +239,8 @@ export default function DashboardPage() {
             Some dashboard sources could not load: {data.errors.join(' | ')}
           </div>
         ) : null}
+
+        <DailyBriefPanel />
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
           <MetricCard
