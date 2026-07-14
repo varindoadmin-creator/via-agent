@@ -162,6 +162,7 @@ export default function ReconcilePage() {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [loadingRecorded, setLoadingRecorded] = useState(true);
   const [recordedError, setRecordedError] = useState("");
+  const [dateSortDir, setDateSortDir] = useState<"asc" | "desc">("desc");
 
   async function fetchRecordedStatements() {
     setLoadingRecorded(true);
@@ -475,12 +476,20 @@ export default function ReconcilePage() {
           {!recordedError && selectedMonth && (() => {
             const group = recordedMonths.find((m) => m.month === selectedMonth);
             if (!group) return null;
+            const sortedRows = [...group.rows].sort((a, b) =>
+              dateSortDir === "asc" ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
+            );
             return (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-[var(--text-3)] uppercase tracking-wide bg-[var(--surface-2)] border-b border-[var(--border)]">
-                      <th className="px-4 py-2 font-medium">Date</th>
+                      <th
+                        className="px-4 py-2 font-medium cursor-pointer select-none hover:text-[var(--text)]"
+                        onClick={() => setDateSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                      >
+                        Date <span className="text-[var(--text-4)]">{dateSortDir === "asc" ? "▲" : "▼"}</span>
+                      </th>
                       <th className="px-4 py-2 font-medium">Name / Description</th>
                       <th className="px-4 py-2 font-medium text-right">Amount</th>
                       <th className="px-4 py-2 font-medium">Status</th>
@@ -488,7 +497,7 @@ export default function ReconcilePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {group.rows.map((row) => (
+                    {sortedRows.map((row) => (
                       <tr key={row.bank_row_hash} className="border-b border-[var(--border-muted)] last:border-b-0">
                         <td className="px-4 py-2 text-[var(--text-3)] whitespace-nowrap">{row.date}</td>
                         <td className="px-4 py-2 text-[var(--text-2)] max-w-xs truncate" title={row.name_in_statement || row.description}>
