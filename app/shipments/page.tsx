@@ -919,6 +919,8 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [soLineItems, setSoLineItems] = useState<Record<string, Array<{name: string; quantity: number; unit: string; quantity_packed: number}>>>({});
   const [loadingLines, setLoadingLines] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [printing, setPrinting] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -927,6 +929,22 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
     );
   }, [items, search]);
 
+  async function fetchLineItemsFor(id: string): Promise<Array<{name: string; quantity: number; unit: string; quantity_packed: number}>> {
+    if (soLineItems[id]) return soLineItems[id];
+    setLoadingLines(prev => new Set(prev).add(id));
+    try {
+      const res = await fetch('/api/shipments?mode=so_detail&id=' + id);
+      const data = await res.json();
+      const lines = data.line_items || [];
+      setSoLineItems(prev => ({ ...prev, [id]: lines }));
+      return lines;
+    } catch {
+      return [];
+    } finally {
+      setLoadingLines(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  }
+
   async function toggleExpand(id: string) {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -934,24 +952,85 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
       return next;
     });
     // Fetch line items if not already loaded
-    if (!soLineItems[id]) {
-      setLoadingLines(prev => new Set(prev).add(id));
-      try {
-        const res = await fetch('/api/shipments?mode=so_detail&id=' + id);
-        const data = await res.json();
-        if (data.line_items) {
-          setSoLineItems(prev => ({ ...prev, [id]: data.line_items }));
-        }
-      } catch { /* ignore */ }
-      finally {
-        setLoadingLines(prev => { const n = new Set(prev); n.delete(id); return n; });
-      }
+    if (!soLineItems[id]) fetchLineItemsFor(id);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function printSelectedShipments() {
+    if (selectedIds.size === 0) return;
+    setPrinting(true);
+    try {
+      const selected = filtered.filter(i => selectedIds.has(i.salesorder_id));
+      const linesById = await Promise.all(selected.map(i => fetchLineItemsFor(i.salesorder_id)));
+
+      const blocks = selected.map((item, idx) => {
+        const lines = linesById[idx];
+        const rows = lines.map(li =>
+          `<tr><td>${li.name}</td><td class="qty">${li.quantity} ${li.unit}</td></tr>`
+        ).join('');
+        const shipmentRefs = item.packages.map(p => p.shipment_number || p.package_number).filter(Boolean).join(', ') || '—';
+        return `
+          <div class="shipment">
+            <div class="hdr">
+              <div><span class="lbl">SO Number</span><span class="val">${item.salesorder_number}</span></div>
+              <div><span class="lbl">Customer</span><span class="val">${item.customer_name}</span></div>
+              <div><span class="lbl">Shipment</span><span class="val">${shipmentRefs}</span></div>
+            </div>
+            <table class="items">
+              <thead><tr><th>Item</th><th class="qty">Qty</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      }).join('');
+
+      const css = [
+        '* { margin: 0; padding: 0; box-sizing: border-box; }',
+        'body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: white; }',
+        '.page { padding: 16mm; }',
+        'h1 { font-size: 18px; margin-bottom: 4mm; }',
+        '.shipment { border: 1px solid #ccc; border-radius: 6px; padding: 4mm; margin-bottom: 6mm; page-break-inside: avoid; }',
+        '.hdr { display: flex; gap: 8mm; margin-bottom: 3mm; flex-wrap: wrap; }',
+        '.hdr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; }',
+        '.hdr .val { display: block; font-weight: 600; font-size: 13px; }',
+        'table.items { width: 100%; border-collapse: collapse; }',
+        'table.items th { text-align: left; font-size: 10px; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 3px 6px; }',
+        'table.items td { padding: 4px 6px; border-bottom: 1px solid #eee; font-size: 12px; }',
+        'table.items .qty { text-align: right; white-space: nowrap; }',
+        '@media print { body { margin: 0; } .page { padding: 10mm 16mm; } }',
+      ].join(' ');
+
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        + '<title>Shipments</title>'
+        + '<style>' + css + '</style>'
+        + '</head><body>'
+        + '<div class="page"><h1>Shipment In-Transit — ' + selected.length + ' order' + (selected.length > 1 ? 's' : '') + '</h1>' + blocks + '</div>'
+        + '<script>window.onload = function(){ window.print(); }<\/script>'
+        + '</body></html>';
+
+      const win = window.open('', '_blank');
+      if (win) { win.document.write(html); win.document.close(); }
+      setSelectedIds(new Set());
+    } finally {
+      setPrinting(false);
     }
   }
 
   return (
     <TableShell title="Shipment In-Transit"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}>
+      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
+      extra={selectedIds.size > 0 ? (
+        <button onClick={printSelectedShipments} disabled={printing}
+          className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
+          {printing ? '…' : `🖨 Print Shipments (${selectedIds.size})`}
+        </button>
+      ) : undefined}>
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
       {!loading && !error && filtered.length === 0 && <EmptyState icon="▤" msg="No pending deliveries." />}
@@ -959,6 +1038,14 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
         <div className="overflow-x-auto">
           <table className="via-table">
             <thead><tr>
+              <th className="w-8">
+                <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                  checked={filtered.length > 0 && filtered.every(i => selectedIds.has(i.salesorder_id))}
+                  onChange={() => {
+                    const allSel = filtered.every(i => selectedIds.has(i.salesorder_id));
+                    setSelectedIds(allSel ? new Set() : new Set(filtered.map(i => i.salesorder_id)));
+                  }} />
+              </th>
               <th className="w-8"></th>
               <th>SO Number</th>
               <th>Customer</th>
@@ -979,6 +1066,11 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
                     <tr
                       className="cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
                       onClick={() => toggleExpand(item.salesorder_id)}>
+                      <td className="w-8" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                          checked={selectedIds.has(item.salesorder_id)}
+                          onChange={() => toggleSelect(item.salesorder_id)} />
+                      </td>
                       <td className="text-center text-[var(--text-4)] text-xs select-none w-8">
                         {exp ? '▾' : '▸'}
                       </td>
@@ -1018,7 +1110,7 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
                     </tr>
                     {exp && (
                       <tr key={item.salesorder_id + '_detail'}>
-                        <td colSpan={10} className="p-0">
+                        <td colSpan={11} className="p-0">
                           <div className="bg-[var(--surface-2)] px-6 py-4">
                             {/* Packages */}
                             <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>Shipments</div>
