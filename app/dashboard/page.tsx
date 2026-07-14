@@ -310,30 +310,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-5">
-          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: 18 }}>
-            <h2 className="text-[var(--text)] font-semibold text-sm mb-3">Quick Summary</h2>
-            <div className="space-y-3 text-sm text-[var(--muted)]">
-              <p>Monthly Sales uses Zoho invoice subtotal before PPN.</p>
-              <p>Gross Profit = Monthly Sales before PPN minus COGS. COGS uses item Purchase Rate × quantity sold.</p>
-              <p>Total Receivables uses unpaid invoice balance due.</p>
-              <p>Inventory Summary uses stock on hand × item Purchase Rate.</p>
-              {data?.gross_profit.missingCostLines ? (
-                <p style={{ color: 'var(--warning)' }}>
-                  Note: {data.gross_profit.missingCostLines} invoice lines had missing Purchase Rate, so GP may be understated.
-                </p>
-              ) : null}
-              {data?.inventory_summary.zeroOrMissingCostItems ? (
-                <p style={{ color: 'var(--warning)' }}>
-                  Note: {data.inventory_summary.zeroOrMissingCostItems} stocked items had missing Purchase Rate, so inventory value may be understated.
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <div style={{ minHeight: 'min(620px, 70dvh)', overflow: 'hidden', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--panel)' }}>
-            <ChatInterface />
-          </div>
+        <div style={{ minHeight: 'min(620px, 70dvh)', overflow: 'hidden', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--panel)' }}>
+          <ChatInterface />
         </div>
       </div>
     </div>
