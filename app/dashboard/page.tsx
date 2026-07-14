@@ -45,7 +45,6 @@ function DailyBriefPanel() {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">Daily Brief</h2>
-          <p className="text-[var(--muted)] text-xs mt-0.5">Customers repaired and shipments auto-invoiced by VIA, by day.</p>
         </div>
         <button onClick={load} disabled={loading}
           className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
