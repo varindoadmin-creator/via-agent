@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { formatBusinessName, normalizeSpaces } from '@/lib/customerCleanup/rules';
+
+const MARKS_TABLE = 'lead_customer_marks';
 
 type Row = {
   id: string;
@@ -16,9 +18,9 @@ const TYPE_LABEL: Record<string, string> = {
   catalogue: 'Catalogue',
 };
 
-function sbHeaders() {
+function sbHeaders(extra: Record<string, string> = {}) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+  return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...extra };
 }
 
 function sbUrl(path: string) {
@@ -74,9 +76,25 @@ function groupSubmissions(rows: Row[]): { request_type: string; customer_name: s
   }));
 }
 
+/** Keys already marked as an existing customer — soft-fails to an empty set if the
+ * lead_customer_marks table hasn't been created yet, so viewing the list never breaks. */
+async function getMarkedKeys(): Promise<Set<string>> {
+  try {
+    const res = await fetch(sbUrl(`${MARKS_TABLE}?select=lead_key`), { headers: sbHeaders() });
+    if (!res.ok) return new Set();
+    const rows = (await res.json()) as Array<{ lead_key: string }>;
+    return new Set(rows.map(r => r.lead_key));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function GET() {
   try {
-    const rows = await sbGet('requests?select=id,created_at,request_type,customer_name,phone,address&order=created_at.asc&limit=2000');
+    const [rows, markedKeys] = await Promise.all([
+      sbGet('requests?select=id,created_at,request_type,customer_name,phone,address&order=created_at.asc&limit=2000'),
+      getMarkedKeys(),
+    ]);
     const submissions = groupSubmissions(rows);
 
     const byKey = new Map<string, {
@@ -120,8 +138,10 @@ export async function GET() {
       }
     }
 
-    const customers = Array.from(byKey.values())
-      .map(c => ({
+    const customers = Array.from(byKey.entries())
+      .filter(([key]) => !markedKeys.has(key))
+      .map(([key, c]) => ({
+        key,
         ...c,
         name: c.name ? formatBusinessName(c.name) : c.name,
         address: c.address ? normalizeSpaces(c.address) : c.address,
@@ -130,6 +150,38 @@ export async function GET() {
       .sort((a, b) => b.last_at.localeCompare(a.last_at));
 
     return NextResponse.json({ success: true, customers });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+  }
+}
+
+// ─── POST /api/leads/customers — mark leads as already a customer ─────────────
+// Removes them from the Leads list (see GET above) without touching the
+// underlying requests rows — reversible by deleting the row from
+// lead_customer_marks directly in Supabase if ever needed.
+
+export async function POST(request: NextRequest) {
+  try {
+    const { leads } = await request.json() as {
+      leads: Array<{ key: string; name?: string; phone?: string }>;
+    };
+    if (!leads?.length) return NextResponse.json({ success: false, error: 'leads required' }, { status: 400 });
+
+    const rows = leads.map(l => ({
+      lead_key: l.key,
+      name: l.name || null,
+      phone: l.phone || null,
+      marked_at: new Date().toISOString(),
+    }));
+
+    const res = await fetch(sbUrl(`${MARKS_TABLE}?on_conflict=lead_key`), {
+      method: 'POST',
+      headers: sbHeaders({ Prefer: 'return=minimal,resolution=merge-duplicates' }),
+      body: JSON.stringify(rows),
+    });
+    if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }

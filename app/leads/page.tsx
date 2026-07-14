@@ -158,6 +158,7 @@ function RecruitmentPlanPanel() {
 // ─── Customers table (leads sourced from Requests: samples/quotes/catalogues) ──
 
 interface RequestLead {
+  key: string;
   name: string;
   phone: string;
   address: string;
@@ -180,6 +181,8 @@ function CustomersFromRequestsTable() {
   const [leads, setLeads] = useState<RequestLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [marking, setMarking] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -189,6 +192,7 @@ function CustomersFromRequestsTable() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to load');
       setLeads(data.customers || []);
+      setSelectedKeys(new Set());
     } catch (e) {
       setError(String(e));
     } finally {
@@ -197,6 +201,42 @@ function CustomersFromRequestsTable() {
   }, []);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  function toggleSelect(key: string) {
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  async function markAsCustomers() {
+    if (selectedKeys.size === 0) return;
+    setMarking(true);
+    setError('');
+    try {
+      const selected = leads.filter(l => selectedKeys.has(l.key));
+      const res = await fetch('/api/leads/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: selected.map(l => ({ key: l.key, name: l.name, phone: l.phone })) }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        const msg = String(data.error || '');
+        if (msg.includes('lead_customer_marks')) {
+          throw new Error('The lead_customer_marks table hasn\'t been created in Supabase yet. Run supabase/lead_customer_marks.sql in the Supabase SQL editor, then try again.');
+        }
+        throw new Error(msg || 'Failed to mark as customers');
+      }
+      setLeads(prev => prev.filter(l => !selectedKeys.has(l.key)));
+      setSelectedKeys(new Set());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setMarking(false);
+    }
+  }
 
   const thStyle: React.CSSProperties = {
     padding: '8px 12px', textAlign: 'left',
@@ -210,10 +250,16 @@ function CustomersFromRequestsTable() {
     <div className="via-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">Customers</h2>
+          <h2 className="text-[var(--text)] font-semibold text-sm">Leads</h2>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[var(--text-4)] text-xs" style={mono}>{leads.length} leads</span>
+          {selectedKeys.size > 0 && (
+            <button onClick={markAsCustomers} disabled={marking}
+              className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
+              {marking ? '…' : `Mark as Customers (${selectedKeys.size})`}
+            </button>
+          )}
           <button onClick={fetchLeads} disabled={loading}
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
             {loading ? '…' : '↻ Refresh'}
@@ -237,6 +283,14 @@ function CustomersFromRequestsTable() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr>
+                <th style={{ ...thStyle, width: 36 }}>
+                  <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                    checked={leads.length > 0 && leads.every(l => selectedKeys.has(l.key))}
+                    onChange={() => {
+                      const allSel = leads.every(l => selectedKeys.has(l.key));
+                      setSelectedKeys(allSel ? new Set() : new Set(leads.map(l => l.key)));
+                    }} />
+                </th>
                 <th style={thStyle}>Name</th>
                 <th style={thStyle}>Contact</th>
                 <th style={thStyle}>Address</th>
@@ -246,8 +300,15 @@ function CustomersFromRequestsTable() {
               </tr>
             </thead>
             <tbody>
-              {leads.map((l, i) => (
-                <tr key={`${l.phone}-${i}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+              {leads.map(l => (
+                <tr key={l.key}
+                  className={selectedKeys.has(l.key) ? 'bg-[var(--accent-light)]' : undefined}
+                  style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                  <td style={{ padding: '8px 12px', width: 36 }} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                      checked={selectedKeys.has(l.key)}
+                      onChange={() => toggleSelect(l.key)} />
+                  </td>
                   <td style={{ padding: '8px 12px', maxWidth: 220 }}>
                     <div className="text-[var(--text)] text-xs font-medium truncate" title={l.name}>{l.name || '(unnamed)'}</div>
                   </td>
