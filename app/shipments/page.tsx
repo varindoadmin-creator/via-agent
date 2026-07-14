@@ -914,10 +914,16 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
 
 // ─── Table 2: Shipment In-Transit ────────────────────────────────────────────────
 
+interface ShippingAddress {
+  attention: string; address: string; street2: string;
+  city: string; state: string; zip: string; country: string; phone: string;
+}
+
 function PendingDeliveryTable({ items, loading, error }: { items: PendingDelivery[]; loading: boolean; error: string }) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [soLineItems, setSoLineItems] = useState<Record<string, Array<{name: string; quantity: number; unit: string; quantity_packed: number}>>>({});
+  const [soShippingAddress, setSoShippingAddress] = useState<Record<string, ShippingAddress>>({});
   const [loadingLines, setLoadingLines] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [printing, setPrinting] = useState(false);
@@ -929,17 +935,22 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
     );
   }, [items, search]);
 
-  async function fetchLineItemsFor(id: string): Promise<Array<{name: string; quantity: number; unit: string; quantity_packed: number}>> {
-    if (soLineItems[id]) return soLineItems[id];
+  async function fetchLineItemsFor(id: string): Promise<{
+    lines: Array<{name: string; quantity: number; unit: string; quantity_packed: number}>;
+    address: ShippingAddress | null;
+  }> {
+    if (soLineItems[id]) return { lines: soLineItems[id], address: soShippingAddress[id] || null };
     setLoadingLines(prev => new Set(prev).add(id));
     try {
       const res = await fetch('/api/shipments?mode=so_detail&id=' + id);
       const data = await res.json();
       const lines = data.line_items || [];
+      const address = data.shipping_address || null;
       setSoLineItems(prev => ({ ...prev, [id]: lines }));
-      return lines;
+      if (address) setSoShippingAddress(prev => ({ ...prev, [id]: address }));
+      return { lines, address };
     } catch {
-      return [];
+      return { lines: [], address: null };
     } finally {
       setLoadingLines(prev => { const n = new Set(prev); n.delete(id); return n; });
     }
@@ -968,20 +979,35 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
     setPrinting(true);
     try {
       const selected = filtered.filter(i => selectedIds.has(i.salesorder_id));
-      const linesById = await Promise.all(selected.map(i => fetchLineItemsFor(i.salesorder_id)));
+      const detailsById = await Promise.all(selected.map(i => fetchLineItemsFor(i.salesorder_id)));
 
       const blocks = selected.map((item, idx) => {
-        const lines = linesById[idx];
+        const { lines, address: a } = detailsById[idx];
         const rows = lines.map(li =>
           `<tr><td>${li.name}</td><td class="qty">${li.quantity} ${li.unit}</td></tr>`
         ).join('');
         const shipmentRefs = item.packages.map(p => p.shipment_number || p.package_number).filter(Boolean).join(', ') || '—';
+        const addressLines = a ? [
+          a.attention,
+          a.address,
+          a.street2,
+          [a.city, a.zip].filter(Boolean).join(' '),
+          [a.state, a.country].filter(Boolean).join(', '),
+          a.phone ? `Tel. ${a.phone}` : '',
+        ].filter(Boolean) : [];
+        const addressHtml = addressLines.length
+          ? addressLines.map(l => `<div>${l}</div>`).join('')
+          : '<div class="muted">No shipping address on file</div>';
         return `
           <div class="shipment">
             <div class="hdr">
               <div><span class="lbl">SO Number</span><span class="val">${item.salesorder_number}</span></div>
               <div><span class="lbl">Customer</span><span class="val">${item.customer_name}</span></div>
               <div><span class="lbl">Shipment</span><span class="val">${shipmentRefs}</span></div>
+            </div>
+            <div class="addr">
+              <span class="lbl">Shipping Address</span>
+              ${addressHtml}
             </div>
             <table class="items">
               <thead><tr><th>Item</th><th class="qty">Qty</th></tr></thead>
@@ -999,6 +1025,10 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
         '.hdr { display: flex; gap: 8mm; margin-bottom: 3mm; flex-wrap: wrap; }',
         '.hdr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; }',
         '.hdr .val { display: block; font-weight: 600; font-size: 13px; }',
+        '.addr { margin-bottom: 4mm; padding: 3mm; background: #f7f7f7; border-radius: 4px; }',
+        '.addr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; margin-bottom: 1mm; }',
+        '.addr div { font-size: 12px; line-height: 1.5; }',
+        '.addr .muted { color: #999; font-style: italic; }',
         'table.items { width: 100%; border-collapse: collapse; }',
         'table.items th { text-align: left; font-size: 10px; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 3px 6px; }',
         'table.items td { padding: 4px 6px; border-bottom: 1px solid #eee; font-size: 12px; }',

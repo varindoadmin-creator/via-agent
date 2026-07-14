@@ -264,7 +264,18 @@ export async function GET(request: NextRequest) {
         location_name: String(li.location_name || ''),
         quantity_packed: li.quantity_packed !== undefined ? Number(li.quantity_packed) : (li.quantity_shipped !== undefined ? Number(li.quantity_shipped) : 0),
       }));
-      return NextResponse.json({ success: true, line_items: lineItems });
+      const sa = (so?.shipping_address || {}) as Record<string, unknown>;
+      const shippingAddress = {
+        attention: String(sa.attention || ''),
+        address: String(sa.address || ''),
+        street2: String(sa.street2 || ''),
+        city: String(sa.city || ''),
+        state: String(sa.state || ''),
+        zip: String(sa.zip || ''),
+        country: String(sa.country || ''),
+        phone: String(sa.phone || ''),
+      };
+      return NextResponse.json({ success: true, line_items: lineItems, shipping_address: shippingAddress });
     } catch (err) {
       return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
     }
