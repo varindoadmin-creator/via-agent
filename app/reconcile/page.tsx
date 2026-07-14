@@ -429,11 +429,64 @@ export default function ReconcilePage() {
           </h1>
         </div>
 
+        <div className="border border-[var(--border)] rounded-xl p-4 mb-6 bg-[var(--surface)]">
+          <div className="flex flex-col md:flex-row md:items-end gap-3">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-[var(--text-2)] mb-2">
+                Please Upload a Bank Statement
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setFileName(e.target.files?.[0]?.name || "")}
+                className="block w-full text-sm text-[var(--text-2)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:text-white hover:file:bg-[var(--accent-hover)]"
+              />
+            </div>
+
+            <button
+              onClick={runMatchFromCsv}
+              disabled={loading}
+              className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+            >
+              {loading ? "Matching..." : "Upload"}
+            </button>
+
+            {selectedPayments.size > 0 && (
+              <button
+                onClick={receivePayments}
+                disabled={receiving}
+                className="px-5 py-2.5 bg-[var(--success)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              >
+                {receiving
+                  ? "Recording..."
+                  : `Receive Payment for ${selectedPayments.size} Invoice${selectedPayments.size > 1 ? "s" : ""}`}
+              </button>
+            )}
+
+            {selectedManualRows.size > 0 && (
+              <button
+                onClick={markRowsAsReceived}
+                disabled={receiving}
+                className="px-5 py-2.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text)] border border-[var(--border)] rounded-lg font-medium transition-colors"
+              >
+                {receiving
+                  ? "Saving..."
+                  : `Mark ${selectedManualRows.size} Bank Row${selectedManualRows.size > 1 ? "s" : ""} as Received`}
+              </button>
+            )}
+          </div>
+          {fileName && (
+            <div className="text-xs text-[var(--text-3)] mt-3">
+              Selected CSV: {fileName}
+            </div>
+          )}
+        </div>
+
         <div className="border border-[var(--border)] rounded-xl mb-6 bg-[var(--surface)] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
             <div>
               <h2 className="text-sm font-semibold text-[var(--text)]">Recorded Bank Statement</h2>
-              <p className="text-xs text-[var(--text-3)] mt-0.5">Bank statement rows already recorded in Supabase.</p>
             </div>
             <div className="flex items-center gap-2">
               {recordedMonths.length > 0 && (
@@ -524,60 +577,6 @@ export default function ReconcilePage() {
               </div>
             );
           })()}
-        </div>
-
-        <div className="border border-[var(--border)] rounded-xl p-4 mb-6 bg-[var(--surface)]">
-          <div className="flex flex-col md:flex-row md:items-end gap-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-[var(--text-2)] mb-2">
-                Please Upload a Bank Statement
-              </label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setFileName(e.target.files?.[0]?.name || "")}
-                className="block w-full text-sm text-[var(--text-2)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:text-white hover:file:bg-[var(--accent-hover)]"
-              />
-            </div>
-
-            <button
-              onClick={runMatchFromCsv}
-              disabled={loading}
-              className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-            >
-              {loading ? "Matching..." : "Upload"}
-            </button>
-
-            {selectedPayments.size > 0 && (
-              <button
-                onClick={receivePayments}
-                disabled={receiving}
-                className="px-5 py-2.5 bg-[var(--success)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-              >
-                {receiving
-                  ? "Recording..."
-                  : `Receive Payment for ${selectedPayments.size} Invoice${selectedPayments.size > 1 ? "s" : ""}`}
-              </button>
-            )}
-
-            {selectedManualRows.size > 0 && (
-              <button
-                onClick={markRowsAsReceived}
-                disabled={receiving}
-                className="px-5 py-2.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text)] border border-[var(--border)] rounded-lg font-medium transition-colors"
-              >
-                {receiving
-                  ? "Saving..."
-                  : `Mark ${selectedManualRows.size} Bank Row${selectedManualRows.size > 1 ? "s" : ""} as Received`}
-              </button>
-            )}
-          </div>
-          {fileName && (
-            <div className="text-xs text-[var(--text-3)] mt-3">
-              Selected CSV: {fileName}
-            </div>
-          )}
         </div>
 
         {error && (
