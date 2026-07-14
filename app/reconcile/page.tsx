@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface BankTransaction {
   row_hash: string;
@@ -56,6 +56,37 @@ interface ReconcileResult {
 interface PaymentSelection {
   result: ReconcileResult;
   match: InvoiceMatch;
+}
+
+interface LedgerRow {
+  bank_row_hash: string;
+  date: string;
+  amount: number;
+  description: string;
+  name_in_statement: string;
+  status: string;
+  source: string;
+  zoho_payment_number: string | null;
+  invoice_numbers: string[] | null;
+  notes: string | null;
+  updated_at: string;
+}
+
+interface MonthGroup {
+  month: string;
+  label: string;
+  count: number;
+  total_amount: number;
+  rows: LedgerRow[];
+}
+
+function ledgerStatusLabel(status: string) {
+  switch (status) {
+    case "zoho_received": return "Received in Zoho";
+    case "manual_received": return "Manually Recorded";
+    case "received": return "Received";
+    default: return status || "—";
+  }
 }
 
 function formatRp(amount: number) {
@@ -126,6 +157,30 @@ export default function ReconcilePage() {
   const [receivedKeys, setReceivedKeys] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const [recordedMonths, setRecordedMonths] = useState<MonthGroup[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [loadingRecorded, setLoadingRecorded] = useState(true);
+  const [recordedError, setRecordedError] = useState("");
+
+  async function fetchRecordedStatements() {
+    setLoadingRecorded(true);
+    setRecordedError("");
+    try {
+      const res = await fetch("/api/reconcile");
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to load recorded bank statements.");
+      const months: MonthGroup[] = data.months || [];
+      setRecordedMonths(months);
+      setSelectedMonth((prev) => prev && months.some((m) => m.month === prev) ? prev : (months[0]?.month || ""));
+    } catch (err) {
+      setRecordedError(String(err));
+    } finally {
+      setLoadingRecorded(false);
+    }
+  }
+
+  useEffect(() => { fetchRecordedStatements(); }, []);
 
   async function runMatchFromCsv() {
     const file = fileInputRef.current?.files?.[0];
@@ -242,6 +297,7 @@ export default function ReconcilePage() {
       );
       setResults((prev) => prev.filter((row) => !okKeys.has(approvalKey(row))));
       setSelectedManualRows(new Map());
+      fetchRecordedStatements();
       setSelectedPayments((prev) => {
         const next = new Map(prev);
         okKeys.forEach((k) => next.delete(k));
@@ -339,6 +395,7 @@ export default function ReconcilePage() {
           okKeys.forEach((k) => next.delete(k));
           return next;
         });
+        fetchRecordedStatements();
       }
       if (!data.success) throw new Error(data.error || "Some payments failed.");
     } catch (err) {
@@ -369,6 +426,95 @@ export default function ReconcilePage() {
           <h1 className="text-2xl font-bold text-[var(--text)]">
             Bank Reconciliation
           </h1>
+        </div>
+
+        <div className="border border-[var(--border)] rounded-xl mb-6 bg-[var(--surface)] overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--text)]">Recorded Bank Statement</h2>
+              <p className="text-xs text-[var(--text-3)] mt-0.5">Bank statement rows already recorded in Supabase.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {recordedMonths.length > 0 && (
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="text-xs border border-[var(--border)] rounded-lg px-2.5 py-1.5 bg-[var(--surface)] text-[var(--text)]"
+                >
+                  {recordedMonths.map((m) => (
+                    <option key={m.month} value={m.month}>
+                      {m.label} ({m.count})
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={fetchRecordedStatements}
+                disabled={loadingRecorded}
+                className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] border border-[var(--border)] rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loadingRecorded ? "…" : "↻ Refresh"}
+              </button>
+            </div>
+          </div>
+
+          {recordedError && (
+            <div className="m-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">
+              {recordedError}
+            </div>
+          )}
+
+          {!loadingRecorded && !recordedError && recordedMonths.length === 0 && (
+            <div className="py-10 text-center text-[var(--text-3)] text-sm">No recorded bank statement rows yet.</div>
+          )}
+
+          {loadingRecorded && recordedMonths.length === 0 && (
+            <div className="py-10 text-center text-[var(--text-3)] text-sm">Loading…</div>
+          )}
+
+          {!recordedError && selectedMonth && (() => {
+            const group = recordedMonths.find((m) => m.month === selectedMonth);
+            if (!group) return null;
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-[var(--text-3)] uppercase tracking-wide bg-[var(--surface-2)] border-b border-[var(--border)]">
+                      <th className="px-4 py-2 font-medium">Date</th>
+                      <th className="px-4 py-2 font-medium">Name / Description</th>
+                      <th className="px-4 py-2 font-medium text-right">Amount</th>
+                      <th className="px-4 py-2 font-medium">Status</th>
+                      <th className="px-4 py-2 font-medium">Zoho Payment #</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.rows.map((row) => (
+                      <tr key={row.bank_row_hash} className="border-b border-[var(--border-muted)] last:border-b-0">
+                        <td className="px-4 py-2 text-[var(--text-3)] whitespace-nowrap">{row.date}</td>
+                        <td className="px-4 py-2 text-[var(--text-2)] max-w-xs truncate" title={row.name_in_statement || row.description}>
+                          {row.name_in_statement || row.description}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-[var(--text)]">{formatRp(row.amount)}</td>
+                        <td className="px-4 py-2">
+                          <span className="text-xs px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-3)]">
+                            {ledgerStatusLabel(row.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-[var(--text-3)] font-mono text-xs">{row.zoho_payment_number || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[var(--surface-2)] border-t border-[var(--border)]">
+                      <td colSpan={2} className="px-4 py-2 text-xs text-[var(--text-3)]">TOTAL ({group.count} rows)</td>
+                      <td className="px-4 py-2 text-right font-mono font-semibold text-[var(--text)]">{formatRp(group.total_amount)}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="border border-[var(--border)] rounded-xl p-4 mb-6 bg-[var(--surface)]">

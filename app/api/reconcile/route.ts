@@ -809,12 +809,59 @@ async function runCsvMatch(file: File) {
   });
 }
 
+interface LedgerRow {
+  bank_row_hash: string;
+  date: string;
+  amount: number;
+  description: string;
+  name_in_statement: string;
+  status: string;
+  source: string;
+  zoho_payment_number: string | null;
+  invoice_numbers: string[] | null;
+  notes: string | null;
+  updated_at: string;
+}
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split("-");
+  const d = new Date(Date.UTC(Number(y), Number(m) - 1, 1));
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+// GET /api/reconcile — recorded bank statement rows from Supabase, grouped by month
+// (most recent month first) for the "Recorded Bank Statement" view.
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    message:
-      "Upload CSV bank statement using POST multipart/form-data with mode=match_csv and file.",
-  });
+  try {
+    const { table } = supabaseConfig();
+    const data = await supabaseRequest(
+      `${table}?select=bank_row_hash,date,amount,description,name_in_statement,status,source,zoho_payment_number,invoice_numbers,notes,updated_at&order=date.desc&limit=2000`,
+    );
+    const rows = (Array.isArray(data) ? data : []) as LedgerRow[];
+
+    const byMonth = new Map<string, LedgerRow[]>();
+    for (const row of rows) {
+      const month = String(row.date || "").slice(0, 7);
+      if (!month) continue;
+      const list = byMonth.get(month);
+      if (list) list.push(row);
+      else byMonth.set(month, [row]);
+    }
+
+    const months = Array.from(byMonth.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([month, monthRows]) => ({
+        month,
+        label: monthLabel(month),
+        count: monthRows.length,
+        total_amount: monthRows.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+        rows: monthRows,
+      }));
+
+    return NextResponse.json({ success: true, months });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
