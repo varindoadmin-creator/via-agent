@@ -1,20 +1,30 @@
 import { NextResponse } from 'next/server';
 
-// ─── Daily Brief: customers VIA auto-repaired, grouped by day ─────────────────
-// Reads the same customer_cleanup_log table the daily 09:00 Asia/Jakarta
-// auto-repair job writes to (see lib/customerCleanup/autoRepair.ts). Rows
-// with an empty `changes` array mean "scanned, nothing needed fixing" —
-// those are excluded here since the Daily Brief is specifically about
-// customers that were actually changed.
+// ─── Daily Brief: what VIA did automatically, grouped by day ──────────────────
+// Reads two logs the daily 09:00 Asia/Jakarta scheduled jobs write to:
+//   - customer_cleanup_log (lib/customerCleanup/autoRepair.ts) — rows with an
+//     empty `changes` array mean "scanned, nothing needed fixing" and are
+//     excluded, since the brief is specifically about things that changed.
+//   - shipment_invoice_log (lib/shipments/autoInvoice.ts) — only success=true
+//     rows are shown; failed conversion attempts are logged but not surfaced
+//     here (they just get retried automatically the next day).
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
 const DAYS_BACK = 14;
 
-interface LogRow {
+interface CustomerLogRow {
   contact_id: string;
   contact_name: string;
   changes: Array<{ field: string; from: string; to: string }>;
   fixed_at: string;
+}
+
+interface InvoiceLogRow {
+  salesorder_id: string;
+  salesorder_number: string;
+  customer_name: string;
+  invoice_number: string | null;
+  converted_at: string;
 }
 
 function sbHeaders() {
@@ -41,36 +51,58 @@ function dayLabel(date: string, today: string, yesterday: string): string {
 export async function GET() {
   try {
     const cutoff = new Date(Date.now() - DAYS_BACK * 24 * 60 * 60 * 1000).toISOString();
-    const res = await fetch(
-      sbUrl(`customer_cleanup_log?select=contact_id,contact_name,changes,fixed_at&fixed_at=gte.${cutoff}&order=fixed_at.desc&limit=500`),
-      { headers: sbHeaders() }
-    );
-    if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
-    const rows = (await res.json()) as LogRow[];
 
-    const repaired = rows.filter(r => Array.isArray(r.changes) && r.changes.length > 0);
+    const [customerRes, invoiceRes] = await Promise.all([
+      fetch(sbUrl(`customer_cleanup_log?select=contact_id,contact_name,changes,fixed_at&fixed_at=gte.${cutoff}&order=fixed_at.desc&limit=500`), { headers: sbHeaders() }),
+      fetch(sbUrl(`shipment_invoice_log?select=salesorder_id,salesorder_number,customer_name,invoice_number,converted_at&success=eq.true&converted_at=gte.${cutoff}&order=converted_at.desc&limit=500`), { headers: sbHeaders() }),
+    ]);
+
+    if (!customerRes.ok) throw new Error(`Supabase ${customerRes.status}: ${await customerRes.text()}`);
+    const customerRows = (await customerRes.json()) as CustomerLogRow[];
+    const repaired = customerRows.filter(r => Array.isArray(r.changes) && r.changes.length > 0);
+
+    // shipment_invoice_log may not exist yet if the SQL migration hasn't been run —
+    // soft-fail to an empty list rather than breaking the whole Daily Brief.
+    const invoiceRows: InvoiceLogRow[] = invoiceRes.ok ? await invoiceRes.json() : [];
 
     const nowJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS).toISOString().split('T')[0];
     const yesterdayJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const byDate = new Map<string, LogRow[]>();
+    const customersByDate = new Map<string, CustomerLogRow[]>();
     for (const row of repaired) {
       const date = jakartaDate(row.fixed_at);
-      const list = byDate.get(date);
+      const list = customersByDate.get(date);
       if (list) list.push(row);
-      else byDate.set(date, [row]);
+      else customersByDate.set(date, [row]);
     }
 
-    const days = Array.from(byDate.entries())
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([date, customers]) => ({
+    const invoicesByDate = new Map<string, InvoiceLogRow[]>();
+    for (const row of invoiceRows) {
+      const date = jakartaDate(row.converted_at);
+      const list = invoicesByDate.get(date);
+      if (list) list.push(row);
+      else invoicesByDate.set(date, [row]);
+    }
+
+    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys()]);
+
+    const days = Array.from(allDates)
+      .sort((a, b) => b.localeCompare(a))
+      .map(date => ({
         date,
         label: dayLabel(date, nowJakarta, yesterdayJakarta),
-        customers: customers.map(c => ({
+        customers: (customersByDate.get(date) || []).map(c => ({
           contact_id: c.contact_id,
           contact_name: c.contact_name,
           changes: c.changes,
           fixed_at: c.fixed_at,
+        })),
+        invoices: (invoicesByDate.get(date) || []).map(i => ({
+          salesorder_id: i.salesorder_id,
+          salesorder_number: i.salesorder_number,
+          customer_name: i.customer_name,
+          invoice_number: i.invoice_number,
+          converted_at: i.converted_at,
         })),
       }));
 

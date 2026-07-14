@@ -41,7 +41,8 @@ type DashboardData = {
 
 type DailyBriefChange = { field: string; from: string; to: string };
 type DailyBriefCustomer = { contact_id: string; contact_name: string; changes: DailyBriefChange[]; fixed_at: string };
-type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[] };
+type DailyBriefInvoice = { salesorder_id: string; salesorder_number: string; customer_name: string; invoice_number: string | null; converted_at: string };
+type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[] };
 
 function formatRp(value: number) {
   return `Rp ${Math.round(Number(value || 0)).toLocaleString('id-ID')}`;
@@ -115,7 +116,7 @@ function DailyBriefPanel() {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">Daily Brief</h2>
-          <p className="text-[var(--muted)] text-xs mt-0.5">Customers VIA automatically repaired, by day.</p>
+          <p className="text-[var(--muted)] text-xs mt-0.5">Customers repaired and shipments auto-invoiced by VIA, by day.</p>
         </div>
         <button onClick={load} disabled={loading}
           className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
@@ -131,7 +132,7 @@ function DailyBriefPanel() {
       )}
 
       {!loading && !error && days && days.length === 0 && (
-        <div className="text-[var(--muted)] text-xs py-3">No customers have been auto-repaired in the last 14 days.</div>
+        <div className="text-[var(--muted)] text-xs py-3">No customer repairs or auto-invoiced shipments in the last 14 days.</div>
       )}
 
       {!error && days && days.length > 0 && (
@@ -147,7 +148,7 @@ function DailyBriefPanel() {
                 >
                   <span className="text-[var(--text)] text-xs font-medium">{day.label}</span>
                   <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} {isOpen ? '▲' : '▼'}
+                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} {isOpen ? '▲' : '▼'}
                   </span>
                 </button>
                 {isOpen && (
@@ -161,6 +162,15 @@ function DailyBriefPanel() {
                               <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{ch.field}</span>: {ch.from || '(blank)'} → <span style={{ color: 'var(--success)' }}>{ch.to}</span>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    ))}
+                    {day.invoices.map(inv => (
+                      <div key={inv.salesorder_id} className="px-3 py-2">
+                        <div className="text-[var(--text)] text-xs font-medium">{inv.customer_name || '(unnamed)'}</div>
+                        <div className="text-[var(--muted)] text-xs mt-1">
+                          <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{inv.salesorder_number}</span> converted to invoice
+                          {inv.invoice_number && <> — <span style={{ color: 'var(--success)', fontFamily: 'JetBrains Mono, monospace' }}>{inv.invoice_number}</span></>}
                         </div>
                       </div>
                     ))}

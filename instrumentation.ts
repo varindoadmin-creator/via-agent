@@ -32,12 +32,17 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
   const { runAutoRepairForNewCustomers } = await import('./lib/customerCleanup/autoRepair');
+  const { runAutoConvertReadyShipments } = await import('./lib/shipments/autoInvoice');
 
   scheduleDaily(() => {
     runAutoRepairForNewCustomers().catch(err => {
       console.error('[AutoRepair] Scheduled run failed:', err);
     });
+    runAutoConvertReadyShipments().catch(err => {
+      console.error('[AutoInvoice] Scheduled run failed:', err);
+    });
   });
 
   console.log('[AutoRepair] Daily 09:00 Asia/Jakarta customer auto-repair scheduled.');
+  console.log('[AutoInvoice] Daily 09:00 Asia/Jakarta shipment auto-invoice scheduled.');
 }
