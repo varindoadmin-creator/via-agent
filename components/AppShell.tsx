@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Users,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Users, Landmark,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -98,6 +98,14 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'sales-report',     href: '/reports/sales',     label: 'Sales'          },
         { id: 'purchases-report', href: '/reports/purchases',  label: 'Purchases'      },
       ],
+    },
+    hidden: true,
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'banking', label: 'Banking', icon: Landmark,
+      items: [{ id: 'reconcile', href: '/reconcile', label: 'Bank Reconciliation' }],
     },
     hidden: true,
   },
