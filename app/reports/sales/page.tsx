@@ -54,6 +54,7 @@ interface InvoiceDetail {
 interface ReportRow {
   name: string;
   sku?: string;
+  unit?: string;
   quantity: number;
   amount: number;
   avg_price: number;
@@ -94,7 +95,7 @@ const REPORT_TYPES: {
   {
     key: "item",
     label: "Sales by Item",
-    desc: "Top 100 items by revenue",
+    desc: "Revenue breakdown by item",
     icon: "▣",
   },
   {
@@ -282,14 +283,7 @@ export default function SalesReportsPage() {
       );
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-      // For item report, limit to top 100
-      const limited =
-        reportType === "item"
-          ? (data.rows as ReportRow[])
-              .sort((a, b) => b.amount - a.amount)
-              .slice(0, 100)
-          : (data.rows as ReportRow[]);
-      setRows(limited);
+      setRows(data.rows as ReportRow[]);
       setExpandedName("");
       setDateRange(data.from && data.to ? `${data.from} – ${data.to}` : "");
     } catch (e) {
@@ -336,13 +330,20 @@ export default function SalesReportsPage() {
 
   const totals = useMemo(() => {
     const amount = rows.reduce((s, r) => s + r.amount, 0);
-    const quantity = rows.reduce((s, r) => s + r.quantity, 0);
+    // Qty is only a meaningful single number when every row shares the same unit
+    // (sheets). Edge banding/newedge items are sold by the meter, not the sheet —
+    // mixing them into one "sht" total would misrepresent both. Rows without a
+    // unit (brand/location/customer/salesperson reports don't carry one) are left
+    // untouched, since this filter only applies where per-row unit is known.
+    const quantity = rows.reduce((s, r) => s + (!r.unit || r.unit === "sht" ? r.quantity : 0), 0);
+    const edgeQuantity = rows.reduce((s, r) => s + (r.unit === "m" ? r.quantity : 0), 0);
     const cost = rows.reduce((s, r) => s + (r.cost || 0), 0);
     const grossProfit = rows.reduce((s, r) => s + (r.gross_profit || 0), 0);
     const commission = rows.reduce((s, r) => s + (r.commission_amount || 0), 0);
     return {
       amount,
       quantity,
+      edgeQuantity,
       cost,
       grossProfit,
       commission,
@@ -538,19 +539,7 @@ export default function SalesReportsPage() {
           <div className="flex items-center gap-6 mb-4 px-4 py-3 bg-[var(--surface-2)] rounded-lg border border-[var(--border)]">
             <div>
               <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-0.5">
-                Total Revenue
-              </div>
-              <div
-                className="text-[var(--text)] font-bold text-sm"
-                style={mono}
-              >
-                {formatRp(totals.amount)}
-              </div>
-            </div>
-            <div className="w-px h-8 bg-[var(--border)]" />
-            <div>
-              <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-0.5">
-                Total Qty
+                Total Qty HPL
               </div>
               <div
                 className="text-[var(--text)] font-bold text-sm"
@@ -559,6 +548,22 @@ export default function SalesReportsPage() {
                 {formatQty(totals.quantity)} sht
               </div>
             </div>
+            {reportType === "item" && (
+              <>
+                <div className="w-px h-8 bg-[var(--border)]" />
+                <div>
+                  <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-0.5">
+                    Total Qty Edge Band
+                  </div>
+                  <div
+                    className="text-[var(--text)] font-bold text-sm"
+                    style={mono}
+                  >
+                    {formatQty(totals.edgeQuantity)} m
+                  </div>
+                </div>
+              </>
+            )}
             {reportType === "salesperson" && (
               <>
                 <div className="w-px h-8 bg-[var(--border)]" />

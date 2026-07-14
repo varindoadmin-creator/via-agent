@@ -305,6 +305,7 @@ export async function GET(request: NextRequest) {
         sku: String(
           (s as Record<string, Record<string, string>>).item?.sku || "",
         ),
+        unit: String(s.unit || ""),
         quantity: Number(s.quantity_sold) || 0,
         amount: parseMoney(s.amount),
         avg_price: parseMoney(s.average_price),
