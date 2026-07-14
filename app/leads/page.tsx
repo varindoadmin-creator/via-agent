@@ -358,6 +358,11 @@ export default function LeadsPage() {
   const [showPlan, setShowPlan] = useState(false);
   const [statusApiDown, setStatusApiDown] = useState(false);
 
+  const [markedSubDealerKeys, setMarkedSubDealerKeys] = useState<Set<string>>(new Set());
+  const [selectedSubDealerIds, setSelectedSubDealerIds] = useState<Set<string>>(new Set());
+  const [markingSubDealers, setMarkingSubDealers] = useState(false);
+  const [markError, setMarkError] = useState('');
+
   const fetchStatuses = useCallback(async () => {
     setLoading(true);
     try {
@@ -372,7 +377,54 @@ export default function LeadsPage() {
     }
   }, []);
 
+  const fetchMarkedKeys = useCallback(async () => {
+    try {
+      const res = await fetch('/api/leads/marks');
+      const data = await res.json();
+      if (data.success) setMarkedSubDealerKeys(new Set(data.keys || []));
+    } catch {
+      // Non-critical — Sub-Dealer table just won't hide previously-marked rows.
+    }
+  }, []);
+
   useEffect(() => { fetchStatuses(); }, [fetchStatuses]);
+  useEffect(() => { fetchMarkedKeys(); }, [fetchMarkedKeys]);
+
+  function toggleSelectSubDealer(id: string) {
+    setSelectedSubDealerIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function markSubDealersAsCustomers() {
+    if (selectedSubDealerIds.size === 0) return;
+    setMarkingSubDealers(true);
+    setMarkError('');
+    try {
+      const selected = LEADS.filter(l => selectedSubDealerIds.has(l.id));
+      const res = await fetch('/api/leads/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: selected.map(l => ({ key: l.id, name: l.storeName, phone: l.contact })) }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        const msg = String(data.error || '');
+        if (msg.includes('lead_customer_marks')) {
+          throw new Error('The lead_customer_marks table hasn\'t been created in Supabase yet. Run supabase/lead_customer_marks.sql in the Supabase SQL editor, then try again.');
+        }
+        throw new Error(msg || 'Failed to mark as customers');
+      }
+      setMarkedSubDealerKeys(prev => new Set([...Array.from(prev), ...Array.from(selectedSubDealerIds)]));
+      setSelectedSubDealerIds(new Set());
+    } catch (e) {
+      setMarkError(String(e));
+    } finally {
+      setMarkingSubDealers(false);
+    }
+  }
 
   function stageFor(leadId: string) {
     return statuses[leadId]?.stage || 'New';
@@ -388,7 +440,7 @@ export default function LeadsPage() {
   }
 
   const filtered = useMemo(() => {
-    let result = LEADS;
+    let result = LEADS.filter(l => !markedSubDealerKeys.has(l.id));
     if (tierFilter !== 'all') result = result.filter(l => l.tierGroup === tierFilter);
     if (stageFilter !== 'all') result = result.filter(l => stageFor(l.id) === stageFilter);
     if (search.trim()) {
@@ -402,7 +454,7 @@ export default function LeadsPage() {
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, tierFilter, stageFilter, statuses]);
+  }, [search, tierFilter, stageFilter, statuses, markedSubDealerKeys]);
 
   const summary = useMemo(() => {
     const agreed = LEADS.filter(l => stageFor(l.id) === 'Agreed').length;
@@ -494,8 +546,20 @@ export default function LeadsPage() {
         <div className="via-card overflow-hidden mb-5">
           <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
             <h2 className="text-[var(--text)] font-semibold text-sm">Sub-Dealer</h2>
-            <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} leads</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} leads</span>
+              {selectedSubDealerIds.size > 0 && (
+                <button onClick={markSubDealersAsCustomers} disabled={markingSubDealers}
+                  className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
+                  {markingSubDealers ? '…' : `Mark as Customers (${selectedSubDealerIds.size})`}
+                </button>
+              )}
+            </div>
           </div>
+
+          {markError && (
+            <div className="m-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">{markError}</div>
+          )}
 
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center py-10">
@@ -507,6 +571,14 @@ export default function LeadsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr>
+                    <th style={{ ...thStyle, width: 36 }}>
+                      <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                        checked={filtered.length > 0 && filtered.every(l => selectedSubDealerIds.has(l.id))}
+                        onChange={() => {
+                          const allSel = filtered.every(l => selectedSubDealerIds.has(l.id));
+                          setSelectedSubDealerIds(allSel ? new Set() : new Set(filtered.map(l => l.id)));
+                        }} />
+                    </th>
                     <th style={{ ...thStyle, width: 36 }}>#</th>
                     <th style={thStyle}>Store</th>
                     <th style={thStyle}>Tier</th>
@@ -523,9 +595,14 @@ export default function LeadsPage() {
                       <Fragment key={lead.id}>
                         <tr
                           onClick={() => setExpanded(isOpen ? null : lead.id)}
-                          className="transition-colors hover:bg-[var(--surface-2)]"
+                          className={`transition-colors hover:bg-[var(--surface-2)] ${selectedSubDealerIds.has(lead.id) ? 'bg-[var(--accent-light)]' : ''}`}
                           style={{ borderBottom: '1px solid var(--border-muted)', cursor: 'pointer' }}
                         >
+                          <td style={{ padding: '8px 12px', width: 36 }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                              checked={selectedSubDealerIds.has(lead.id)}
+                              onChange={() => toggleSelectSubDealer(lead.id)} />
+                          </td>
                           <td style={{ padding: '8px 12px' }}>
                             <span className="text-[var(--text-4)] text-xs" style={mono}>{lead.rank}</span>
                           </td>
@@ -558,7 +635,7 @@ export default function LeadsPage() {
                         </tr>
                         {isOpen && (
                           <tr style={{ borderBottom: '1px solid var(--border-muted)', background: 'var(--surface-2)' }}>
-                            <td colSpan={7} style={{ padding: '14px 20px' }}>
+                            <td colSpan={8} style={{ padding: '14px 20px' }}>
                               <div className="grid grid-cols-2 gap-5">
                                 <div className="space-y-3">
                                   <div>
