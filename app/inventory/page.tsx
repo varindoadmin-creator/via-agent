@@ -33,20 +33,47 @@ interface LocationSort { field: SortField; dir: SortDir; }
 
 function formatNum(n: number) { return n.toLocaleString('id-ID'); }
 
+function csvEscape(value: string | number): string {
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function itemsToCSV(items: InventoryItem[]): string {
+  const headers = ['Item Code', 'Item Name', 'Brand', 'Stock on Hand', 'Committed', 'Available for Sale', 'Unit'];
+  const rows = items.map(i => [i.item_code, i.item_name, i.brand, i.stock_on_hand, i.committed_stock, i.available_for_sale, i.unit]);
+  return [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+}
+
+function downloadCSV(filename: string, csv: string) {
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function SortIcon({ field, sort }: { field: SortField; sort: LocationSort }) {
   if (sort.field !== field) return <span className="text-[var(--text-4)] ml-1">↕</span>;
   return <span className="text-[var(--accent)] ml-1">{sort.dir === 'asc' ? '↑' : '↓'}</span>;
 }
 
 function LocationTable({
-  location, items, loading,
+  location, brand, items, loading,
 }: {
   location: Location;
+  brand: string;
   items: InventoryItem[];
   loading: boolean;
 }) {
   const meta = LOCATION_META[location];
   const [sort, setSort] = useState<LocationSort>({ field: 'brand', dir: 'asc' });
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<'success' | 'error' | ''>('');
+  const [sendError, setSendError] = useState('');
 
   function toggleSort(field: SortField) {
     setSort(prev => ({
@@ -75,6 +102,35 @@ function LocationTable({
   const thClass = "px-3 py-2.5 text-left text-xs font-medium tracking-wider uppercase cursor-pointer select-none whitespace-nowrap hover:text-[var(--text-2)] transition-colors";
   const tdClass = "px-3 py-2.5 text-sm";
 
+  const exportLabel = (brand === 'All Brands' ? 'All_Brands' : brand) + '_' + meta.label.replace(/\s+/g, '_');
+
+  function exportCSV() {
+    downloadCSV(`${exportLabel}.csv`, itemsToCSV(sorted));
+  }
+
+  async function emailCSV() {
+    if (!emailTo.trim()) return;
+    setSending(true);
+    setSendStatus('');
+    setSendError('');
+    try {
+      const res = await fetch('/api/inventory/export-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: emailTo.trim(), filename: `${exportLabel}.csv`, csv: itemsToCSV(sorted) }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setSendStatus('success');
+      setEmailTo('');
+    } catch (e) {
+      setSendStatus('error');
+      setSendError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div className={`rounded-xl border ${meta.border} bg-[var(--surface)] overflow-hidden`}>
       {/* Table header */}
@@ -92,13 +148,43 @@ function LocationTable({
           )}
         </div>
         {!loading && items.length > 0 && (
-          <div className="flex items-center gap-4 text-xs text-[var(--text-4)]" style={{ fontFamily: "'DM Mono', monospace" }}>
-            <span>SOH: <span className="text-[var(--text-2)]">{formatNum(totals.stock)}</span></span>
-            <span>Committed: <span className="text-[var(--warning)]/80">{formatNum(totals.committed)}</span></span>
-            <span>Available: <span className="text-[var(--success)]/80">{formatNum(totals.available)}</span></span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 text-xs text-[var(--text-4)]" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <span>SOH: <span className="text-[var(--text-2)]">{formatNum(totals.stock)}</span></span>
+              <span>Committed: <span className="text-[var(--warning)]/80">{formatNum(totals.committed)}</span></span>
+              <span>Available: <span className="text-[var(--success)]/80">{formatNum(totals.available)}</span></span>
+            </div>
+            <button onClick={exportCSV}
+              className="px-2.5 py-1 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text-2)] border border-[var(--border)] rounded-lg transition-colors">
+              ⇩ Export CSV
+            </button>
+            <button onClick={() => { setEmailOpen(o => !o); setSendStatus(''); }}
+              className="px-2.5 py-1 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text-2)] border border-[var(--border)] rounded-lg transition-colors">
+              ✉ Email
+            </button>
           </div>
         )}
       </div>
+
+      {/* Email form */}
+      {emailOpen && (
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]">
+          <input
+            type="email"
+            value={emailTo}
+            onChange={e => setEmailTo(e.target.value)}
+            placeholder="recipient@example.com"
+            className="flex-1 max-w-xs px-3 py-1.5 text-xs bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--text)] placeholder-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
+            style={{ fontFamily: "'DM Mono', monospace" }}
+          />
+          <button onClick={emailCSV} disabled={sending || !emailTo.trim()}
+            className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
+            {sending ? 'Sending…' : `Send ${exportLabel.replace(/_/g, ' ')}`}
+          </button>
+          {sendStatus === 'success' && <span className="text-[var(--success)] text-xs">✓ Sent</span>}
+          {sendStatus === 'error' && <span className="text-[var(--danger)] text-xs">✗ {sendError}</span>}
+        </div>
+      )}
 
       {/* Loading skeleton */}
       {loading && (
@@ -264,7 +350,7 @@ export default function InventoryPage() {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-[var(--text)] tracking-tight">Inventory</h1>
+            <h1 className="text-2xl font-semibold text-[var(--text)] tracking-tight">Items</h1>
           </div>
           <div className="flex items-center gap-3">
             {lastFetched && (
@@ -356,6 +442,7 @@ export default function InventoryPage() {
             <LocationTable
               key={loc}
               location={loc}
+              brand={brand}
               items={byLocation[loc] || []}
               loading={loading}
             />
