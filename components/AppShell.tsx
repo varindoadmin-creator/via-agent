@@ -28,7 +28,17 @@ interface NavSection {
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
   { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Home' }, hidden: true },
   { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
-  { type: 'standalone', item: { id: 'items', href: '/inventory', icon: Boxes, label: 'Items' }, hidden: true },
+  {
+    type: 'section',
+    section: {
+      id: 'items', label: 'Items', icon: Boxes,
+      items: [
+        { id: 'items-list',  href: '/inventory',                label: 'Items'       },
+        { id: 'price-lists', href: '/inventory/price-lists',    label: 'Price Lists' },
+      ],
+    },
+    hidden: true,
+  },
   {
     type: 'section',
     section: {
