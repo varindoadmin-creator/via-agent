@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Users, Landmark,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Landmark,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -26,22 +26,14 @@ interface NavSection {
 }
 
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
-  { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }, hidden: true },
+  { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Home' }, hidden: true },
   { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
-  { type: 'standalone', item: { id: 'customers', href: '/customers', icon: Users, label: 'Customers' }, hidden: true },
-  {
-    type: 'section',
-    section: {
-      id: 'banking', label: 'Banking', icon: Landmark,
-      items: [{ id: 'reconcile', href: '/reconcile', label: 'Bank Reconciliation' }],
-    },
-    hidden: true,
-  },
   {
     type: 'section',
     section: {
       id: 'sales', label: 'Sales', icon: ShoppingCart,
       items: [
+        { id: 'customers',    href: '/customers',           label: 'Customers'     },
         { id: 'salesorders',  href: '/shipments',           label: 'Sales Orders'  },
         { id: 'invoices',     href: '/print',               label: 'Invoices'      },
         { id: 'tax-invoices', href: '/sales/tax-invoices',  label: 'Tax Invoices'  },
@@ -63,8 +55,19 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
   {
     type: 'section',
     section: {
+      id: 'banking', label: 'Banking', icon: Landmark,
+      items: [{ id: 'reconcile', href: '/reconcile', label: 'Bank Reconciliation' }],
+    },
+    hidden: true,
+  },
+  {
+    type: 'section',
+    section: {
       id: 'inventory', label: 'Inventory', icon: Boxes,
-      items: [{ id: 'items', href: '/inventory', label: 'Items' }],
+      items: [
+        { id: 'items',     href: '/inventory',           label: 'Items'     },
+        { id: 'shipments', href: '/inventory/shipments', label: 'Shipments' },
+      ],
     },
     hidden: true,
   },
@@ -312,9 +315,17 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   // this — this filter just keeps the sidebar honest about what's reachable.
   const visibleNav = role === 'admin'
     ? NAV.filter(entry =>
-        (entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'documents')) ||
-        (entry.type === 'standalone' && (entry.item.id === 'guide' || entry.item.id === 'customers'))
-      ).map(entry => ({ ...entry, hidden: false })) // clear any hidden flag on entries explicitly allow-listed above
+        (entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'documents' || entry.section.id === 'sales')) ||
+        (entry.type === 'standalone' && entry.item.id === 'guide')
+      ).map(entry => {
+        // Sales is only shown so Admin can reach Customers — Invoices and Tax
+        // Invoices aren't in ADMIN_ALLOWED_PREFIXES (middleware.ts), so keep
+        // them out of the sidebar too rather than showing a link that 403s.
+        if (entry.type === 'section' && entry.section.id === 'sales') {
+          return { ...entry, hidden: false, section: { ...entry.section, items: entry.section.items.filter(i => i.id === 'customers') } };
+        }
+        return { ...entry, hidden: false };
+      }) // clear any hidden flag on entries explicitly allow-listed above
     : role === 'director'
     ? NAV.map(entry => ({ ...entry, hidden: false })) // Director sees every section, including WIP ones hidden from Admin
     : NAV;
