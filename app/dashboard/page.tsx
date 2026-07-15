@@ -6,7 +6,8 @@ import ChatInterface from '@/components/ChatInterface';
 type DailyBriefChange = { field: string; from: string; to: string };
 type DailyBriefCustomer = { contact_id: string; contact_name: string; changes: DailyBriefChange[]; fixed_at: string };
 type DailyBriefInvoice = { salesorder_id: string; salesorder_number: string; customer_name: string; invoice_number: string | null; converted_at: string };
-type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[] };
+type DailyBriefSentInvoice = { invoice_id: string; invoice_number: string; customer_name: string; sent_at: string };
+type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[]; sentInvoices: DailyBriefSentInvoice[] };
 
 function DailyBriefPanel() {
   const [days, setDays] = useState<DailyBriefDay[] | null>(null);
@@ -60,7 +61,7 @@ function DailyBriefPanel() {
       )}
 
       {!loading && !error && days && days.length === 0 && (
-        <div className="text-[var(--muted)] text-xs py-3">No customer repairs or auto-invoiced shipments in the last 14 days.</div>
+        <div className="text-[var(--muted)] text-xs py-3">No customer repairs, auto-invoiced shipments, or auto-sent invoices in the last 14 days.</div>
       )}
 
       {!error && days && days.length > 0 && (
@@ -76,7 +77,7 @@ function DailyBriefPanel() {
                 >
                   <span className="text-[var(--text)] text-xs font-medium">{day.label}</span>
                   <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} {isOpen ? '▲' : '▼'}
+                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} · {day.sentInvoices.length} sent {isOpen ? '▲' : '▼'}
                   </span>
                 </button>
                 {isOpen && (
@@ -99,6 +100,14 @@ function DailyBriefPanel() {
                         <div className="text-[var(--muted)] text-xs mt-1">
                           <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{inv.salesorder_number}</span> converted to invoice
                           {inv.invoice_number && <> — <span style={{ color: 'var(--success)', fontFamily: 'JetBrains Mono, monospace' }}>{inv.invoice_number}</span></>}
+                        </div>
+                      </div>
+                    ))}
+                    {day.sentInvoices.map(inv => (
+                      <div key={inv.invoice_id} className="px-3 py-2">
+                        <div className="text-[var(--text)] text-xs font-medium">{inv.customer_name || '(unnamed)'}</div>
+                        <div className="text-[var(--muted)] text-xs mt-1">
+                          Invoice <span style={{ color: 'var(--success)', fontFamily: 'JetBrains Mono, monospace' }}>{inv.invoice_number}</span> marked as sent
                         </div>
                       </div>
                     ))}

@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 
 // ─── Daily Brief: what VIA did automatically, grouped by day ──────────────────
-// Reads two logs the daily 09:00 Asia/Jakarta scheduled jobs write to:
+// Reads three logs the daily 09:00 Asia/Jakarta scheduled jobs write to:
 //   - customer_cleanup_log (lib/customerCleanup/autoRepair.ts) — rows with an
 //     empty `changes` array mean "scanned, nothing needed fixing" and are
 //     excluded, since the brief is specifically about things that changed.
 //   - shipment_invoice_log (lib/shipments/autoInvoice.ts) — only success=true
 //     rows are shown; failed conversion attempts are logged but not surfaced
 //     here (they just get retried automatically the next day).
+//   - invoice_auto_send_log (app/api/invoices-page/auto-send/route.ts) — same
+//     success=true-only rule; skipped (insufficient stock) and failed sends
+//     are logged but not shown here, since they just retry the next run.
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
 const DAYS_BACK = 14;
@@ -25,6 +28,13 @@ interface InvoiceLogRow {
   customer_name: string;
   invoice_number: string | null;
   converted_at: string;
+}
+
+interface SentInvoiceLogRow {
+  invoice_id: string;
+  invoice_number: string;
+  customer_name: string;
+  sent_at: string;
 }
 
 function sbHeaders() {
@@ -52,18 +62,21 @@ export async function GET() {
   try {
     const cutoff = new Date(Date.now() - DAYS_BACK * 24 * 60 * 60 * 1000).toISOString();
 
-    const [customerRes, invoiceRes] = await Promise.all([
+    const [customerRes, invoiceRes, sentInvoiceRes] = await Promise.all([
       fetch(sbUrl(`customer_cleanup_log?select=contact_id,contact_name,changes,fixed_at&fixed_at=gte.${cutoff}&order=fixed_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`shipment_invoice_log?select=salesorder_id,salesorder_number,customer_name,invoice_number,converted_at&success=eq.true&converted_at=gte.${cutoff}&order=converted_at.desc&limit=500`), { headers: sbHeaders() }),
+      fetch(sbUrl(`invoice_auto_send_log?select=invoice_id,invoice_number,customer_name,sent_at&success=eq.true&sent_at=gte.${cutoff}&order=sent_at.desc&limit=500`), { headers: sbHeaders() }),
     ]);
 
     if (!customerRes.ok) throw new Error(`Supabase ${customerRes.status}: ${await customerRes.text()}`);
     const customerRows = (await customerRes.json()) as CustomerLogRow[];
     const repaired = customerRows.filter(r => Array.isArray(r.changes) && r.changes.length > 0);
 
-    // shipment_invoice_log may not exist yet if the SQL migration hasn't been run —
-    // soft-fail to an empty list rather than breaking the whole Daily Brief.
+    // shipment_invoice_log / invoice_auto_send_log may not exist yet if their SQL
+    // migration hasn't been run — soft-fail to an empty list rather than breaking
+    // the whole Daily Brief.
     const invoiceRows: InvoiceLogRow[] = invoiceRes.ok ? await invoiceRes.json() : [];
+    const sentInvoiceRows: SentInvoiceLogRow[] = sentInvoiceRes.ok ? await sentInvoiceRes.json() : [];
 
     const nowJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS).toISOString().split('T')[0];
     const yesterdayJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -84,7 +97,15 @@ export async function GET() {
       else invoicesByDate.set(date, [row]);
     }
 
-    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys()]);
+    const sentInvoicesByDate = new Map<string, SentInvoiceLogRow[]>();
+    for (const row of sentInvoiceRows) {
+      const date = jakartaDate(row.sent_at);
+      const list = sentInvoicesByDate.get(date);
+      if (list) list.push(row);
+      else sentInvoicesByDate.set(date, [row]);
+    }
+
+    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys()]);
 
     const days = Array.from(allDates)
       .sort((a, b) => b.localeCompare(a))
@@ -103,6 +124,12 @@ export async function GET() {
           customer_name: i.customer_name,
           invoice_number: i.invoice_number,
           converted_at: i.converted_at,
+        })),
+        sentInvoices: (sentInvoicesByDate.get(date) || []).map(i => ({
+          invoice_id: i.invoice_id,
+          invoice_number: i.invoice_number,
+          customer_name: i.customer_name,
+          sent_at: i.sent_at,
         })),
       }));
 

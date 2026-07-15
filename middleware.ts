@@ -3,9 +3,9 @@ import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/ping'];
 
-// Hit by the Hostinger hPanel cron jobs (no browser session available), so
-// these bypass session auth via a shared secret header instead.
-const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair'];
+// Hit by external cron-job.org scheduled jobs (no browser session available),
+// so these bypass session auth via a shared secret header instead.
+const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/invoices-page/auto-send'];
 
 function isCronAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

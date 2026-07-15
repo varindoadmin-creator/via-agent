@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { runAutoConvertReadyShipments } from '@/lib/shipments/autoInvoice';
 
-// Triggered daily at 09:00 Asia/Jakarta by a Hostinger hPanel Cron Job (see
-// middleware.ts for the x-cron-secret auth bypass). Also callable manually
-// while authenticated in the app, for testing.
+// Triggered daily at 09:00 Asia/Jakarta by an external cron-job.org scheduled
+// job (see middleware.ts for the x-cron-secret auth bypass — Hostinger's
+// Node.js Web App hosting has no cron support of its own). Also callable
+// manually while authenticated in the app, for testing.
 export async function POST() {
   try {
     const result = await runAutoConvertReadyShipments();
