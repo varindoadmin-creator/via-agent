@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Landmark,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Landmark, Truck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -28,6 +28,15 @@ interface NavSection {
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
   { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Home' }, hidden: true },
   { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
+  { type: 'standalone', item: { id: 'items', href: '/inventory', icon: Boxes, label: 'Items' }, hidden: true },
+  {
+    type: 'section',
+    section: {
+      id: 'inventory', label: 'Inventory', icon: Truck,
+      items: [{ id: 'shipments', href: '/inventory/shipments', label: 'Shipments' }],
+    },
+    hidden: true,
+  },
   {
     type: 'section',
     section: {
@@ -57,17 +66,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
     section: {
       id: 'banking', label: 'Banking', icon: Landmark,
       items: [{ id: 'reconcile', href: '/reconcile', label: 'Bank Reconciliation' }],
-    },
-    hidden: true,
-  },
-  {
-    type: 'section',
-    section: {
-      id: 'inventory', label: 'Inventory', icon: Boxes,
-      items: [
-        { id: 'items',     href: '/inventory',           label: 'Items'     },
-        { id: 'shipments', href: '/inventory/shipments', label: 'Shipments' },
-      ],
     },
     hidden: true,
   },
