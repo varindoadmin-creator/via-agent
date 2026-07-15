@@ -3,6 +3,20 @@ import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/ping'];
 
+// Hit by the Hostinger hPanel cron jobs (no browser session available), so
+// these bypass session auth via a shared secret header instead.
+const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair'];
+
+function isCronAuthorized(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const provided = req.headers.get('x-cron-secret') || '';
+  if (provided.length !== secret.length) return false;
+  let diff = 0;
+  for (let i = 0; i < secret.length; i++) diff |= secret.charCodeAt(i) ^ provided.charCodeAt(i);
+  return diff === 0;
+}
+
 // Path prefixes the 'admin' role may access — matches exactly what's visible
 // in today's sidebar (Approvals + Requests). Everything else is Director-only.
 const ADMIN_ALLOWED_PREFIXES = [
@@ -24,6 +38,7 @@ function adminAllowed(pathname: string): boolean {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (isPublic(pathname)) return NextResponse.next();
+  if (CRON_PATHS.includes(pathname) && isCronAuthorized(req)) return NextResponse.next();
 
   const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   const role = await verifySessionToken(token);

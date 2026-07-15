@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { runAutoConvertReadyShipments } from '@/lib/shipments/autoInvoice';
 
-// Manual trigger for the same job instrumentation.ts runs daily at 09:00
-// Asia/Jakarta — useful for testing without waiting for the schedule.
+// Triggered daily at 09:00 Asia/Jakarta by a Hostinger hPanel Cron Job (see
+// middleware.ts for the x-cron-secret auth bypass). Also callable manually
+// while authenticated in the app, for testing.
 export async function POST() {
   try {
     const result = await runAutoConvertReadyShipments();

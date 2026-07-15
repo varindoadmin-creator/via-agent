@@ -1,5 +1,6 @@
 // ─── Automated conversion for fully-delivered Sales Orders ─────────────────
-// Runs daily (see instrumentation.ts) alongside the customer auto-repair job.
+// Runs daily via a Hostinger hPanel Cron Job hitting POST /api/shipments/auto-invoice
+// (see middleware.ts for the x-cron-secret auth bypass on that route).
 // Reuses the exact same GET/POST logic the manual "Convert to Invoice" button
 // on the Shipment Delivered — Not Invoiced table calls (app/api/shipments/route.ts),
 // invoked in-process rather than over HTTP. Only SOs where every line item is

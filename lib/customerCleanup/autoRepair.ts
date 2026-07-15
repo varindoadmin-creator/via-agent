@@ -1,5 +1,7 @@
 // ─── Automated repair for new customers ────────────────────────────────────
-// Runs daily (see instrumentation.ts) — scans customers created in the last 7
+// Runs daily via a Hostinger hPanel Cron Job hitting POST /api/customers/auto-repair
+// (see middleware.ts for the x-cron-secret auth bypass on that route). Scans
+// customers created in the last 7
 // days and applies the same fix logic as the manual "Repair Data" flow
 // (app/api/customers/cleanup/route.ts), but with no human review step: any
 // computable fix is written straight to Zoho. Anything computeCustomerFix
