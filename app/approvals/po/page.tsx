@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
-type MatchRow = { salesorder_number: string; customer_name: string; customer_region: string; so_quantity: number; fulfilled_qty: number };
+type MatchRow = { salesorder_number: string; customer_name: string; customer_region: string; so_quantity: number; fulfilled_qty: number; fully_covered: boolean };
 
 type LineItem = {
   item_id: string;
@@ -16,6 +16,7 @@ type LineItem = {
   matches: MatchRow[];
   matched_qty: number;
   stock_qty: number;
+  stock_on_hand: number;
   match_status: string;
 };
 
@@ -243,9 +244,10 @@ export default function POApprovalCheckPage() {
                               <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}>
                                 <th style={{ padding: 9, textAlign: 'left' }}>ITEM</th>
                                 <th style={{ padding: 9, textAlign: 'left' }}>LOCATION</th>
+                                <th style={{ padding: 9, textAlign: 'right' }}>STOCK ON HAND</th>
                                 <th style={{ padding: 9, textAlign: 'right' }}>PO QTY</th>
                                 <th style={{ padding: 9, textAlign: 'left' }}>MATCHED SO(s)</th>
-                                <th style={{ padding: 9, textAlign: 'right' }}>STOCK QTY</th>
+                                <th style={{ padding: 9, textAlign: 'right' }}>EXCESS QTY</th>
                                 <th style={{ padding: 9, textAlign: 'center' }}>STATUS</th>
                               </tr>
                             </thead>
@@ -254,13 +256,15 @@ export default function POApprovalCheckPage() {
                                 <tr key={idx} style={{ borderTop: '1px solid var(--border)', verticalAlign: 'top' }}>
                                   <td style={{ padding: 9 }}>{li.name}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{li.sku}</div></td>
                                   <td style={{ padding: 9, ...mono, fontSize: 11 }}>{li.location_name}</td>
+                                  <td style={{ padding: 9, textAlign: 'right', ...mono }}>{fmt(li.stock_on_hand)} {li.unit}</td>
                                   <td style={{ padding: 9, textAlign: 'right', ...mono }}>{fmt(li.quantity)} {li.unit}</td>
                                   <td style={{ padding: 9 }}>
                                     {li.matches.length === 0 ? <span style={{ color: 'var(--text-4)' }}>—</span> : li.matches.map((m, i) => (
                                       <div key={i} style={{ fontSize: 12 }}>
                                         <span style={mono}>{m.salesorder_number}</span> {m.customer_name}
                                         {m.customer_region && <span style={{ color: 'var(--text-4)' }}> ({m.customer_region})</span>}
-                                        <span style={{ ...mono, color: 'var(--text-3)' }}> — {fmt(m.fulfilled_qty)} {li.unit}</span>
+                                        <span style={{ ...mono, color: 'var(--text-3)' }}> — {fmt(m.fulfilled_qty)} of {fmt(m.so_quantity)} {li.unit} SO qty</span>
+                                        {!m.fully_covered && <span style={{ color: 'var(--warning)' }}> (remainder still needed)</span>}
                                       </div>
                                     ))}
                                   </td>

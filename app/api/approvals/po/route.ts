@@ -170,6 +170,7 @@ interface MatchRow {
   customer_region: string;
   so_quantity: number;
   fulfilled_qty: number;
+  fully_covered: boolean;
 }
 
 type MatchStatus = 'matched' | 'multi_match' | 'partial_so' | 'excess_stock' | 'for_stock' | 'needs_review';
@@ -187,6 +188,7 @@ interface ComputedLineItem {
   matches: MatchRow[];
   matched_qty: number;
   stock_qty: number;
+  stock_on_hand: number;
   match_status: MatchStatus;
 }
 
@@ -324,6 +326,8 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
   }
 
   for (const [k, poEntries] of poByGroup) {
+    const [groupItemId, groupLocationId] = k.split('::');
+    const stockOnHand = stockOnHandAt(groupItemId, groupLocationId);
     const queue = remainingQueues.get(k) || [];
     let qIdx = 0;
     for (const { po, item } of poEntries) {
@@ -333,6 +337,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
         const slot = queue[qIdx];
         if (slot.remaining <= 0) { qIdx++; continue; }
         const take = Math.min(remaining, slot.remaining);
+        slot.remaining -= take;
         matches.push({
           salesorder_id: slot.entry.salesorder_id,
           salesorder_number: slot.entry.salesorder_number,
@@ -340,25 +345,32 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
           customer_region: slot.entry.customer_region,
           so_quantity: slot.entry.original_qty,
           fulfilled_qty: take,
+          // Whether this SO's shortfall (its need beyond stock already on hand) is now
+          // fully drained — possibly by this PO alone, possibly combined with earlier POs
+          // that already claimed part of the same slot. This, not a raw quantity compare
+          // against the SO's full original need, is what "matched" vs "partial_so" means:
+          // stock_on_hand already legitimately covers part of the SO, so a PO only needs
+          // to cover the remainder to fully clear it.
+          fully_covered: slot.remaining <= 0,
         });
-        slot.remaining -= take;
         remaining -= take;
         if (slot.remaining <= 0) qIdx++;
       }
       const matched_qty = item.quantity - remaining;
       const stock_qty = remaining;
+      const allFullyCovered = matches.length > 0 && matches.every(m => m.fully_covered);
 
       let match_status: MatchStatus;
       if (!item.item_id) match_status = 'needs_review';
       else if (matches.length === 0) match_status = 'for_stock';
-      else if (matches.length === 1 && stock_qty === 0) match_status = matches[0].fulfilled_qty >= matches[0].so_quantity ? 'matched' : 'partial_so';
-      else if (matches.length > 1 && stock_qty === 0) match_status = 'multi_match';
-      else match_status = 'excess_stock';
+      else if (stock_qty > 0) match_status = 'excess_stock';
+      else if (matches.length === 1) match_status = allFullyCovered ? 'matched' : 'partial_so';
+      else match_status = allFullyCovered ? 'multi_match' : 'partial_so';
 
       pushLineItem(po.purchaseorder_id, {
         order: item.order, item_id: item.item_id, name: item.name, sku: item.sku, unit: item.unit,
         location_name: item.location_name, quantity: item.quantity, rate: item.rate, amount: item.amount,
-        matches, matched_qty, stock_qty, match_status,
+        matches, matched_qty, stock_qty, stock_on_hand: stockOnHand, match_status,
       });
     }
   }
@@ -370,7 +382,7 @@ async function computeApprovalData(): Promise<{ purchase_orders: ComputedPO[]; u
       pushLineItem(po.purchaseorder_id, {
         order: item.order, item_id: '', name: item.name, sku: item.sku, unit: item.unit,
         location_name: item.location_name, quantity: item.quantity, rate: item.rate, amount: item.amount,
-        matches: [], matched_qty: 0, stock_qty: item.quantity, match_status: 'needs_review',
+        matches: [], matched_qty: 0, stock_qty: item.quantity, stock_on_hand: 0, match_status: 'needs_review',
       });
     }
   }
