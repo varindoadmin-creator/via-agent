@@ -17,6 +17,8 @@ interface TaxInvoice {
   cf_npwp: string;
   cf_customer_po_no: string;
   has_attachment: boolean;
+  document_sent: boolean;
+  document_sent_at: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -38,6 +40,7 @@ export default function TaxInvoicesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [markingSent, setMarkingSent] = useState(false);
 
   // Upload state
   const [uploading, setUploading] = useState(false);
@@ -131,6 +134,28 @@ export default function TaxInvoicesPage() {
     });
   }
 
+  async function markDocumentsSent() {
+    const items = filtered.filter(inv => selected.has(inv.invoice_id));
+    if (!items.length) return;
+    setMarkingSent(true);
+    try {
+      const res = await fetch('/api/sales/tax-invoices/mark-sent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoices: items.map(i => ({ invoice_id: i.invoice_id, invoice_number: i.invoice_number, customer_name: i.customer_name })),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      await fetchData();
+    } catch (e) {
+      alert('Failed to mark as sent: ' + String(e));
+    } finally {
+      setMarkingSent(false);
+    }
+  }
+
   const thStyle: React.CSSProperties = {
     padding: '9px 12px', textAlign: 'left',
     color: 'var(--text-3)', fontWeight: 500, fontSize: 10,
@@ -153,7 +178,7 @@ export default function TaxInvoicesPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Tax Invoices</h1>
+            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Invoice Tracker</h1>
             <p className="text-[var(--text-3)] text-sm mt-0.5">{dateRange || 'Loading…'}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -181,6 +206,10 @@ export default function TaxInvoicesPage() {
                         : 'bg-[var(--accent)] text-white border-[var(--accent)] hover:opacity-90'
                     }`}>
                     {copied ? '✓ Copied!' : `📋 Copy FP List (${selected.size})`}
+                  </button>
+                  <button onClick={markDocumentsSent} disabled={markingSent}
+                    className="px-4 py-2 text-xs font-semibold rounded-lg border transition-all bg-[var(--success)] text-white border-[var(--success)] hover:opacity-90 disabled:opacity-50">
+                    {markingSent ? '⏳ Marking…' : `✓ Documents Sent (${selected.size})`}
                   </button>
                 </>
               );
@@ -289,13 +318,13 @@ export default function TaxInvoicesPage() {
                       else setSelected(new Set(filtered.map(i => i.invoice_id)));
                     }} />
                 </th>
-                <th style={{ ...thStyle, width: 40, textAlign: 'center' }} title="Tax Invoice / Faktur Pajak attached">FP</th>
                 <th style={thStyle}>#</th>
                 <th style={thStyle}>Invoice No.</th>
                 <th style={thStyle}>Customer</th>
                 <th style={thStyle}>Date</th>
                 <th style={thStyle}>NPWP</th>
                 <th style={thStyle}>Status</th>
+                <th style={thStyle}>Remarks</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Total</th>
               </tr>
             </thead>
@@ -326,12 +355,6 @@ export default function TaxInvoicesPage() {
                       checked={selected.has(inv.invoice_id)}
                       onChange={() => toggleSelect(inv.invoice_id)} />
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                    {inv.has_attachment
-                      ? <span title="Faktur Pajak attached" style={{ fontSize: 14 }}>📎</span>
-                      : <span style={{ color: 'var(--border)', fontSize: 11 }}>—</span>
-                    }
-                  </td>
                   <td style={{ padding: '9px 12px', color: 'var(--text-4)', fontSize: 11, ...mono }}>{i + 1}</td>
                   <td style={{ padding: '9px 12px', ...mono, color: 'var(--accent-text)', fontWeight: 600, fontSize: 12 }}>
                     {inv.invoice_number}
@@ -359,6 +382,26 @@ export default function TaxInvoicesPage() {
                     }}>
                       {inv.status?.replace('_', ' ')}
                     </span>
+                  </td>
+                  <td style={{ padding: '9px 12px' }}>
+                    {inv.document_sent ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--success)',
+                          background: 'var(--success-bg)', border: '1px solid var(--success-border)',
+                          padding: '2px 7px', borderRadius: 4 }}>
+                          Sent
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--text-4)' }}>
+                          {inv.document_sent_at && new Date(inv.document_sent_at).toLocaleDateString('id-ID')}
+                        </span>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)',
+                        background: 'var(--surface-3)', border: '1px solid var(--border)',
+                        padding: '2px 7px', borderRadius: 4 }}>
+                        Not Sent
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontSize: 12, fontWeight: 600 }}>
                     {formatRp(inv.total)}

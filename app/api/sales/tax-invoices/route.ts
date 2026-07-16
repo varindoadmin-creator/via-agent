@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
 import { fetchWithRetry } from '@/lib/zoho/retry';
 
+function sbHeaders() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  return { apikey: key, Authorization: `Bearer ${key}` };
+}
+
+function sbUrl(path: string) {
+  return `${(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/rest/v1/${path}`;
+}
+
+interface SentLogRow {
+  invoice_id: string;
+  sent_at: string;
+}
+
+/** invoice_id -> sent_at. Soft-fails to an empty map if the table isn't migrated yet. */
+async function fetchSentMap(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const res = await fetch(sbUrl('tax_invoice_sent_log?select=invoice_id,sent_at&limit=5000'), { headers: sbHeaders() });
+    if (!res.ok) return map;
+    const rows = (await res.json()) as SentLogRow[];
+    for (const row of rows) map.set(row.invoice_id, row.sent_at);
+  } catch { /* soft-fail — REMARKS just shows Not Sent for everything */ }
+  return map;
+}
+
 function getDateRange(period: string) {
   const now = new Date();
   const y = now.getFullYear();
@@ -45,19 +71,26 @@ export async function GET(request: NextRequest) {
       if (page > 10) break;
     }
 
-    const invoices = allInvoices.map(inv => ({
-      invoice_id: inv.invoice_id,
-      invoice_number: inv.invoice_number,
-      customer_name: inv.customer_name,
-      date: inv.date,
-      due_date: inv.due_date,
-      status: inv.status,
-      total: Number(inv.total) || 0,
-      balance: Number(inv.balance) || 0,
-      cf_npwp: inv.cf_npwp || '',
-      cf_customer_po_no: inv.cf_customer_po_no || '',
-      has_attachment: Boolean(inv.has_attachment),
-    }));
+    const sentMap = await fetchSentMap();
+
+    const invoices = allInvoices.map(inv => {
+      const sentAt = sentMap.get(String(inv.invoice_id)) || null;
+      return {
+        invoice_id: inv.invoice_id,
+        invoice_number: inv.invoice_number,
+        customer_name: inv.customer_name,
+        date: inv.date,
+        due_date: inv.due_date,
+        status: inv.status,
+        total: Number(inv.total) || 0,
+        balance: Number(inv.balance) || 0,
+        cf_npwp: inv.cf_npwp || '',
+        cf_customer_po_no: inv.cf_customer_po_no || '',
+        has_attachment: Boolean(inv.has_attachment),
+        document_sent: sentAt !== null,
+        document_sent_at: sentAt,
+      };
+    });
 
     return NextResponse.json({ success: true, invoices, from, to });
   } catch (err) {
