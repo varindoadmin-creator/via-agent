@@ -2,6 +2,7 @@
 import React from 'react';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import POApprovalPanel from '@/components/POApprovalPanel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,13 +44,6 @@ interface PO {
   line_items: POLineItem[];
   fulfillment_type: 'so_fulfillment' | 'multi_so' | 'mixed' | 'stock_only' | 'needs_review';
   matched_so_numbers: string[];
-}
-
-interface ApproveResult {
-  purchaseorder_id: string;
-  purchaseorder_number: string;
-  success: boolean;
-  error?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -619,105 +613,6 @@ function ReceiveItemsModal({ poId, onClose, onDone }: {
   );
 }
 
-// ─── Pending Approval PO Table ───────────────────────────────────────────────
-
-function PendingApprovalPOTable({ onRefresh }: { onRefresh: () => void }) {
-  const [items, setItems] = useState<PO[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [approving, setApproving] = useState(false);
-  const [results, setResults] = useState<{number: string; success: boolean; error?: string}[]>([]);
-  const mono = { fontFamily: 'JetBrains Mono, monospace' };
-  const formatRp = (n: number) => 'Rp ' + Number(n).toLocaleString('id-ID');
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/purchases?mode=pending_approval');
-      const data = await res.json();
-      setItems(data.purchaseorders || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  async function handleApprove() {
-    setApproving(true); setResults([]);
-    const out: typeof results = [];
-    for (const id of selected) {
-      const po = items.find(p => p.purchaseorder_id === id);
-      try {
-        const res = await fetch('/api/purchases/auto-approve', { method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ purchaseorder_id: id }),
-        });
-        const d = await res.json();
-        if (!d.success) throw new Error(d.error);
-        out.push({ number: po?.purchaseorder_number || id, success: true });
-      } catch(e) { out.push({ number: po?.purchaseorder_number || id, success: false, error: String(e) }); }
-    }
-    setResults(out);
-    setSelected(new Set());
-    await fetchData();
-    onRefresh();
-    setApproving(false);
-  }
-
-  if (!loading && items.length === 0) return null;
-
-  return (
-    <div className="via-card mb-4">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-        <div>
-          <h3 className="text-[var(--text)] font-semibold text-sm">Pending Approval</h3>
-          <p className="text-[var(--text-4)] text-xs">POs awaiting approval — tick to approve</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[var(--text-4)] text-xs" style={mono}>{items.length} POs</span>
-          {selected.size > 0 && (
-            <button onClick={handleApprove} disabled={approving}
-              className="px-3 py-1.5 text-xs bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50">
-              {approving ? 'Approving…' : `✓ Approve (${selected.size})`}
-            </button>
-          )}
-        </div>
-      </div>
-      {results.length > 0 && (
-        <div className="px-5 py-2 border-b border-[var(--border)] space-y-1">
-          {results.map((r,i) => (
-            <div key={i} className={`text-xs flex gap-2 ${r.success?'text-[var(--success)]':'text-[var(--danger)]'}`}>
-              <span>{r.success?'✓':'✗'}</span><span style={mono}>{r.number}</span>
-              <span>{r.success?'Approved':r.error}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <table className="via-table">
-        <thead><tr>
-          <th className="w-8"><input type="checkbox" className="w-3.5 h-3.5 rounded"
-            checked={selected.size===items.length&&items.length>0}
-            onChange={()=>selected.size===items.length?setSelected(new Set()):setSelected(new Set(items.map(p=>p.purchaseorder_id)))} /></th>
-          <th>PO Number</th><th>Vendor</th><th>Date</th><th className="text-right">Total</th>
-        </tr></thead>
-        <tbody>
-          {items.map(po => (
-            <tr key={po.purchaseorder_id} className={selected.has(po.purchaseorder_id)?'bg-[var(--accent-light)]':'hover:bg-[var(--surface-2)] transition-colors'}>
-              <td><input type="checkbox" className="w-3.5 h-3.5 rounded"
-                checked={selected.has(po.purchaseorder_id)}
-                onChange={()=>setSelected(prev=>{const n=new Set(prev);n.has(po.purchaseorder_id)?n.delete(po.purchaseorder_id):n.add(po.purchaseorder_id);return n;})} /></td>
-              <td className="text-[var(--accent-text)] text-xs font-medium" style={mono}>{po.purchaseorder_number}</td>
-              <td className="text-[var(--text)] text-xs">{po.vendor_name}</td>
-              <td className="text-[var(--text-3)] text-xs">{po.date}</td>
-              <td className="text-right text-[var(--text-2)] text-xs" style={mono}>{formatRp(po.total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 // ─── Bulk Receive Modal ──────────────────────────────────────────────────────
 
 function BulkReceiveModal({ poIds, pos, onClose, onDone }: {
@@ -974,11 +869,6 @@ export default function PurchasesPage() {
   const [soCount, setSoCount] = useState(0);
   const [lastRefreshed, setLastRefreshed] = useState('');
 
-  // Approve state
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [approving, setApproving] = useState(false);
-  const [approveResults, setApproveResults] = useState<ApproveResult[]>([]);
   const [receiveModal, setReceiveModal] = useState<string | null>(null);
   const [selectedIssued, setSelectedIssued] = useState<Set<string>>(new Set());
   const [showBulkReceive, setShowBulkReceive] = useState(false);
@@ -986,7 +876,6 @@ export default function PurchasesPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError('');
-    setApproveResults([]);
     try {
       const res = await fetch('/api/purchases');
       const data = await res.json();
@@ -1000,39 +889,6 @@ export default function PurchasesPage() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  function toggleAll() {
-    if (selected.size === draftPOs.length) setSelected(new Set());
-    else setSelected(new Set(draftPOs.map(po => po.purchaseorder_id)));
-  }
-
-  function toggle(id: string) {
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }
-
-  const selectedPOs = draftPOs.filter(po => selected.has(po.purchaseorder_id));
-  const hasNeedsReview = selectedPOs.some(po => po.fulfillment_type === 'needs_review');
-
-  async function doApprove() {
-    setApproving(true);
-    try {
-      const res = await fetch('/api/purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ purchaseorder_ids: Array.from(selected) }),
-      });
-      const data = await res.json();
-      setApproveResults(data.results || []);
-      const successIds = (data.results || [])
-        .filter((r: ApproveResult) => r.success)
-        .map((r: ApproveResult) => r.purchaseorder_id);
-      if (successIds.length > 0) {
-        setDraftPOs(prev => prev.filter(po => !successIds.includes(po.purchaseorder_id)));
-        setSelected(new Set());
-      }
-    } catch (e) { setError(String(e)); }
-    finally { setApproving(false); setShowConfirm(false); }
-  }
 
   return (
     <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
@@ -1053,12 +909,11 @@ export default function PurchasesPage() {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { label: 'Draft (Pending Approval)', value: loading ? '…' : draftPOs.length, color: 'var(--warning)' },
+            { label: 'Draft', value: loading ? '…' : draftPOs.length, color: 'var(--text-3)' },
             { label: 'Issued (Open)', value: loading ? '…' : issuedPOs.length, color: 'var(--info)' },
             { label: 'Confirmed SOs Checked', value: loading ? '…' : soCount, color: 'var(--success)' },
-            { label: 'Needs Review', value: loading ? '…' : draftPOs.filter(p => p.fulfillment_type === 'needs_review').length, color: 'var(--danger)' },
           ].map(c => (
             <div key={c.label} className="via-card px-4 py-3">
               <div className="text-[var(--text-3)] text-xs mb-1">{c.label}</div>
@@ -1069,45 +924,27 @@ export default function PurchasesPage() {
 
         {error && <div className="mb-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-sm">{error}</div>}
 
-        {/* Approve results */}
-        {approveResults.length > 0 && (
-          <div className="mb-4 via-card p-4 space-y-1">
-            {approveResults.map((r, i) => (
-              <div key={i} className={'text-xs flex gap-2 ' + (r.success ? 'text-[var(--success)]' : 'text-[var(--danger)]')}>
-                <span>{r.success ? '✓' : '✗'}</span>
-                <span style={mono} className="font-medium">{r.purchaseorder_number}</span>
-                <span>{r.success ? 'Approved — moved to Issued' : r.error}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Search + Approve button */}
+        {/* Search */}
         <div className="flex items-center gap-3 mb-5">
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search PO number, vendor, SO number, item, customer…"
             className="via-input text-xs py-1.5 px-3 w-80" />
-          {selected.size > 0 && (
-            <button onClick={() => setShowConfirm(true)} disabled={approving}
-              className="ml-auto px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2">
-              {approving ? 'Approving…' : `Approve ${selected.size} PO${selected.size > 1 ? 's' : ''}`}
-              {hasNeedsReview && <span className="text-yellow-200">⚠</span>}
-            </button>
-          )}
         </div>
 
-        {/* Table 1 — Draft POs */}
+        {/* Table 1 — Draft POs (real Zoho draft status — not yet submitted for approval, no checks) */}
         <div className="mb-6">
           <POTable
             title="Draft"
-            desc="Pending Approval — review SO matching below, tick and approve when ready"
-            pos={draftPOs} loading={loading} search={search} showMatching={true}
-            selectable={true} selected={selected} onToggleAll={toggleAll} onToggle={toggle}
+            desc="Not yet submitted for approval — plain list, no SO matching"
+            pos={draftPOs} loading={loading} search={search} showMatching={false}
+            selectable={false}
           />
         </div>
 
-        {/* Pending Approval POs */}
-        <PendingApprovalPOTable onRefresh={fetchAll} />
+        {/* Pending Approval — SO-matching, stock-on-hand, and the only gated approval path */}
+        <div className="mb-6">
+          <POApprovalPanel compact onApproved={fetchAll} />
+        </div>
 
         {/* Table 2 — Issued POs */}
         {selectedIssued.size > 0 && (
@@ -1160,46 +997,6 @@ export default function PurchasesPage() {
             onClose={() => setShowBulkReceive(false)}
             onDone={() => { setShowBulkReceive(false); setSelectedIssued(new Set()); fetchAll(); }}
           />
-        )}
-
-        {/* Confirm modal */}
-        {showConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="via-card w-[480px] p-6 mx-4">
-              <h3 className="text-[var(--text)] font-semibold text-sm mb-2">Approve Purchase Orders</h3>
-              {hasNeedsReview && (
-                <div className="mb-3 p-2.5 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-lg text-[var(--warning)] text-xs">
-                  ⚠ Some selected POs have items that could not be matched to Confirmed SOs. Please verify before approving.
-                </div>
-              )}
-              <p className="text-[var(--text-3)] text-xs mb-4">
-                Approve <strong className="text-[var(--text)]">{selected.size}</strong> Draft Purchase Order{selected.size > 1 ? 's' : ''}?
-                They will move to Issued status and be sent to the vendor.
-              </p>
-              <div className="max-h-48 overflow-y-auto mb-4 border border-[var(--border)] rounded-lg divide-y divide-[var(--border-muted)]">
-                {selectedPOs.map(po => (
-                  <div key={po.purchaseorder_id} className="flex items-center justify-between px-3 py-2.5 text-xs">
-                    <span style={mono} className="text-[var(--accent-text)] font-medium">{po.purchaseorder_number}</span>
-                    <span className="text-[var(--text-3)] truncate mx-2 flex-1">{po.vendor_name}</span>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <FulfillmentBadge type={po.fulfillment_type} />
-                      <span style={mono} className="text-[var(--text-2)]">{formatRp(po.total)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 justify-end">
-                <button onClick={() => setShowConfirm(false)}
-                  className="px-4 py-2 text-xs text-[var(--text-3)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-2)] transition-colors">
-                  Cancel
-                </button>
-                <button onClick={doApprove} disabled={approving}
-                  className="px-4 py-2 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
-                  {approving ? 'Approving…' : 'Confirm Approve'}
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
       </div>

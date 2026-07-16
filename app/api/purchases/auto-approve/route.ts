@@ -1,53 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
-import { fetchWithRetry } from '@/lib/zoho/retry';
+import { computeApprovalData, approvePurchaseOrders } from '@/lib/zoho/poApprovalEngine';
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const singleId = body?.purchaseorder_id;
 
-    const token = await getZohoAccessToken();
-    const base = getZohoApiBaseUrl();
-    const orgId = getZohoOrgId();
-
-    let pos: Record<string, unknown>[] = [];
+    // Every PO approved here — whether a single id or the whole pending-approval
+    // batch — goes through the same SO-matching / stock-on-hand validation as the
+    // Pending Approval page, so this quick-action can never bypass those checks.
+    let ids: string[];
     if (singleId) {
-      // Single PO approve
-      pos = [{ purchaseorder_id: singleId, purchaseorder_number: singleId }];
+      ids = [String(singleId)];
     } else {
-      // Fetch all pending approval POs
-      const res = await fetchWithRetry(`${base}/purchaseorders?status=pending_approval&per_page=200&organization_id=${orgId}`, {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      });
-      const data = await res.json();
-      pos = data.purchaseorders || [];
+      const { purchase_orders } = await computeApprovalData();
+      ids = purchase_orders.map(po => po.purchaseorder_id);
     }
 
-    const results: Array<{ po_number: string; success: boolean; error?: string }> = [];
-
-    for (const po of pos) {
-      try {
-        const tok = await getZohoAccessToken();
-        // Approve = pending_approval -> approved. Not /status/open, which jumps straight
-        // to Issued and skips the Approved step.
-        const approveRes = await fetchWithRetry(`${base}/purchaseorders/${po.purchaseorder_id}/approve?organization_id=${orgId}`, {
-          method: 'POST',
-          headers: { Authorization: `Zoho-oauthtoken ${tok}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        const approveData = await approveRes.json();
-        if (!approveRes.ok && approveData.code !== 0) throw new Error(approveData.message || 'Failed');
-        results.push({ po_number: String(po.purchaseorder_number), success: true });
-      } catch (e) {
-        results.push({ po_number: String(po.purchaseorder_number), success: false, error: String(e) });
-      }
-    }
-
+    const results = await approvePurchaseOrders(ids);
     const approved = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
 
-    return NextResponse.json({ success: true, sent: approved, failed, results });
+    return NextResponse.json({
+      success: true,
+      sent: approved,
+      failed,
+      results: results.map(r => ({ po_number: r.purchaseorder_number, success: r.success, error: r.error })),
+    });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }

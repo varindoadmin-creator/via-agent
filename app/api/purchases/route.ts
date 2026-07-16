@@ -101,6 +101,10 @@ export interface IssuedPO {
   matched_so_numbers: string[];
 }
 
+// Informational-only matching used for the Issued (already-approved) table, so Admin can
+// still see which SO(s) an issued PO is fulfilling. This does NOT gate anything — real
+// approval gating for Pending Approval POs lives in lib/zoho/poApprovalEngine.ts, used by
+// /api/approvals/po (and surfaced inside the Purchases page's Pending Approval section).
 function matchItems(poItems: Record<string, unknown>[], confirmedSOs: ConfirmedSO[]): POLineItem[] {
   const itemMap = new Map<string, Array<{ so: ConfirmedSO; item: SOLineItem }>>();
   for (const so of confirmedSOs) {
@@ -175,20 +179,6 @@ function classifyFulfillment(items: POLineItem[]): IssuedPO['fulfillment_type'] 
 export async function GET(request: NextRequest) {
   const mode = request.nextUrl.searchParams.get('mode');
 
-  // Pending approval POs
-  if (mode === 'pending_approval') {
-    try {
-      const token = await getZohoAccessToken();
-      const base = getZohoApiBaseUrl();
-      const orgId = getZohoOrgId();
-      const res = await fetchWithRetry(`${base}/purchaseorders?status=pending_approval&per_page=100&organization_id=${orgId}`, {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      });
-      const data = await res.json();
-      return NextResponse.json({ success: true, purchaseorders: data.purchaseorders || [] });
-    } catch(err) { return NextResponse.json({ success: false, error: String(err) }, { status: 500 }); }
-  }
-
   // Received but not billed
   if (mode === 'received_not_billed') {
     try {
@@ -211,21 +201,23 @@ export async function GET(request: NextRequest) {
     await getZohoAccessToken();
 
     // Status mapping:
-    // pending_approval = Draft (needs review & approval in Zoho)
-    // open             = Issued (approved, sent to vendor)
-    // approved         = Approved (awaiting receipt)
-    // billed/closed    = Closed (hidden)
+    // draft            = Draft (not yet submitted for approval — plain list, no checks)
+    // pending_approval  = Pending Approval — see /api/approvals/po for the SO-matching /
+    //                     stock-on-hand engine that gates this status. Not fetched here.
+    // open              = Issued (approved, sent to vendor)
+    // approved          = Approved (awaiting receipt)
+    // billed/closed     = Closed (hidden)
     const [draftPOList, issuedPOList, soList] = await Promise.all([
-      safeFetchAllPages('/purchaseorders?status=pending_approval&sort_column=date&sort_order=D', 'purchaseorders', 'draft/pending approval POs'),
+      safeFetchAllPages('/purchaseorders?status=draft&sort_column=date&sort_order=D', 'purchaseorders', 'draft POs'),
       safeFetchAllPages('/purchaseorders?status=open&sort_column=date&sort_order=D', 'purchaseorders', 'issued/open POs'),
       // Zoho can return code:1000 when status=confirmed is combined with invoiced_status=not_invoiced.
       // Fetch confirmed SOs first, then match/filter inside VIA instead of relying on that fragile Zoho filter.
       safeFetchAllPages('/salesorders?status=confirmed&sort_column=date&sort_order=D', 'salesorders', 'confirmed SOs'),
     ]);
 
-    console.log(`[Purchases] draft(pending_approval)=${draftPOList.length} issued(open)=${issuedPOList.length} confirmed_sos=${soList.length}`);
+    console.log(`[Purchases] draft=${draftPOList.length} issued(open)=${issuedPOList.length} confirmed_sos=${soList.length}`);
 
-    // Fetch confirmed SO details for line item matching
+    // Fetch confirmed SO details — only needed for the Issued table's informational matching.
     const BATCH = 10;
     const confirmedSOs: ConfirmedSO[] = [];
     for (let i = 0; i < soList.length; i += BATCH) {
@@ -253,7 +245,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Process both PO lists with line item detail + matching
+    // Process both PO lists with line item detail. Draft POs are shown plain (no SO
+    // matching — they haven't even been submitted for approval yet). Issued POs keep the
+    // informational (non-gating) matching so Admin can see which SO(s) they fulfilled.
     async function buildPOs(poList: Record<string, unknown>[], withMatching: boolean): Promise<IssuedPO[]> {
       const result: IssuedPO[] = [];
       for (let i = 0; i < poList.length; i += BATCH) {
@@ -307,9 +301,8 @@ export async function GET(request: NextRequest) {
       return result;
     }
 
-    // Both draft and issued POs get SO matching
     const [draftPOs, issuedPOs] = await Promise.all([
-      buildPOs(draftPOList, true),
+      buildPOs(draftPOList, false),
       buildPOs(issuedPOList, true),
     ]);
 
@@ -317,58 +310,6 @@ export async function GET(request: NextRequest) {
 
   } catch (err) {
     console.error('[Purchases] Error:', err);
-    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { purchaseorder_ids } = body as { purchaseorder_ids: string[] };
-    if (!purchaseorder_ids?.length) return NextResponse.json({ error: 'purchaseorder_ids required' }, { status: 400 });
-
-    const results: Array<{
-      purchaseorder_id: string;
-      purchaseorder_number: string;
-      success: boolean;
-      error?: string;
-    }> = [];
-
-    for (const poId of purchaseorder_ids) {
-      try {
-        const detail = await zohoGet('/purchaseorders/' + poId);
-        const po = detail.purchaseorder;
-        if (!po) throw new Error('Purchase Order not found');
-        if (String(po.status) !== 'pending_approval') throw new Error('Only Pending Approval POs can be approved (current: ' + po.status + ')');
-
-        const token = await getZohoAccessToken();
-        const base = getZohoApiBaseUrl();
-        const orgId = getZohoOrgId();
-
-        // Approve = pending_approval -> approved. Not /status/open, which jumps straight
-        // to Issued and skips the Approved step.
-        const url = `${base}/purchaseorders/${poId}/approve?organization_id=${orgId}`;
-        const res = await fetchWithRetry(url, {
-          method: 'POST',
-          headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        const resBody = await res.json();
-        if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(resBody)}`);
-
-        results.push({ purchaseorder_id: poId, purchaseorder_number: String(po.purchaseorder_number), success: true });
-      } catch (e) {
-        results.push({ purchaseorder_id: poId, purchaseorder_number: poId, success: false, error: String(e) });
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      approved: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
-      results,
-    });
-  } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }
 }
