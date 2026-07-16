@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // ─── Daily Brief: what VIA did automatically, grouped by day ──────────────────
-// Reads three logs the daily 09:00 Asia/Jakarta scheduled jobs write to:
+// Reads four logs the daily 09:00 Asia/Jakarta scheduled jobs write to:
 //   - customer_cleanup_log (lib/customerCleanup/autoRepair.ts) — rows with an
 //     empty `changes` array mean "scanned, nothing needed fixing" and are
 //     excluded, since the brief is specifically about things that changed.
@@ -11,6 +11,11 @@ import { NextResponse } from 'next/server';
 //   - invoice_auto_send_log (app/api/invoices-page/auto-send/route.ts) — same
 //     success=true-only rule; skipped (insufficient stock) and failed sends
 //     are logged but not shown here, since they just retry the next run.
+//   - price_list_sync_log (lib/zoho/priceListSync.ts) — only real
+//     (dry_run=false) action='added' rows; skipped rows (no reference prefix,
+//     or an inconsistent one) need a human to price the item, not a Daily
+//     Brief mention. Rows come in one-per-tier, so they're merged here into
+//     one entry per item with the list of tiers it was added to.
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
 const DAYS_BACK = 14;
@@ -35,6 +40,14 @@ interface SentInvoiceLogRow {
   invoice_number: string;
   customer_name: string;
   sent_at: string;
+}
+
+interface PriceListSyncLogRow {
+  item_id: string;
+  item_name: string;
+  tier: string;
+  discount_applied: string | null;
+  created_at: string;
 }
 
 function sbHeaders() {
@@ -62,21 +75,23 @@ export async function GET() {
   try {
     const cutoff = new Date(Date.now() - DAYS_BACK * 24 * 60 * 60 * 1000).toISOString();
 
-    const [customerRes, invoiceRes, sentInvoiceRes] = await Promise.all([
+    const [customerRes, invoiceRes, sentInvoiceRes, priceListRes] = await Promise.all([
       fetch(sbUrl(`customer_cleanup_log?select=contact_id,contact_name,changes,fixed_at&fixed_at=gte.${cutoff}&order=fixed_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`shipment_invoice_log?select=salesorder_id,salesorder_number,customer_name,invoice_number,converted_at&success=eq.true&converted_at=gte.${cutoff}&order=converted_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`invoice_auto_send_log?select=invoice_id,invoice_number,customer_name,sent_at&success=eq.true&sent_at=gte.${cutoff}&order=sent_at.desc&limit=500`), { headers: sbHeaders() }),
+      fetch(sbUrl(`price_list_sync_log?select=item_id,item_name,tier,discount_applied,created_at&action=eq.added&dry_run=eq.false&created_at=gte.${cutoff}&order=created_at.desc&limit=1000`), { headers: sbHeaders() }),
     ]);
 
     if (!customerRes.ok) throw new Error(`Supabase ${customerRes.status}: ${await customerRes.text()}`);
     const customerRows = (await customerRes.json()) as CustomerLogRow[];
     const repaired = customerRows.filter(r => Array.isArray(r.changes) && r.changes.length > 0);
 
-    // shipment_invoice_log / invoice_auto_send_log may not exist yet if their SQL
-    // migration hasn't been run — soft-fail to an empty list rather than breaking
-    // the whole Daily Brief.
+    // shipment_invoice_log / invoice_auto_send_log / price_list_sync_log may not
+    // exist yet if their SQL migration hasn't been run — soft-fail to an empty
+    // list rather than breaking the whole Daily Brief.
     const invoiceRows: InvoiceLogRow[] = invoiceRes.ok ? await invoiceRes.json() : [];
     const sentInvoiceRows: SentInvoiceLogRow[] = sentInvoiceRes.ok ? await sentInvoiceRes.json() : [];
+    const priceListRows: PriceListSyncLogRow[] = priceListRes.ok ? await priceListRes.json() : [];
 
     const nowJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS).toISOString().split('T')[0];
     const yesterdayJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -105,7 +120,23 @@ export async function GET() {
       else sentInvoicesByDate.set(date, [row]);
     }
 
-    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys()]);
+    // price_list_sync_log has one row per (item, tier) — merge into one entry
+    // per item with the tiers it was added to, keyed by the run's date.
+    const priceListItems = new Map<string, { item_id: string; item_name: string; tiers: string[]; created_at: string }>();
+    for (const row of priceListRows) {
+      const existing = priceListItems.get(row.item_id);
+      if (existing) existing.tiers.push(row.tier);
+      else priceListItems.set(row.item_id, { item_id: row.item_id, item_name: row.item_name, tiers: [row.tier], created_at: row.created_at });
+    }
+    const priceListByDate = new Map<string, Array<{ item_id: string; item_name: string; tiers: string[]; created_at: string }>>();
+    for (const item of priceListItems.values()) {
+      const date = jakartaDate(item.created_at);
+      const list = priceListByDate.get(date);
+      if (list) list.push(item);
+      else priceListByDate.set(date, [item]);
+    }
+
+    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys(), ...priceListByDate.keys()]);
 
     const days = Array.from(allDates)
       .sort((a, b) => b.localeCompare(a))
@@ -130,6 +161,12 @@ export async function GET() {
           invoice_number: i.invoice_number,
           customer_name: i.customer_name,
           sent_at: i.sent_at,
+        })),
+        priceListItems: (priceListByDate.get(date) || []).map(i => ({
+          item_id: i.item_id,
+          item_name: i.item_name,
+          tiers: i.tiers,
+          created_at: i.created_at,
         })),
       }));
 
