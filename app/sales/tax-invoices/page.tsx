@@ -318,7 +318,7 @@ export default function TaxInvoicesPage() {
                       else setSelected(new Set(filtered.map(i => i.invoice_id)));
                     }} />
                 </th>
-                <th style={thStyle}>#</th>
+                <th style={{ ...thStyle, width: 40, textAlign: 'center' }} title="Tax Invoice / Faktur Pajak attached">FP</th>
                 <th style={thStyle}>Invoice No.</th>
                 <th style={thStyle}>Customer</th>
                 <th style={thStyle}>Date</th>
@@ -345,7 +345,7 @@ export default function TaxInvoicesPage() {
                   </td>
                 </tr>
               )}
-              {!loading && filtered.map((inv, i) => (
+              {!loading && filtered.map(inv => (
                 <tr key={inv.invoice_id}
                   onClick={() => toggleSelect(inv.invoice_id)}
                   className={`cursor-pointer transition-colors ${selected.has(inv.invoice_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}
@@ -355,7 +355,12 @@ export default function TaxInvoicesPage() {
                       checked={selected.has(inv.invoice_id)}
                       onChange={() => toggleSelect(inv.invoice_id)} />
                   </td>
-                  <td style={{ padding: '9px 12px', color: 'var(--text-4)', fontSize: 11, ...mono }}>{i + 1}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    {inv.has_attachment
+                      ? <span title="Faktur Pajak attached" style={{ fontSize: 14 }}>📎</span>
+                      : <span style={{ color: 'var(--border)', fontSize: 11 }}>—</span>
+                    }
+                  </td>
                   <td style={{ padding: '9px 12px', ...mono, color: 'var(--accent-text)', fontWeight: 600, fontSize: 12 }}>
                     {inv.invoice_number}
                   </td>
