@@ -125,6 +125,25 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
 
 const COMING_SOON = ['/bills', '/orders', '/prices', '/reports'];
 
+// All nav hrefs, flattened once — used to resolve exactly one "active" item per
+// route even when one item's href is a literal path-prefix of another's (e.g.
+// Items → /inventory and Shipments → /inventory/shipments). Whichever href is
+// the longest boundary match for the current pathname wins; every other item
+// that merely shares the prefix stays inactive.
+const ALL_NAV_HREFS: string[] = NAV.flatMap(entry =>
+  entry.type === 'section' ? entry.section.items.map(i => i.href) : [entry.item.href]
+);
+
+function matchesPath(pathname: string, href: string): boolean {
+  return href === '/' ? pathname === '/' : (pathname === href || pathname.startsWith(href + '/'));
+}
+
+function bestMatchingHref(pathname: string): string | null {
+  const matches = ALL_NAV_HREFS.filter(href => matchesPath(pathname, href));
+  if (matches.length === 0) return null;
+  return matches.reduce((best, h) => h.length > best.length ? h : best);
+}
+
 // Nav item id -> API endpoint whose "New" status count should badge that item.
 const NEW_COUNT_ENDPOINTS: Record<string, string> = {
   'req-samples':    '/api/requests/samples',
@@ -156,7 +175,7 @@ function NavContent({
   newCounts: Record<string, number>;
 }) {
   function isActive(href: string) {
-    return href === '/' ? pathname === '/' : pathname.startsWith(href);
+    return bestMatchingHref(pathname) === href;
   }
   function isSectionActive(s: NavSection) {
     return s.items.some(i => isActive(i.href));
@@ -388,11 +407,10 @@ export default function AppShell({ children, role }: { children: React.ReactNode
 
   // Auto-open section for active route
   useEffect(() => {
+    const active = bestMatchingHref(pathname);
     for (const entry of NAV) {
       if (entry.type === 'section') {
-        const hasActive = entry.section.items.some(item =>
-          item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-        );
+        const hasActive = entry.section.items.some(item => item.href === active);
         if (hasActive) setOpenSections(prev => new Set([...prev, entry.section.id]));
       }
     }
