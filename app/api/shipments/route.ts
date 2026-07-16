@@ -48,6 +48,7 @@ export interface PendingDelivery {
   quantity_packed: number;
   delivery_method: string;
   is_full: boolean; // quantity_packed >= quantity
+  location_name: string;
   packages: Array<{
     package_id: string;
     package_number: string;
@@ -391,48 +392,57 @@ export async function GET(request: NextRequest) {
     // ── TABLE 2: Pending Delivery ─────────────────────────────────────────────
     const pendingDelivery: PendingDelivery[] = [];
     if (mode === 'pending' || mode === 'all') {
-      // Group active packages by SO
-      for (const [soId, pkgs] of soActivePackagesMap) {
-        // Find the SO record
-        const so = confirmedSOs.find(s => String(s.salesorder_id) === soId);
-        if (!so) continue;
+      // Fetch SO details in batches — line items carry the actual hub location,
+      // not the SO header, same reasoning as Tables 1 and 3.
+      const pendingSoIds = Array.from(soActivePackagesMap.keys());
+      const BATCH = 10;
+      for (let i = 0; i < pendingSoIds.length; i += BATCH) {
+        const batch = pendingSoIds.slice(i, i + BATCH);
+        const details = await Promise.all(batch.map(fetchSoDetail));
 
-        const invoicedStatus = String(so.invoiced_status || '');
-        if (invoicedStatus === 'invoiced') continue;
+        for (const so of details) {
+          if (!so) continue;
+          const soId = String(so.salesorder_id);
+          const pkgs = soActivePackagesMap.get(soId) || [];
 
-        const qty = Number(so.quantity) || 0;
-        const qtyPacked = Number(so.quantity_packed) || 0;
-        const isFull = qty > 0 && qtyPacked >= qty;
+          const invoicedStatus = String(so.invoiced_status || '');
+          if (invoicedStatus === 'invoiced') continue;
 
-        const packageRows = pkgs.map(p => {
-          const shipId = String(p.shipment_id || '');
-          const shipData = shipmentMap.get(shipId) || {};
-          return {
-            package_id: String(p.package_id),
-            package_number: String(p.package_number || ''),
-            shipment_id: shipId,
-            shipment_number: String(shipData.shipment_number || ''),
-            shipment_status: String(p.status || ''),
-            date: String(p.date || ''),
-            shipment_date: String(p.shipment_date || shipData.date || ''),
-            tracking_number: String(p.tracking_number || ''),
-            carrier: String(shipData.carrier || p.delivery_method || ''),
-            quantity: Number(p.quantity) || 0,
-          };
-        });
+          const qty = Number(so.quantity) || 0;
+          const qtyPacked = Number(so.quantity_packed) || 0;
+          const isFull = qty > 0 && qtyPacked >= qty;
 
-        pendingDelivery.push({
-          salesorder_id: soId,
-          salesorder_number: String(so.salesorder_number || ''),
-          customer_name: String(so.customer_name || ''),
-          so_date: String(so.date || ''),
-          total: Number(so.total) || 0,
-          quantity: qty,
-          quantity_packed: qtyPacked,
-          delivery_method: String(so.delivery_method || ''),
-          is_full: isFull,
-          packages: packageRows,
-        });
+          const packageRows = pkgs.map(p => {
+            const shipId = String(p.shipment_id || '');
+            const shipData = shipmentMap.get(shipId) || {};
+            return {
+              package_id: String(p.package_id),
+              package_number: String(p.package_number || ''),
+              shipment_id: shipId,
+              shipment_number: String(shipData.shipment_number || ''),
+              shipment_status: String(p.status || ''),
+              date: String(p.date || ''),
+              shipment_date: String(p.shipment_date || shipData.date || ''),
+              tracking_number: String(p.tracking_number || ''),
+              carrier: String(shipData.carrier || p.delivery_method || ''),
+              quantity: Number(p.quantity) || 0,
+            };
+          });
+
+          pendingDelivery.push({
+            salesorder_id: soId,
+            salesorder_number: String(so.salesorder_number || ''),
+            customer_name: String(so.customer_name || ''),
+            so_date: String(so.date || ''),
+            total: Number(so.total) || 0,
+            quantity: qty,
+            quantity_packed: qtyPacked,
+            delivery_method: String(so.delivery_method || ''),
+            is_full: isFull,
+            location_name: extractLineItemLocation(so),
+            packages: packageRows,
+          });
+        }
       }
 
       // Sort by latest package date desc

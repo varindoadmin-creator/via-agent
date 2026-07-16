@@ -289,21 +289,26 @@ function NavContent({
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 
-function Logo({ collapsed }: { collapsed: boolean }) {
+function Logo({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: collapsed ? '16px 0' : '16px 14px',
-      justifyContent: collapsed ? 'center' : 'flex-start',
-      borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0,
-    }}>
+    <button
+      onClick={onClick}
+      title="Go to Home"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: collapsed ? '16px 0' : '16px 14px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0,
+        background: 'none', border: 'none', borderBottomWidth: 1, borderBottomStyle: 'solid',
+        borderBottomColor: 'var(--sidebar-border)', cursor: 'pointer', width: '100%',
+      }}>
       <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: 'white', fontSize: 12, fontWeight: 600, letterSpacing: '-0.5px' }}>V</span>
       </div>
       {!collapsed && (
         <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, letterSpacing: '0.01em', fontFamily: 'Inter, sans-serif' }}>VIA</div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -429,12 +434,15 @@ export default function AppShell({ children, role }: { children: React.ReactNode
           padding: '0 16px',
           background: 'var(--sidebar-bg)', borderBottom: '1px solid var(--sidebar-border)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={() => router.push('/dashboard')}
+            title="Go to Home"
+            style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: 'white', fontSize: 12, fontWeight: 600 }}>V</span>
             </div>
             <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>VIA</div>
-          </div>
+          </button>
           <button
             onClick={() => setMobileOpen(true)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-text)', padding: '6px', borderRadius: 6 }}
@@ -465,12 +473,15 @@ export default function AppShell({ children, role }: { children: React.ReactNode
           transition: 'transform 0.25s ease',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => { setMobileOpen(false); router.push('/dashboard'); }}
+              title="Go to Home"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: 'white', fontSize: 12, fontWeight: 600 }}>V</span>
               </div>
               <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>VIA</div>
-            </div>
+            </button>
             <button
               onClick={() => setMobileOpen(false)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', padding: 4, borderRadius: 4, fontSize: 16 }}
@@ -515,7 +526,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
         background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)',
         transition: 'width 0.25s ease', overflow: 'hidden',
       }}>
-        <Logo collapsed={collapsed} />
+        <Logo collapsed={collapsed} onClick={() => router.push('/dashboard')} />
 
         <NavContent
           nav={visibleNav}

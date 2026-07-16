@@ -28,6 +28,7 @@ interface PendingDelivery {
   quantity_packed: number;
   delivery_method: string;
   is_full: boolean;
+  location_name: string;
   packages: PendingPackage[];
 }
 
@@ -35,6 +36,15 @@ interface ShippingAddress {
   attention: string; address: string; street2: string;
   city: string; state: string; zip: string; country: string; phone: string;
 }
+
+const LOCATIONS = ['HEAD OFFICE', 'HUB-BDG', 'HUB-MDN'] as const;
+type Location = typeof LOCATIONS[number];
+
+const LOCATION_META: Record<Location, { label: string; city: string; color: string; border: string }> = {
+  'HEAD OFFICE': { label: 'Head Office',  city: 'Tangerang',  color: 'text-[var(--accent)]',   border: 'border-[var(--accent-border)]' },
+  'HUB-BDG':    { label: 'Hub Bandung',   city: 'Bandung',    color: 'text-[var(--info)]',    border: 'border-[var(--border)]' },
+  'HUB-MDN':    { label: 'Hub Medan',     city: 'Medan',      color: 'text-[var(--success)]', border: 'border-[var(--border)]' },
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,33 +87,6 @@ function StatusBadge({ label, type }: { label: string; type: 'success' | 'warnin
   return <span className={'via-badge border text-xs ' + styles[type]}>{label}</span>;
 }
 
-function TableShell({ title, count, loading, search, onSearch, extra, children }: {
-  title: string; count?: number; loading: boolean;
-  search?: string; onSearch?: (v: string) => void;
-  extra?: React.ReactNode; children: React.ReactNode;
-}) {
-  return (
-    <div className="via-card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-        <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          {!loading && count !== undefined && (
-            <span className="text-[var(--text-4)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{count} orders</span>
-          )}
-          {onSearch && (
-            <input value={search} onChange={e => onSearch(e.target.value)}
-              placeholder="Search…" className="via-input text-xs py-1.5 px-3 w-44" />
-          )}
-          {extra}
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div className="p-5 space-y-2">
@@ -128,9 +111,54 @@ function EmptyState({ icon, msg }: { icon: string; msg: string }) {
   );
 }
 
-// ─── Shipment In-Transit ──────────────────────────────────────────────────────
+const PRINT_CSS = [
+  '* { margin: 0; padding: 0; box-sizing: border-box; }',
+  'body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: white; }',
+  '.page { padding: 16mm; }',
+  'h1 { font-size: 18px; margin-bottom: 4mm; }',
+  '.docmeta { display: flex; gap: 8mm; margin-bottom: 6mm; flex-wrap: wrap; padding-bottom: 4mm; border-bottom: 1px solid #ccc; }',
+  '.docmeta div { font-size: 12px; }',
+  '.docmeta .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; }',
+  '.docmeta .val { display: block; font-weight: 600; font-size: 13px; }',
+  '.shipment { border: 1px solid #ccc; border-radius: 6px; padding: 4mm; margin-bottom: 6mm; page-break-inside: avoid; }',
+  '.hdr { display: flex; gap: 8mm; margin-bottom: 3mm; flex-wrap: wrap; }',
+  '.hdr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; }',
+  '.hdr .val { display: block; font-weight: 600; font-size: 13px; }',
+  '.addr { margin-bottom: 4mm; padding: 3mm; background: #f7f7f7; border-radius: 4px; }',
+  '.addr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; margin-bottom: 1mm; }',
+  '.addr div { font-size: 12px; line-height: 1.5; }',
+  '.addr .muted { color: #999; font-style: italic; }',
+  'table.items { width: 100%; border-collapse: collapse; }',
+  'table.items th { text-align: left; font-size: 10px; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 3px 6px; }',
+  'table.items td { padding: 4px 6px; border-bottom: 1px solid #eee; font-size: 12px; }',
+  'table.items .qty { text-align: right; white-space: nowrap; }',
+  '@media print { body { margin: 0; } .page { padding: 10mm 16mm; } }',
+].join(' ');
 
-function PendingDeliveryTable({ items, loading, error }: { items: PendingDelivery[]; loading: boolean; error: string }) {
+function buildPrintHtml(meta: { total: number; warehouse: string }, blocks: string): string {
+  const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const docmeta = `
+    <div class="docmeta">
+      <div><span class="lbl">Date</span><span class="val">${date}</span></div>
+      <div><span class="lbl">Status</span><span class="val">Out for Delivery</span></div>
+      <div><span class="lbl">Total</span><span class="val">${meta.total} Order${meta.total > 1 ? 's' : ''}</span></div>
+      <div><span class="lbl">Warehouse</span><span class="val">${meta.warehouse}</span></div>
+    </div>`;
+  return '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<title>Shipments</title>'
+    + '<style>' + PRINT_CSS + '</style>'
+    + '</head><body>'
+    + '<div class="page"><h1>Shipments</h1>' + docmeta + blocks + '</div>'
+    + '<script>window.onload = function(){ window.print(); }<\/script>'
+    + '</body></html>';
+}
+
+// ─── Out-for-Delivery Shipments (per hub) ──────────────────────────────────────
+
+function HubShipmentTable({ location, items, loading, error }: {
+  location: Location; items: PendingDelivery[]; loading: boolean; error: string;
+}) {
+  const meta = LOCATION_META[location];
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [soLineItems, setSoLineItems] = useState<Record<string, Array<{name: string; quantity: number; unit: string; quantity_packed: number}>>>({});
@@ -138,6 +166,7 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
   const [loadingLines, setLoadingLines] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -173,7 +202,6 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-    // Fetch line items if not already loaded
     if (!soLineItems[id]) fetchLineItemsFor(id);
   }
 
@@ -185,76 +213,53 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
     });
   }
 
+  function buildBlocks(rows: PendingDelivery[], detailsById: Array<{
+    lines: Array<{name: string; quantity: number; unit: string; quantity_packed: number}>;
+    address: ShippingAddress | null;
+  }>): string {
+    return rows.map((item, idx) => {
+      const { lines, address: a } = detailsById[idx];
+      const rowsHtml = lines.map(li =>
+        `<tr><td>${li.name}</td><td class="qty">${li.quantity} ${li.unit}</td></tr>`
+      ).join('');
+      const shipmentRefs = item.packages.map(p => p.shipment_number || p.package_number).filter(Boolean).join(', ') || '—';
+      const addressLines = a ? [
+        a.attention,
+        a.address,
+        a.street2,
+        [a.city, a.zip].filter(Boolean).join(' '),
+        [a.state, a.country].filter(Boolean).join(', '),
+        a.phone ? `Tel. ${a.phone}` : '',
+      ].filter(Boolean) : [];
+      const addressHtml = addressLines.length
+        ? addressLines.map(l => `<div>${l}</div>`).join('')
+        : '<div class="muted">No shipping address on file</div>';
+      return `
+        <div class="shipment">
+          <div class="hdr">
+            <div><span class="lbl">SO Number</span><span class="val">${item.salesorder_number}</span></div>
+            <div><span class="lbl">Customer</span><span class="val">${item.customer_name}</span></div>
+            <div><span class="lbl">Shipment</span><span class="val">${shipmentRefs}</span></div>
+          </div>
+          <div class="addr">
+            <span class="lbl">Shipping Address</span>
+            ${addressHtml}
+          </div>
+          <table class="items">
+            <thead><tr><th>Item</th><th class="qty">Qty</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`;
+    }).join('');
+  }
+
   async function printSelectedShipments() {
     if (selectedIds.size === 0) return;
     setPrinting(true);
     try {
       const selected = filtered.filter(i => selectedIds.has(i.salesorder_id));
       const detailsById = await Promise.all(selected.map(i => fetchLineItemsFor(i.salesorder_id)));
-
-      const blocks = selected.map((item, idx) => {
-        const { lines, address: a } = detailsById[idx];
-        const rows = lines.map(li =>
-          `<tr><td>${li.name}</td><td class="qty">${li.quantity} ${li.unit}</td></tr>`
-        ).join('');
-        const shipmentRefs = item.packages.map(p => p.shipment_number || p.package_number).filter(Boolean).join(', ') || '—';
-        const addressLines = a ? [
-          a.attention,
-          a.address,
-          a.street2,
-          [a.city, a.zip].filter(Boolean).join(' '),
-          [a.state, a.country].filter(Boolean).join(', '),
-          a.phone ? `Tel. ${a.phone}` : '',
-        ].filter(Boolean) : [];
-        const addressHtml = addressLines.length
-          ? addressLines.map(l => `<div>${l}</div>`).join('')
-          : '<div class="muted">No shipping address on file</div>';
-        return `
-          <div class="shipment">
-            <div class="hdr">
-              <div><span class="lbl">SO Number</span><span class="val">${item.salesorder_number}</span></div>
-              <div><span class="lbl">Customer</span><span class="val">${item.customer_name}</span></div>
-              <div><span class="lbl">Shipment</span><span class="val">${shipmentRefs}</span></div>
-            </div>
-            <div class="addr">
-              <span class="lbl">Shipping Address</span>
-              ${addressHtml}
-            </div>
-            <table class="items">
-              <thead><tr><th>Item</th><th class="qty">Qty</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>`;
-      }).join('');
-
-      const css = [
-        '* { margin: 0; padding: 0; box-sizing: border-box; }',
-        'body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: white; }',
-        '.page { padding: 16mm; }',
-        'h1 { font-size: 18px; margin-bottom: 4mm; }',
-        '.shipment { border: 1px solid #ccc; border-radius: 6px; padding: 4mm; margin-bottom: 6mm; page-break-inside: avoid; }',
-        '.hdr { display: flex; gap: 8mm; margin-bottom: 3mm; flex-wrap: wrap; }',
-        '.hdr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; }',
-        '.hdr .val { display: block; font-weight: 600; font-size: 13px; }',
-        '.addr { margin-bottom: 4mm; padding: 3mm; background: #f7f7f7; border-radius: 4px; }',
-        '.addr .lbl { display: block; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.04em; margin-bottom: 1mm; }',
-        '.addr div { font-size: 12px; line-height: 1.5; }',
-        '.addr .muted { color: #999; font-style: italic; }',
-        'table.items { width: 100%; border-collapse: collapse; }',
-        'table.items th { text-align: left; font-size: 10px; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 3px 6px; }',
-        'table.items td { padding: 4px 6px; border-bottom: 1px solid #eee; font-size: 12px; }',
-        'table.items .qty { text-align: right; white-space: nowrap; }',
-        '@media print { body { margin: 0; } .page { padding: 10mm 16mm; } }',
-      ].join(' ');
-
-      const html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        + '<title>Shipments</title>'
-        + '<style>' + css + '</style>'
-        + '</head><body>'
-        + '<div class="page"><h1>Shipment In-Transit — ' + selected.length + ' order' + (selected.length > 1 ? 's' : '') + '</h1>' + blocks + '</div>'
-        + '<script>window.onload = function(){ window.print(); }<\/script>'
-        + '</body></html>';
-
+      const html = buildPrintHtml({ total: selected.length, warehouse: meta.label }, buildBlocks(selected, detailsById));
       const win = window.open('', '_blank');
       if (win) { win.document.write(html); win.document.close(); }
       setSelectedIds(new Set());
@@ -263,18 +268,59 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
     }
   }
 
+  async function exportTablePDF() {
+    if (filtered.length === 0) return;
+    setExporting(true);
+    try {
+      const detailsById = await Promise.all(filtered.map(i => fetchLineItemsFor(i.salesorder_id)));
+      const html = buildPrintHtml({ total: filtered.length, warehouse: meta.label }, buildBlocks(filtered, detailsById));
+      const win = window.open('', '_blank');
+      if (win) { win.document.write(html); win.document.close(); }
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
-    <TableShell title="Shipment In-Transit"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
-      extra={selectedIds.size > 0 ? (
-        <button onClick={printSelectedShipments} disabled={printing}
-          className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
-          {printing ? '…' : `🖨 Print Shipments (${selectedIds.size})`}
-        </button>
-      ) : undefined}>
+    <div className={`rounded-xl border ${meta.border} bg-[var(--surface)] overflow-hidden`}>
+      {/* Table header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`text-xs font-bold tracking-widest uppercase ${meta.color}`}
+            style={{ fontFamily: "'DM Mono', monospace" }}>
+            {location}
+          </div>
+          <div className="text-[var(--text-4)] text-xs">{meta.city}</div>
+          {!loading && (
+            <div className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--text-3)]">
+              {filtered.length} orders
+            </div>
+          )}
+          {!loading && items.length > 0 && (
+            <div className="text-[var(--text-4)] text-xs" style={{ fontFamily: "'DM Mono', monospace" }}>
+              {items.filter(i => i.is_full).length} full · {items.filter(i => !i.is_full).length} partial
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search…" className="via-input text-xs py-1.5 px-3 w-44" />
+          <button onClick={exportTablePDF} disabled={exporting || filtered.length === 0}
+            className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
+            {exporting ? '…' : '⬇ Export PDF'}
+          </button>
+          {selectedIds.size > 0 && (
+            <button onClick={printSelectedShipments} disabled={printing}
+              className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
+              {printing ? '…' : `🖨 Print Selected (${selectedIds.size})`}
+            </button>
+          )}
+        </div>
+      </div>
+
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
-      {!loading && !error && filtered.length === 0 && <EmptyState icon="▤" msg="No pending deliveries." />}
+      {!loading && !error && filtered.length === 0 && <EmptyState icon="▤" msg="No out-for-delivery shipments at this hub." />}
       {!loading && !error && filtered.length > 0 && (
         <div className="overflow-x-auto">
           <table className="via-table">
@@ -422,7 +468,7 @@ function PendingDeliveryTable({ items, loading, error }: { items: PendingDeliver
           </table>
         </div>
       )}
-    </TableShell>
+    </div>
   );
 }
 
@@ -452,6 +498,14 @@ export default function InventoryShipmentsPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const byLocation = useMemo(() => {
+    const grouped: Record<Location, PendingDelivery[]> = { 'HEAD OFFICE': [], 'HUB-BDG': [], 'HUB-MDN': [] };
+    for (const item of pending) {
+      if (grouped[item.location_name as Location]) grouped[item.location_name as Location].push(item);
+    }
+    return grouped;
+  }, [pending]);
+
   return (
     <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
@@ -480,22 +534,17 @@ export default function InventoryShipmentsPage() {
           </div>
         )}
 
-        {/* Summary card */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="via-card px-5 py-4">
-            <div className="text-[var(--text-3)] text-xs mb-1">Shipment In-Transit</div>
-            <div className="text-2xl font-semibold" style={{ fontFamily: 'JetBrains Mono, monospace', color: pending.length > 0 ? 'var(--info)' : 'var(--text)' }}>
-              {loading ? '…' : pending.length}
-            </div>
-            <div className="text-[var(--text-4)] text-xs mt-1">
-              {pending.filter(i => i.is_full).length} full · {pending.filter(i => !i.is_full).length} partial
-            </div>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="space-y-6">
-          <PendingDeliveryTable items={pending} loading={loading} error={error} />
+        {/* Hub tables */}
+        <div className="space-y-5">
+          {LOCATIONS.map(loc => (
+            <HubShipmentTable
+              key={loc}
+              location={loc}
+              items={byLocation[loc]}
+              loading={loading}
+              error={error}
+            />
+          ))}
         </div>
 
       </div>
