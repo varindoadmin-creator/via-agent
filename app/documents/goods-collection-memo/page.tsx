@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 
 interface PO {
   purchaseorder_id: string;
@@ -13,118 +14,167 @@ interface PO {
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 const formatRp = (n: number) => 'Rp ' + Number(n).toLocaleString('id-ID');
 
-function generateMemoPDF(data: {
+const NAVY = rgb(0.118, 0.227, 0.373);
+const DARK = rgb(0.067, 0.094, 0.153);
+const GRAY = rgb(0.42, 0.45, 0.5);
+const BODY_GRAY = rgb(0.216, 0.255, 0.318);
+const LIGHT_BG = rgb(0.976, 0.98, 0.984);
+const BORDER = rgb(0.898, 0.906, 0.922);
+const WHITE = rgb(1, 1, 1);
+const HEADER_BG = rgb(0.094, 0.094, 0.106);
+
+function truncateToWidth(text: string, font: PDFFont, size: number, maxWidth: number): string {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && font.widthOfTextAtSize(t + '...', size) > maxWidth) t = t.slice(0, -1);
+  return t + '...';
+}
+
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (current && font.widthOfTextAtSize(test, size) > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+async function generateMemoPDF(data: {
   courier_name: string; vehicle: string; courier_service: string;
   date: string; pos: Array<{ po_number: string; vendor_name: string; date: string }>;
 }) {
-  // Build printable HTML and trigger browser print-to-PDF
-  const pos_rows = data.pos.map((po, i) => `
-    <tr>
-      <td style="text-align:center">${i + 1}</td>
-      <td><strong>${po.po_number}</strong></td>
-      <td>${po.vendor_name}</td>
-      <td>${po.date}</td>
-      <td></td>
-    </tr>`).join('');
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Goods Collection Memo</title>
-<style>
-  /* Standalone print document opened in its own window — cannot reference the
-     app's CSS custom properties, so the theme's hex values are inlined here
-     directly (kept in sync with app/globals.css: --text, --primary, --accent, etc). */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; padding: 24px 32px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
-  .company { font-size: 15px; font-weight: bold; color: #111827; }
-  .doc-title { font-size: 15px; font-weight: bold; color: #1e3a5f; text-align: right; }
-  .divider { border: none; border-top: 2.5px solid #1e3a5f; margin: 8px 0 12px; }
-  .info-grid { display: grid; grid-template-columns: 90px 1fr 110px 1fr; gap: 4px 8px; margin-bottom: 16px; }
-  .info-label { color: #6b7280; font-size: 10px; }
-  .info-value { font-weight: bold; }
-  .pickup-addr { grid-column: 4; grid-row: 1 / span 3; border-left: 2px solid #e5e7eb; padding-left: 10px; }
-  .pickup-addr .addr-name { font-weight: bold; font-size: 11px; }
-  .pickup-addr .addr-line { font-size: 10px; color: #374151; line-height: 1.5; }
-  .section-title { font-size: 9px; font-weight: bold; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-  .courier-box { background: #f9fafb; border: 0.5px solid #e5e7eb; padding: 8px 12px; margin-bottom: 16px; }
-  .courier-grid { display: grid; grid-template-columns: 70px 1fr 80px 1fr; gap: 4px 8px; }
-  .cou-label { color: #6b7280; font-size: 10px; }
-  .cou-value { font-weight: bold; font-size: 11px; }
-  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 14px; }
-  thead tr { background: #18181b; color: white; }
-  th { padding: 6px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; }
-  th:first-child, td:first-child { text-align: center; width: 30px; }
-  td { padding: 5px 8px; border-bottom: 0.4px solid #e5e7eb; }
-  tr:nth-child(even) td { background: #f9fafb; }
-  td:nth-child(2) { font-weight: bold; }
-  .notes { background: #eaeef5; border: 0.5px solid #1e3a5f; padding: 7px 10px; font-size: 9px; color: #374151; margin-bottom: 14px; line-height: 1.5; }
-  .footer-bar { background: #f3f4f6; border: 0.5px solid #e5e7eb; text-align: center; padding: 8px; font-size: 10px; font-weight: bold; color: #111827; }
-  .footer-line { text-align: center; font-size: 8px; color: #9ca3af; margin-top: 5px; }
-  @media print { body { padding: 16px 24px; } }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="company">CV. VARINDO FORMA HUTAMA</div>
-    <div class="doc-title">GOODS COLLECTION MEMO</div>
-  </div>
-  <hr class="divider">
+  const margin = 40;
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const contentWidth = pageWidth - margin * 2;
 
-  <div class="info-grid">
-    <span class="info-label">Date</span>
-    <span class="info-value">${data.date}</span>
-    <span class="info-label" style="border-left:2px solid #e5e7eb; padding-left:10px;">Pickup Location</span>
-    <div class="pickup-addr">
-      <div class="addr-name">TAK PRODUCTS AND SERVICES, PT</div>
-      <div class="addr-line">Jl. Komp. Multi Guna No. 17 Blok C<br>Kec. Serpong Utara, Tangerang 15320, Banten</div>
-    </div>
-    <span class="info-label">Prepared by</span>
-    <span class="info-value">Varindo Admin</span>
-    <span></span>
-  </div>
+  let page!: PDFPage;
+  let y!: number;
 
-  <div class="section-title">Courier Details</div>
-  <div class="courier-box">
-    <div class="courier-grid">
-      <span class="cou-label">Name</span>
-      <span class="cou-value">${data.courier_name}</span>
-      <span class="cou-label">Vehicle No.</span>
-      <span class="cou-value">${data.vehicle}</span>
-      <span class="cou-label">Service</span>
-      <span class="cou-value">${data.courier_service}</span>
-      <span></span><span></span>
-    </div>
-  </div>
+  function newPage() {
+    page = pdfDoc.addPage([pageWidth, pageHeight]);
+    y = pageHeight - margin;
+  }
 
-  <div class="section-title">Purchase Orders to Collect</div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th><th>PO Number</th><th>Vendor</th><th>PO Date</th><th>Remarks</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${pos_rows}
-      <tr><td></td><td></td><td></td><td></td><td></td></tr>
-    </tbody>
-  </table>
+  function drawTableHeader() {
+    const headers = ['#', 'PO Number', 'Vendor', 'PO Date', 'Remarks'];
+    const colX = [margin, margin + 26, margin + 150, margin + 350, margin + 440];
+    page.drawRectangle({ x: margin, y: y - 14, width: contentWidth, height: 18, color: HEADER_BG });
+    headers.forEach((h, i) => page.drawText(h, { x: colX[i] + 4, y: y - 9, size: 8, font: fontBold, color: WHITE }));
+    y -= 18;
+    return colX;
+  }
 
-  <div class="notes">Please ensure all items listed above are handed over to the courier before departure. Both parties must verify quantities and conditions upon handover.</div>
+  newPage();
 
-  <div class="footer-bar">Computer-Generated Document &mdash; No Signature Required</div>
-  <div class="footer-line">CV. Varindo Forma Hutama</div>
-</body>
-</html>`;
+  // ── Header ──
+  page.drawText('CV. VARINDO FORMA HUTAMA', { x: margin, y, size: 14, font: fontBold, color: DARK });
+  const title = 'GOODS COLLECTION MEMO';
+  page.drawText(title, { x: pageWidth - margin - fontBold.widthOfTextAtSize(title, 14), y, size: 14, font: fontBold, color: NAVY });
+  y -= 8;
+  page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 2, color: NAVY });
+  y -= 26;
 
-  const win = window.open('', '_blank');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => { win.print(); }, 500);
+  // ── Info grid ──
+  const pickupX = margin + 260;
+  page.drawText('DATE', { x: margin, y, size: 8, font, color: GRAY });
+  page.drawText('PICKUP LOCATION', { x: pickupX, y, size: 8, font, color: GRAY });
+  y -= 13;
+  page.drawText(data.date, { x: margin, y, size: 10, font: fontBold, color: DARK });
+  page.drawText('TAK PRODUCTS AND SERVICES, PT', { x: pickupX, y, size: 10, font: fontBold, color: DARK });
+  y -= 12;
+  page.drawText('Jl. Komp. Multi Guna No. 17 Blok C', { x: pickupX, y, size: 9, font, color: BODY_GRAY });
+  y -= 12;
+  page.drawText('Kec. Serpong Utara, Tangerang 15320, Banten', { x: pickupX, y, size: 9, font, color: BODY_GRAY });
+  y -= 22;
+  page.drawText('PREPARED BY', { x: margin, y, size: 8, font, color: GRAY });
+  y -= 13;
+  page.drawText('Varindo Admin', { x: margin, y, size: 10, font: fontBold, color: DARK });
+  y -= 26;
+
+  // ── Courier details ──
+  page.drawText('COURIER DETAILS', { x: margin, y, size: 8, font: fontBold, color: GRAY });
+  y -= 12;
+  const courierBoxTop = y;
+  page.drawRectangle({ x: margin, y: courierBoxTop - 34, width: contentWidth, height: 34, color: LIGHT_BG, borderColor: BORDER, borderWidth: 0.5 });
+  const cx = [margin + 10, margin + 190, margin + 350];
+  const clabels = ['NAME', 'VEHICLE NO.', 'SERVICE'];
+  const cvalues = [data.courier_name, data.vehicle, data.courier_service];
+  clabels.forEach((label, i) => {
+    page.drawText(label, { x: cx[i], y: courierBoxTop - 12, size: 8, font, color: GRAY });
+    page.drawText(truncateToWidth(cvalues[i], fontBold, 10, 150), { x: cx[i], y: courierBoxTop - 25, size: 10, font: fontBold, color: DARK });
+  });
+  y = courierBoxTop - 34 - 24;
+
+  // ── PO table ──
+  page.drawText('PURCHASE ORDERS TO COLLECT', { x: margin, y, size: 8, font: fontBold, color: GRAY });
+  y -= 12;
+  let colX = drawTableHeader();
+
+  const rowHeight = 20;
+  const footerReserve = 90; // notes box + footer bar
+  data.pos.forEach((po, i) => {
+    if (y - rowHeight < footerReserve) {
+      newPage();
+      colX = drawTableHeader();
+    }
+    if (i % 2 === 1) page.drawRectangle({ x: margin, y: y - 14, width: contentWidth, height: rowHeight - 2, color: LIGHT_BG });
+    page.drawText(String(i + 1), { x: colX[0] + 8, y: y - 9, size: 9, font, color: DARK });
+    page.drawText(truncateToWidth(po.po_number, fontBold, 9, 120), { x: colX[1] + 4, y: y - 9, size: 9, font: fontBold, color: DARK });
+    page.drawText(truncateToWidth(po.vendor_name, font, 9, 195), { x: colX[2] + 4, y: y - 9, size: 9, font, color: DARK });
+    page.drawText(po.date, { x: colX[3] + 4, y: y - 9, size: 9, font, color: DARK });
+    y -= rowHeight;
+  });
+  y -= 16;
+
+  // ── Notes ──
+  const notesLines = wrapText(
+    'Please ensure all items listed above are handed over to the courier before departure. Both parties must verify quantities and conditions upon handover.',
+    font, 9, contentWidth - 20,
+  );
+  const notesHeight = notesLines.length * 12 + 12;
+  page.drawRectangle({ x: margin, y: y - notesHeight, width: contentWidth, height: notesHeight, color: rgb(0.918, 0.933, 0.961), borderColor: NAVY, borderWidth: 0.5 });
+  notesLines.forEach((line, i) => {
+    page.drawText(line, { x: margin + 10, y: y - 14 - i * 12, size: 9, font, color: BODY_GRAY });
+  });
+  y -= notesHeight + 14;
+
+  // ── Footer ──
+  page.drawRectangle({ x: margin, y: y - 22, width: contentWidth, height: 22, color: rgb(0.953, 0.957, 0.965), borderColor: BORDER, borderWidth: 0.5 });
+  const footerText = 'Computer-Generated Document - No Signature Required';
+  page.drawText(footerText, {
+    x: margin + (contentWidth - fontBold.widthOfTextAtSize(footerText, 10)) / 2,
+    y: y - 15, size: 10, font: fontBold, color: DARK,
+  });
+  y -= 32;
+  const companyText = 'CV. Varindo Forma Hutama';
+  page.drawText(companyText, {
+    x: margin + (contentWidth - font.widthOfTextAtSize(companyText, 8)) / 2,
+    y, size: 8, font, color: rgb(0.612, 0.639, 0.686),
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Goods-Collection-Memo-${data.date}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export default function GoodsCollectionMemoPage() {
@@ -168,7 +218,7 @@ export default function GoodsCollectionMemoPage() {
     setSelectedPOs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!courierName.trim()) { setError('Enter courier name'); return; }
     if (!vehicle.trim()) { setError('Enter vehicle number'); return; }
     if (!selectedPOs.size) { setError('Select at least one PO'); return; }
@@ -178,7 +228,11 @@ export default function GoodsCollectionMemoPage() {
       .filter(po => selectedPOs.has(po.purchaseorder_id))
       .map(po => ({ po_number: po.purchaseorder_number, vendor_name: po.vendor_name, date: po.date }));
 
-    generateMemoPDF({ courier_name: courierName, vehicle, courier_service: courierService, date, pos });
+    try {
+      await generateMemoPDF({ courier_name: courierName, vehicle, courier_service: courierService, date, pos });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate PDF');
+    }
   }
 
   return (
@@ -285,7 +339,7 @@ export default function GoodsCollectionMemoPage() {
             </div>
             <button onClick={handleCreate} disabled={selectedPOs.size === 0 || !courierName || !vehicle}
               className="px-5 py-2 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-semibold transition-colors disabled:opacity-40">
-              Print / Save as PDF
+              Export to PDF
             </button>
           </div>
         </div>
