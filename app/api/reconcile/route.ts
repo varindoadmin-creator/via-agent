@@ -453,6 +453,74 @@ async function supabaseRequest(path: string, init: RequestInit = {}) {
   return res.json();
 }
 
+const BANK_NAME_HISTORY_TABLE =
+  process.env.SUPABASE_BANK_NAME_HISTORY_TABLE || "customer_bank_names";
+
+/** customer_id → set of normalized bank account names seen paying that customer before. */
+async function getBankNameHistory(): Promise<Map<string, Set<string>>> {
+  const history = new Map<string, Set<string>>();
+  try {
+    const data = await supabaseRequest(
+      `${BANK_NAME_HISTORY_TABLE}?select=customer_id,bank_account_name_key`,
+    );
+    if (!Array.isArray(data)) return history;
+    for (const r of data as Record<string, unknown>[]) {
+      const customerId = String(r.customer_id || "");
+      const key = String(r.bank_account_name_key || "");
+      if (!customerId || !key) continue;
+      if (!history.has(customerId)) history.set(customerId, new Set());
+      history.get(customerId)!.add(key);
+    }
+  } catch (err) {
+    // Soft-fail so matching still works before the customer_bank_names table exists.
+    console.warn("[Reconcile] Failed to load bank name history:", err);
+  }
+  return history;
+}
+
+/**
+ * Remember that this customer has received a bank transfer under this account name,
+ * so future statements can be matched to them even when the name on the statement
+ * doesn't closely resemble the Zoho customer name. One customer can have several
+ * bank account names on file — each is tracked as its own row.
+ */
+async function recordBankAccountName(
+  customerId: string,
+  customerName: string,
+  bankAccountName: string,
+) {
+  const name = String(bankAccountName || "").trim();
+  const key = normalizeName(name);
+  if (!customerId || !name || !key) return;
+  try {
+    const existing = await supabaseRequest(
+      `${BANK_NAME_HISTORY_TABLE}?customer_id=eq.${encodeURIComponent(customerId)}&bank_account_name_key=eq.${encodeURIComponent(key)}&select=times_seen`,
+    );
+    const timesSeen =
+      Array.isArray(existing) && existing[0]
+        ? (Number((existing[0] as Record<string, unknown>).times_seen) || 0) + 1
+        : 1;
+    await supabaseRequest(
+      `${BANK_NAME_HISTORY_TABLE}?on_conflict=customer_id,bank_account_name_key`,
+      {
+        method: "POST",
+        body: JSON.stringify([
+          {
+            customer_id: customerId,
+            customer_name: customerName || "",
+            bank_account_name: name,
+            bank_account_name_key: key,
+            times_seen: timesSeen,
+            last_seen_at: new Date().toISOString(),
+          },
+        ]),
+      },
+    );
+  } catch (err) {
+    console.warn("[Reconcile] Failed to record bank account name history:", err);
+  }
+}
+
 async function getReceivedLedgerHashes(): Promise<Set<string>> {
   const { table } = supabaseConfig();
   const data = await supabaseRequest(
@@ -646,8 +714,14 @@ function findMultiInvoiceCombinations(
 function matchTransactions(
   transactions: BankTransaction[],
   allInvoices: ZohoInvoice[],
+  bankNameHistory: Map<string, Set<string>> = new Map(),
   minScore = 0.4,
 ): ReconcileResult[] {
+  const isKnownBankName = (customerId: string, bankName: string): boolean => {
+    const known = bankNameHistory.get(customerId);
+    return !!known && known.has(normalizeName(bankName));
+  };
+
   const byCustomer = new Map<string, ZohoInvoice[]>();
   const openInvoices = allInvoices.filter((inv) => hasPositiveBalance(inv));
 
@@ -660,10 +734,18 @@ function matchTransactions(
   for (const txn of transactions) {
     const matches: InvoiceMatch[] = [];
     for (const inv of openInvoices) {
-      const nameScore = nameMatchScore(
+      const rawNameScore = nameMatchScore(
         txn.name_in_statement || txn.description,
         inv.customer_name,
       );
+      const knownBankName = isKnownBankName(
+        inv.customer_id,
+        txn.name_in_statement,
+      );
+      // A bank account name we've seen pay this exact customer before is a stronger
+      // signal than string similarity to the Zoho customer name (e.g. "Jully Agatta"
+      // paying invoices for customer "JDESIGN").
+      const nameScore = knownBankName ? 1.0 : rawNameScore;
       const amountScore = amountMatchScore(txn.amount, inv.balance);
       // Amount is the strongest fallback when the bank sender name is not the invoice customer
       // e.g. Likha Interior invoice paid by Andy Winata.
@@ -673,7 +755,8 @@ function matchTransactions(
           : nameScore * 0.4 + amountScore * 0.6;
       if (matchScore >= minScore || amountScore === 1.0) {
         const reasons: string[] = [];
-        if (nameScore >= 0.9) reasons.push("name matches");
+        if (knownBankName) reasons.push("known bank account for this customer");
+        else if (nameScore >= 0.9) reasons.push("name matches");
         else if (nameScore >= 0.5) reasons.push("name partially matches");
         else if (amountScore === 1.0)
           reasons.push("name different/unclear, amount exact");
@@ -701,10 +784,10 @@ function matchTransactions(
     for (const [customerId, custInvoices] of byCustomer) {
       if (custInvoices.length < 2) continue;
       const customerName = custInvoices[0].customer_name;
-      const nameScore = nameMatchScore(
-        txn.name_in_statement || txn.description,
-        customerName,
-      );
+      const knownBankName = isKnownBankName(customerId, txn.name_in_statement);
+      const nameScore = knownBankName
+        ? 1.0
+        : nameMatchScore(txn.name_in_statement || txn.description, customerName);
       if (nameScore < 0.3) continue;
       for (const combo of findMultiInvoiceCombinations(
         txn.amount,
@@ -725,7 +808,9 @@ function matchTransactions(
           difference: combo.difference,
           name_score: Math.round(nameScore * 100) / 100,
           match_score: Math.round(matchScore * 100) / 100,
-          match_reason: `${combo.invoices.length} invoices sum to payment amount`,
+          match_reason: knownBankName
+            ? `known bank account for this customer, ${combo.invoices.length} invoices sum to payment amount`
+            : `${combo.invoices.length} invoices sum to payment amount`,
         });
       }
     }
@@ -773,7 +858,10 @@ async function runCsvMatch(file: File) {
     `[Reconcile] CSV rows=${rows.length} incoming=${transactions.length}`,
   );
 
-  const receivedHashes = await getReceivedLedgerHashes();
+  const [receivedHashes, bankNameHistory] = await Promise.all([
+    getReceivedLedgerHashes(),
+    getBankNameHistory(),
+  ]);
   const hiddenReceived = transactions.filter((t) =>
     receivedHashes.has(t.row_hash),
   ).length;
@@ -783,10 +871,14 @@ async function runCsvMatch(file: File) {
 
   const allInvoices = await fetchOpenInvoices();
   console.log(
-    `[Reconcile] Zoho open invoices=${allInvoices.length} ledger_hidden=${hiddenReceived}`,
+    `[Reconcile] Zoho open invoices=${allInvoices.length} ledger_hidden=${hiddenReceived} known_bank_names=${bankNameHistory.size}`,
   );
 
-  const results = matchTransactions(pendingTransactions, allInvoices);
+  const results = matchTransactions(
+    pendingTransactions,
+    allInvoices,
+    bankNameHistory,
+  );
   console.log(
     `[Reconcile] BCA CSV parser focused on Column D/Jumlah CR only. First CR: ${transactions[0]?.amount || 0} ${transactions[0]?.name_in_statement || ""}`,
   );
@@ -998,6 +1090,13 @@ export async function POST(request: NextRequest) {
           invoices: invoiceList,
         };
         const res = await zohoPost("/customerpayments", paymentData);
+        if (approval.name_in_statement) {
+          await recordBankAccountName(
+            approval.customer_id,
+            String(res.payment?.customer_name || ""),
+            approval.name_in_statement,
+          );
+        }
         const ledgerHash =
           approval.row_hash ||
           approval.transaction_key ||
