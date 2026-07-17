@@ -59,6 +59,31 @@ function nameMatchScore(bankName: string, zohoName: string): number {
   return matches.length / Math.max(bWords.length, zWords.length);
 }
 
+// Indonesian bank transfer descriptions are full of boilerplate that never identifies
+// who actually sent the money (PO/reference numbers, "cash deposit", etc) — these must
+// not count toward recognizing a customer's known bank account name. e.g. in
+// "lem fox MARTOYO" only "MARTOYO" identifies the sender; "00747 LEUWIH JAYA CV" should
+// match on "LEUWIH JAYA", not the leading reference number.
+const BANK_NOISE_WORDS = new Set([
+  "SETORAN", "TUNAI", "TRANSFER", "TRSF", "BANKING", "EBANKING", "BANK", "REKENING", "REK",
+]);
+
+function significantNameWords(text: string): string[] {
+  return normalizeName(text)
+    .split(" ")
+    .filter((w) => w.length >= 4 && !/^\d+$/.test(w) && !BANK_NOISE_WORDS.has(w));
+}
+
+/** True if the two bank/customer names share at least one meaningful word — a much
+ * looser signal than nameMatchScore's full-string comparison, used to recognize a
+ * previously-seen bank account even when surrounding noise differs transaction to
+ * transaction. */
+function hasSignificantWordOverlap(a: string, b: string): boolean {
+  const wordsB = new Set(significantNameWords(b));
+  if (!wordsB.size) return false;
+  return significantNameWords(a).some((w) => wordsB.has(w));
+}
+
 function amountMatchScore(bankAmount: number, invoiceAmount: number): number {
   if (!invoiceAmount || !bankAmount) return 0;
   if (Math.round(bankAmount) === Math.round(invoiceAmount)) return 1.0;
@@ -456,20 +481,21 @@ async function supabaseRequest(path: string, init: RequestInit = {}) {
 const BANK_NAME_HISTORY_TABLE =
   process.env.SUPABASE_BANK_NAME_HISTORY_TABLE || "customer_bank_names";
 
-/** customer_id → set of normalized bank account names seen paying that customer before. */
-async function getBankNameHistory(): Promise<Map<string, Set<string>>> {
-  const history = new Map<string, Set<string>>();
+/** customer_id → raw bank account names seen paying that customer before (compared via
+ * significant-word overlap at match time, not exact equality — see hasSignificantWordOverlap). */
+async function getBankNameHistory(): Promise<Map<string, string[]>> {
+  const history = new Map<string, string[]>();
   try {
     const data = await supabaseRequest(
-      `${BANK_NAME_HISTORY_TABLE}?select=customer_id,bank_account_name_key`,
+      `${BANK_NAME_HISTORY_TABLE}?select=customer_id,bank_account_name`,
     );
     if (!Array.isArray(data)) return history;
     for (const r of data as Record<string, unknown>[]) {
       const customerId = String(r.customer_id || "");
-      const key = String(r.bank_account_name_key || "");
-      if (!customerId || !key) continue;
-      if (!history.has(customerId)) history.set(customerId, new Set());
-      history.get(customerId)!.add(key);
+      const name = String(r.bank_account_name || "");
+      if (!customerId || !name) continue;
+      if (!history.has(customerId)) history.set(customerId, []);
+      history.get(customerId)!.push(name);
     }
   } catch (err) {
     // Soft-fail so matching still works before the customer_bank_names table exists.
@@ -490,7 +516,10 @@ async function recordBankAccountName(
   bankAccountName: string,
 ) {
   const name = String(bankAccountName || "").trim();
-  const key = normalizeName(name);
+  // Key on the significant words only (e.g. "lem fox MARTOYO" → "MARTOYO"), so repeat
+  // sightings of the same real account under different surrounding noise increment the
+  // same row instead of piling up near-duplicates.
+  const key = significantNameWords(name).join(" ");
   if (!customerId || !name || !key) return;
   try {
     const existing = await supabaseRequest(
@@ -714,12 +743,13 @@ function findMultiInvoiceCombinations(
 function matchTransactions(
   transactions: BankTransaction[],
   allInvoices: ZohoInvoice[],
-  bankNameHistory: Map<string, Set<string>> = new Map(),
+  bankNameHistory: Map<string, string[]> = new Map(),
   minScore = 0.4,
 ): ReconcileResult[] {
   const isKnownBankName = (customerId: string, bankName: string): boolean => {
     const known = bankNameHistory.get(customerId);
-    return !!known && known.has(normalizeName(bankName));
+    if (!known || !bankName) return false;
+    return known.some((storedName) => hasSignificantWordOverlap(bankName, storedName));
   };
 
   const byCustomer = new Map<string, ZohoInvoice[]>();
