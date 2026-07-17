@@ -117,6 +117,27 @@ async function fetchSoDetail(soId: string): Promise<Record<string, unknown> | nu
 }
 
 /**
+ * Zoho's SO header aggregates (quantity, quantity_packed) can lag or read 0 even
+ * when the line items are fully packed. Sum the line items when present and fall
+ * back to the header fields only when line items aren't available (e.g. list-mode SOs).
+ */
+function getQtyStats(so: Record<string, unknown>): { qty: number; qtyPacked: number } {
+  const lineItems = (so.line_items || []) as Record<string, unknown>[];
+  if (lineItems.length) {
+    let qty = 0;
+    let qtyPacked = 0;
+    for (const li of lineItems) {
+      qty += Number(li.quantity) || 0;
+      qtyPacked += li.quantity_packed !== undefined
+        ? Number(li.quantity_packed)
+        : (li.quantity_shipped !== undefined ? Number(li.quantity_shipped) : 0);
+    }
+    return { qty, qtyPacked };
+  }
+  return { qty: Number(so.quantity) || 0, qtyPacked: Number(so.quantity_packed) || 0 };
+}
+
+/**
  * Extract the dominant location from SO line items.
  * Line items carry the actual warehouse/hub location, not the SO header.
  */
@@ -349,8 +370,7 @@ export async function GET(request: NextRequest) {
         const invoicedStatus = String(so.invoiced_status || '');
         if (invoicedStatus === 'invoiced') return false;
         if (hasActivePackage) return false;
-        const qtyPacked = Number(so.quantity_packed) || 0;
-        const qty = Number(so.quantity) || 0;
+        const { qty, qtyPacked } = getQtyStats(so);
         if (hasDelivered && qtyPacked >= qty && qty > 0) return false;
         return true;
       });
@@ -364,8 +384,7 @@ export async function GET(request: NextRequest) {
         for (const so of details) {
           if (!so) continue;
           const soId = String(so.salesorder_id);
-          const qtyPacked = Number(so.quantity_packed) || 0;
-          const qty = Number(so.quantity) || 0;
+          const { qty, qtyPacked } = getQtyStats(so);
           const qtyShipped = Number(so.quantity_shipped) || 0;
           const reason = qtyPacked === 0 ? 'no_package' : 'partial_packed';
           const locationName = extractLineItemLocation(so);
@@ -408,8 +427,7 @@ export async function GET(request: NextRequest) {
           const invoicedStatus = String(so.invoiced_status || '');
           if (invoicedStatus === 'invoiced') continue;
 
-          const qty = Number(so.quantity) || 0;
-          const qtyPacked = Number(so.quantity_packed) || 0;
+          const { qty, qtyPacked } = getQtyStats(so);
           const isFull = qty > 0 && qtyPacked >= qty;
 
           const packageRows = pkgs.map(p => {
@@ -553,7 +571,7 @@ export async function GET(request: NextRequest) {
             date: String(so.date || ''),
             total: Number(so.total) || 0,
             invoiced_status: inv,
-            quantity: Number(so.quantity) || 0,
+            quantity: getQtyStats(so).qty,
             delivery_method: String(so.delivery_method || ''),
             salesperson_name: String(so.salesperson_name || ''),
             all_delivered: allDelivered,
