@@ -22,33 +22,49 @@ async function zohoGet(path: string) {
 }
 
 // GET /api/invoices?customer=PATIO+LIVITY&from=2026-05-01&to=2026-05-31
+// GET /api/invoices?customer_id=1234567890&from=2026-05-01&to=2026-05-31
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const customer = searchParams.get('customer') || '';
+  const customerId = searchParams.get('customer_id') || '';
   const from = searchParams.get('from') || '';
   const to = searchParams.get('to') || '';
 
   try {
     let invoices: unknown[] = [];
-    let customerInfo = null;
+    let customerInfo: { id: string; name: string } | null = null;
 
-    if (customer) {
-      // Search by customer + date range
-      const custRes = await zohoGet(
-        `/contacts?contact_name_contains=${encodeURIComponent(customer)}&contact_type=customer&per_page=10`
-      );
-      const contacts = custRes.contacts || [];
-      if (contacts.length === 0) {
-        return NextResponse.json({ success: true, invoices: [], message: `No customer found matching "${customer}"` });
+    if (customerId || customer) {
+      let contactId = customerId;
+      let contactName = '';
+
+      if (!contactId) {
+        // Search by customer name
+        const custRes = await zohoGet(
+          `/contacts?contact_name_contains=${encodeURIComponent(customer)}&contact_type=customer&per_page=10`
+        );
+        const contacts = custRes.contacts || [];
+        if (contacts.length === 0) {
+          return NextResponse.json({ success: true, invoices: [], message: `No customer found matching "${customer}"` });
+        }
+        contactId = contacts[0].contact_id;
+        contactName = contacts[0].contact_name;
       }
-      const contact = contacts[0];
-      customerInfo = { id: contact.contact_id, name: contact.contact_name };
+      customerInfo = { id: contactId, name: contactName };
 
-      let path = `/invoices?customer_id=${contact.contact_id}&per_page=200&sort_column=date&sort_order=A`;
-      if (from) path += `&date_start=${from}`;
-      if (to)   path += `&date_end=${to}`;
-      const invRes = await zohoGet(path);
-      invoices = invRes.invoices || [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        let path = `/invoices?customer_id=${contactId}&per_page=200&page=${page}&sort_column=date&sort_order=A`;
+        if (from) path += `&date_start=${from}`;
+        if (to)   path += `&date_end=${to}`;
+        const invRes = await zohoGet(path);
+        const batch = invRes.invoices || [];
+        invoices = [...invoices, ...batch];
+        hasMore = batch.length === 200;
+        page++;
+        if (page > 10) break; // Safety cap at 2000 invoices
+      }
     } else {
       // All invoices in date range — paginate if needed
       if (!from || !to) {
@@ -76,6 +92,7 @@ export async function GET(request: NextRequest) {
       total: i.total,
       balance: i.balance,
       status: i.status,
+      has_attachment: Boolean(i.has_attachment),
     }));
 
     return NextResponse.json({

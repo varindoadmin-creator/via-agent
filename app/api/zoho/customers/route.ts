@@ -1,4 +1,4 @@
-// GET /api/zoho/customers?q=query
+// GET /api/zoho/customers?q=query  (omit q, or leave it empty, to list all customers)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { searchCustomers } from '@/lib/zoho/customers';
@@ -6,14 +6,14 @@ import { searchCustomers } from '@/lib/zoho/customers';
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get('q') || '';
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const query = (searchParams.get('q') || '').trim();
+    const limit = parseInt(searchParams.get('limit') || (query ? '10' : '1000'), 10);
 
-    if (!query || query.trim().length < 2) {
+    if (query.length === 1) {
       return NextResponse.json({ customers: [], error: 'Query too short' });
     }
 
-    const customers = await searchCustomers(query.trim(), limit);
+    const customers = await searchCustomers(query, limit);
 
     return NextResponse.json({ customers });
   } catch (error) {
