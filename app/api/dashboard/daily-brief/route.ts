@@ -16,6 +16,9 @@ import { NextResponse } from 'next/server';
 //     or an inconsistent one) need a human to price the item, not a Daily
 //     Brief mention. Rows come in one-per-tier, so they're merged here into
 //     one entry per item with the list of tiers it was added to.
+//   - salesperson_auto_assign_log (lib/salespersonMap/sync.ts) — only
+//     success=true rows are shown; failed assignments are logged but not
+//     surfaced here (they just get retried automatically the next run).
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
 const DAYS_BACK = 14;
@@ -50,6 +53,15 @@ interface PriceListSyncLogRow {
   created_at: string;
 }
 
+interface SalespersonAssignLogRow {
+  document_type: 'sales_order' | 'invoice';
+  document_id: string;
+  document_number: string;
+  customer_name: string;
+  salesperson_name: string;
+  assigned_at: string;
+}
+
 function sbHeaders() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   return { apikey: key, Authorization: `Bearer ${key}` };
@@ -75,23 +87,26 @@ export async function GET() {
   try {
     const cutoff = new Date(Date.now() - DAYS_BACK * 24 * 60 * 60 * 1000).toISOString();
 
-    const [customerRes, invoiceRes, sentInvoiceRes, priceListRes] = await Promise.all([
+    const [customerRes, invoiceRes, sentInvoiceRes, priceListRes, salespersonRes] = await Promise.all([
       fetch(sbUrl(`customer_cleanup_log?select=contact_id,contact_name,changes,fixed_at&fixed_at=gte.${cutoff}&order=fixed_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`shipment_invoice_log?select=salesorder_id,salesorder_number,customer_name,invoice_number,converted_at&success=eq.true&converted_at=gte.${cutoff}&order=converted_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`invoice_auto_send_log?select=invoice_id,invoice_number,customer_name,sent_at&success=eq.true&sent_at=gte.${cutoff}&order=sent_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`price_list_sync_log?select=item_id,item_name,tier,discount_applied,created_at&action=eq.added&dry_run=eq.false&created_at=gte.${cutoff}&order=created_at.desc&limit=1000`), { headers: sbHeaders() }),
+      fetch(sbUrl(`salesperson_auto_assign_log?select=document_type,document_id,document_number,customer_name,salesperson_name,assigned_at&success=eq.true&assigned_at=gte.${cutoff}&order=assigned_at.desc&limit=500`), { headers: sbHeaders() }),
     ]);
 
     if (!customerRes.ok) throw new Error(`Supabase ${customerRes.status}: ${await customerRes.text()}`);
     const customerRows = (await customerRes.json()) as CustomerLogRow[];
     const repaired = customerRows.filter(r => Array.isArray(r.changes) && r.changes.length > 0);
 
-    // shipment_invoice_log / invoice_auto_send_log / price_list_sync_log may not
-    // exist yet if their SQL migration hasn't been run — soft-fail to an empty
-    // list rather than breaking the whole Daily Brief.
+    // shipment_invoice_log / invoice_auto_send_log / price_list_sync_log /
+    // salesperson_auto_assign_log may not exist yet if their SQL migration
+    // hasn't been run — soft-fail to an empty list rather than breaking the
+    // whole Daily Brief.
     const invoiceRows: InvoiceLogRow[] = invoiceRes.ok ? await invoiceRes.json() : [];
     const sentInvoiceRows: SentInvoiceLogRow[] = sentInvoiceRes.ok ? await sentInvoiceRes.json() : [];
     const priceListRows: PriceListSyncLogRow[] = priceListRes.ok ? await priceListRes.json() : [];
+    const salespersonRows: SalespersonAssignLogRow[] = salespersonRes.ok ? await salespersonRes.json() : [];
 
     const nowJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS).toISOString().split('T')[0];
     const yesterdayJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -136,7 +151,15 @@ export async function GET() {
       else priceListByDate.set(date, [item]);
     }
 
-    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys(), ...priceListByDate.keys()]);
+    const salespersonByDate = new Map<string, SalespersonAssignLogRow[]>();
+    for (const row of salespersonRows) {
+      const date = jakartaDate(row.assigned_at);
+      const list = salespersonByDate.get(date);
+      if (list) list.push(row);
+      else salespersonByDate.set(date, [row]);
+    }
+
+    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys(), ...priceListByDate.keys(), ...salespersonByDate.keys()]);
 
     const days = Array.from(allDates)
       .sort((a, b) => b.localeCompare(a))
@@ -167,6 +190,14 @@ export async function GET() {
           item_name: i.item_name,
           tiers: i.tiers,
           created_at: i.created_at,
+        })),
+        salespersonAssignments: (salespersonByDate.get(date) || []).map(s => ({
+          document_type: s.document_type,
+          document_id: s.document_id,
+          document_number: s.document_number,
+          customer_name: s.customer_name,
+          salesperson_name: s.salesperson_name,
+          assigned_at: s.assigned_at,
         })),
       }));
 

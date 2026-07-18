@@ -8,7 +8,8 @@ type DailyBriefCustomer = { contact_id: string; contact_name: string; changes: D
 type DailyBriefInvoice = { salesorder_id: string; salesorder_number: string; customer_name: string; invoice_number: string | null; converted_at: string };
 type DailyBriefSentInvoice = { invoice_id: string; invoice_number: string; customer_name: string; sent_at: string };
 type DailyBriefPriceListItem = { item_id: string; item_name: string; tiers: string[]; created_at: string };
-type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[]; sentInvoices: DailyBriefSentInvoice[]; priceListItems: DailyBriefPriceListItem[] };
+type DailyBriefSalespersonAssignment = { document_type: 'sales_order' | 'invoice'; document_id: string; document_number: string; customer_name: string; salesperson_name: string; assigned_at: string };
+type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[]; sentInvoices: DailyBriefSentInvoice[]; priceListItems: DailyBriefPriceListItem[]; salespersonAssignments: DailyBriefSalespersonAssignment[] };
 
 function CategorySection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
   if (count === 0) return null;
@@ -29,6 +30,8 @@ function DailyBriefPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
 
   async function load() {
     setLoading(true);
@@ -48,6 +51,22 @@ function DailyBriefPanel() {
 
   useEffect(() => { load(); }, []);
 
+  async function runSalespersonSync() {
+    setSyncing(true);
+    setSyncMessage('');
+    try {
+      const res = await fetch('/api/salesperson-map/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Sync failed');
+      setSyncMessage(`Assigned ${json.assigned}, learned ${json.learned}, skipped ${json.skipped}, failed ${json.failed}.`);
+      await load();
+    } catch (err) {
+      setSyncMessage('Sync failed: ' + String(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function toggle(date: string) {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -62,12 +81,25 @@ function DailyBriefPanel() {
         <div>
           <h2 className="text-[var(--text)] font-semibold text-sm">Daily Automated Tasks</h2>
         </div>
-        <button onClick={load} disabled={loading}
-          className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
-          style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
-          {loading ? '…' : '↻ Refresh'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={runSalespersonSync} disabled={syncing}
+            className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+            {syncing ? 'Syncing…' : 'Run Salesperson Sync Now'}
+          </button>
+          <button onClick={load} disabled={loading}
+            className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+            {loading ? '…' : '↻ Refresh'}
+          </button>
+        </div>
       </div>
+
+      {syncMessage && (
+        <div className="rounded-lg p-3 text-xs mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+          {syncMessage}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)' }}>
@@ -76,7 +108,7 @@ function DailyBriefPanel() {
       )}
 
       {!loading && !error && days && days.length === 0 && (
-        <div className="text-[var(--muted)] text-xs py-3">No customer repairs, auto-invoiced shipments, auto-sent invoices, or price list additions in the last 14 days.</div>
+        <div className="text-[var(--muted)] text-xs py-3">No customer repairs, auto-invoiced shipments, auto-sent invoices, price list additions, or salesperson assignments in the last 14 days.</div>
       )}
 
       {!error && days && days.length > 0 && (
@@ -92,7 +124,7 @@ function DailyBriefPanel() {
                 >
                   <span className="text-[var(--text)] text-xs font-medium">{day.label}</span>
                   <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} · {day.sentInvoices.length} sent · {day.priceListItems.length} priced {isOpen ? '▲' : '▼'}
+                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} · {day.sentInvoices.length} sent · {day.priceListItems.length} priced · {day.salespersonAssignments.length} salesperson {isOpen ? '▲' : '▼'}
                   </span>
                 </button>
                 {isOpen && (
@@ -141,6 +173,18 @@ function DailyBriefPanel() {
                           <div className="text-[var(--text)] text-xs font-medium">{item.item_name}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
                             Added to Price Lists — <span style={{ color: 'var(--success)' }}>{item.tiers.join(', ')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </CategorySection>
+
+                    <CategorySection label="Salesperson Auto-Assigned" count={day.salespersonAssignments.length}>
+                      {day.salespersonAssignments.map(s => (
+                        <div key={s.document_type + s.document_id} className="px-3 py-2">
+                          <div className="text-[var(--text)] text-xs font-medium">{s.customer_name || '(unnamed)'}</div>
+                          <div className="text-[var(--muted)] text-xs mt-1">
+                            {s.document_type === 'sales_order' ? 'Sales Order' : 'Invoice'} <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{s.document_number}</span> assigned to{' '}
+                            <span style={{ color: 'var(--success)' }}>{s.salesperson_name}</span>
                           </div>
                         </div>
                       ))}
