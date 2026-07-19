@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Bug, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
-import { v4 as uuid } from 'crypto';
 
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
