@@ -300,13 +300,39 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ─── PATCH /api/customers — Update customer phone/mobile ─────────────────────
+// ─── PATCH /api/customers — Update customer phone/mobile, Billing/Shipping address ──
+
+interface AddressPatch {
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  attention?: string;
+  phone?: string;
+}
+
+function buildZohoAddress(a: AddressPatch) {
+  return {
+    address: (a.address_line1 || '').trim(),
+    street2: (a.address_line2 || '').trim(),
+    city: (a.city || '').trim(),
+    state: (a.state || '').trim(),
+    zip: (a.zip || '').trim(),
+    country: 'Indonesia',
+    country_code: 'ID',
+    phone: (a.phone || '').trim(),
+    fax: '',
+    attention: (a.attention || '').trim(),
+  };
+}
 
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contact_id, mobile, phone } = body as {
+    const { contact_id, mobile, phone, billing_address, shipping_address } = body as {
       contact_id: string; mobile?: string; phone?: string;
+      billing_address?: AddressPatch; shipping_address?: AddressPatch;
     };
 
     if (!contact_id) return NextResponse.json({ error: 'contact_id required' }, { status: 400 });
@@ -315,9 +341,11 @@ export async function PATCH(request: NextRequest) {
     const base = getZohoApiBaseUrl();
     const orgId = getZohoOrgId();
 
-    const payload: Record<string, string> = {};
+    const payload: Record<string, unknown> = {};
     if (mobile !== undefined) payload.mobile = mobile.trim();
     if (phone !== undefined) payload.phone = phone.trim();
+    if (billing_address) payload.billing_address = buildZohoAddress(billing_address);
+    if (shipping_address) payload.shipping_address = buildZohoAddress(shipping_address);
 
     if (Object.keys(payload).length === 0) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
@@ -335,7 +363,9 @@ export async function PATCH(request: NextRequest) {
       success: true,
       contact_id,
       mobile: data.contact?.mobile,
-      message: 'Phone updated',
+      billing_address: data.contact?.billing_address,
+      shipping_address: data.contact?.shipping_address,
+      message: 'Customer updated',
     });
 
   } catch (err) {

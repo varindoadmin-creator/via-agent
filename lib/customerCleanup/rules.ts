@@ -29,7 +29,7 @@ const PRICEBOOK_TO_TIER: Record<string, string> = {
 
 const LEGAL_SUFFIXES = ['PT', 'CV', 'UD', 'PD', 'FA', 'TBK', 'KOPERASI', 'YAYASAN'];
 
-const INDONESIA_PROVINCES = [
+export const INDONESIA_PROVINCES = [
   // English names — this org's Zoho state dropdown is in English (verified against 68 live
   // customer records: "West Java", "Special Capital Region of Jakarta", "North Sumatra", etc.)
   'Aceh', 'North Sumatra', 'West Sumatra', 'Riau', 'Riau Islands', 'Jambi', 'South Sumatra',

@@ -282,6 +282,22 @@ Return ONLY a JSON object. No explanation, no markdown, no backticks.
   "raw_so_number": ""
 }`;
 
+export const SYSTEM_PROMPT_ADDRESS_PARSE = `You are an address-parsing assistant for Varindo, an Indonesian HPL distributor. You'll be given a raw, pasted block of text — usually an Indonesian address, sometimes with a person's name and/or phone number mixed in (e.g. copied from WhatsApp or a business card). Extract structured fields and return ONLY a valid JSON object, no other text.
+
+Indonesian addresses typically look like: "Jl. <street> No.<number>, RT.<x>/RW.<y>, <kelurahan/desa>, Kec. <kecamatan>, <Kota/Kabupaten> <city>, <province>, <5-digit zip>"
+
+Split it as:
+- "address_line1": the street + number + RT/RW portion (e.g. "Jl. Palem Barat No.35 4, RT.4/RW.7")
+- "address_line2": the kelurahan/desa + kecamatan portion (e.g. "Duri Kepa, Kec. Kb. Jeruk")
+- "city": the Kota/Kabupaten name, without the "Kota"/"Kabupaten" prefix (e.g. "Jakarta Barat", "Bandung")
+- "state": the province name IN ENGLISH matching Indonesia's official 38 provinces (e.g. "Daerah Khusus Ibukota Jakarta" → "Special Capital Region of Jakarta", "Jawa Barat" → "West Java", "Jawa Tengah" → "Central Java"). Leave blank if you can't confidently map it.
+- "zip": the 5-digit postal code, if present
+- "attention": a person's name, ONLY if one is clearly present in the pasted text (not a company name) — properly capitalized. Leave blank if none.
+- "phone": a phone number, ONLY if one is clearly present — digits only, keep a leading 0 or +62. Leave blank if none.
+
+If a field can't be determined, use an empty string "" for it — never invent a value. Return exactly this shape:
+{"address_line1": "", "address_line2": "", "city": "", "state": "", "zip": "", "attention": "", "phone": ""}`;
+
 export const SYSTEM_PROMPT_SO_CHECK = `You are a Sales Order vs Stock and Purchase Order analyst for Varindo.
 
 Given Sales Order items, available stock, and open Purchase Orders, analyze the situation and provide clear recommendations.

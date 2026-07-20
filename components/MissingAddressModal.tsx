@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { CopyWAButton } from './CopyWAButton';
+import FillAddressModal from './FillAddressModal';
 
 interface MissingAddressCustomer {
   contact_id: string;
@@ -29,6 +30,7 @@ export default function MissingAddressModal({ onClose }: { onClose: () => void }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [customers, setCustomers] = useState<MissingAddressCustomer[] | null>(null);
+  const [fillTarget, setFillTarget] = useState<{ contact_id: string; contact_name: string } | null>(null);
 
   const runScan = useCallback(async () => {
     setLoading(true);
@@ -50,6 +52,7 @@ export default function MissingAddressModal({ onClose }: { onClose: () => void }
   const waMessage = useMemo(() => (customers ? buildWAMessage(customers) : ''), [customers]);
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div className="via-card w-[700px] mx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
@@ -94,7 +97,8 @@ export default function MissingAddressModal({ onClose }: { onClose: () => void }
                 </thead>
                 <tbody>
                   {customers.map((c) => (
-                    <tr key={c.contact_id}>
+                    <tr key={c.contact_id} onClick={() => setFillTarget({ contact_id: c.contact_id, contact_name: c.contact_name })}
+                      className="cursor-pointer hover:bg-[var(--surface-2)] transition-colors" title="Click to fill in address">
                       <td className="font-medium text-[var(--text)] whitespace-nowrap">{c.contact_name}</td>
                       <td className="text-[var(--text-3)] whitespace-nowrap">{c.contact_number || '—'}</td>
                       <td className="text-[var(--warning)]">{missingLabel(c)}</td>
@@ -118,5 +122,14 @@ export default function MissingAddressModal({ onClose }: { onClose: () => void }
         </div>
       </div>
     </div>
+    {fillTarget && (
+      <FillAddressModal
+        contactId={fillTarget.contact_id}
+        contactName={fillTarget.contact_name}
+        onClose={() => setFillTarget(null)}
+        onSaved={runScan}
+      />
+    )}
+    </>
   );
 }
