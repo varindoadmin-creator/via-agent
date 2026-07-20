@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { computeApprovalData, approvePurchaseOrders } from '@/lib/zoho/poApprovalEngine';
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 export const maxDuration = 60;
 
@@ -19,7 +20,8 @@ export async function POST(req: NextRequest) {
     const { purchaseorder_ids } = body as { purchaseorder_ids?: string[] };
     if (!purchaseorder_ids?.length) return NextResponse.json({ success: false, error: 'purchaseorder_ids required' }, { status: 400 });
 
-    const results = await approvePurchaseOrders(purchaseorder_ids);
+    const role = await verifySessionToken(req.cookies.get(SESSION_COOKIE_NAME)?.value);
+    const results = await approvePurchaseOrders(purchaseorder_ids, role || 'unknown');
 
     return NextResponse.json({
       success: true,

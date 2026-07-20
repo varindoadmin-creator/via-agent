@@ -9,7 +9,17 @@ type DailyBriefInvoice = { salesorder_id: string; salesorder_number: string; cus
 type DailyBriefSentInvoice = { invoice_id: string; invoice_number: string; customer_name: string; sent_at: string };
 type DailyBriefPriceListItem = { item_id: string; item_name: string; tiers: string[]; created_at: string };
 type DailyBriefSalespersonAssignment = { document_type: 'sales_order' | 'invoice'; document_id: string; document_number: string; customer_name: string; salesperson_name: string; assigned_at: string };
-type DailyBriefDay = { date: string; label: string; customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[]; sentInvoices: DailyBriefSentInvoice[]; priceListItems: DailyBriefPriceListItem[]; salespersonAssignments: DailyBriefSalespersonAssignment[] };
+type DailyBriefSOApproval = { salesorder_id: string; salesorder_number: string; customer_name: string; total: number; item_count: number; approved_by: string; approved_at: string };
+type DailyBriefPOStockItem = { item_name: string; sku: string; quantity: number; stock_qty: number; match_status: 'for_stock' | 'excess_stock'; location_name: string };
+type DailyBriefPOApproval = { purchaseorder_id: string; purchaseorder_number: string; vendor_name: string; total: number; stock_items: DailyBriefPOStockItem[]; approved_by: string; approved_at: string };
+type DailyBriefDay = {
+  date: string; label: string;
+  customers: DailyBriefCustomer[]; invoices: DailyBriefInvoice[]; sentInvoices: DailyBriefSentInvoice[];
+  priceListItems: DailyBriefPriceListItem[]; salespersonAssignments: DailyBriefSalespersonAssignment[];
+  soApprovals: DailyBriefSOApproval[]; poApprovals: DailyBriefPOApproval[];
+};
+
+const formatRp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
 function CategorySection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
   if (count === 0) return null;
@@ -108,7 +118,7 @@ function DailyBriefPanel() {
       )}
 
       {!loading && !error && days && days.length === 0 && (
-        <div className="text-[var(--muted)] text-xs py-3">No customer repairs, auto-invoiced shipments, auto-sent invoices, price list additions, or salesperson assignments in the last 14 days.</div>
+        <div className="text-[var(--muted)] text-xs py-3">No customer repairs, auto-invoiced shipments, auto-sent invoices, price list additions, salesperson assignments, or SO/PO approvals in the last 14 days.</div>
       )}
 
       {!error && days && days.length > 0 && (
@@ -124,7 +134,7 @@ function DailyBriefPanel() {
                 >
                   <span className="text-[var(--text)] text-xs font-medium">{day.label}</span>
                   <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} · {day.sentInvoices.length} sent · {day.priceListItems.length} priced · {day.salespersonAssignments.length} salesperson {isOpen ? '▲' : '▼'}
+                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} · {day.sentInvoices.length} sent · {day.priceListItems.length} priced · {day.salespersonAssignments.length} salesperson · {day.soApprovals.length} SO · {day.poApprovals.length} PO {isOpen ? '▲' : '▼'}
                   </span>
                 </button>
                 {isOpen && (
@@ -186,6 +196,42 @@ function DailyBriefPanel() {
                             {s.document_type === 'sales_order' ? 'Sales Order' : 'Invoice'} <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{s.document_number}</span> assigned to{' '}
                             <span style={{ color: 'var(--success)' }}>{s.salesperson_name}</span>
                           </div>
+                        </div>
+                      ))}
+                    </CategorySection>
+
+                    <CategorySection label="Sales Orders Approved" count={day.soApprovals.length}>
+                      {day.soApprovals.map(a => (
+                        <div key={a.salesorder_id} className="px-3 py-2">
+                          <div className="text-[var(--text)] text-xs font-medium">{a.customer_name || '(unnamed)'}</div>
+                          <div className="text-[var(--muted)] text-xs mt-1">
+                            <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{a.salesorder_number}</span> — {a.item_count} item{a.item_count === 1 ? '' : 's'}, {formatRp(a.total)} — approved by {a.approved_by}
+                          </div>
+                        </div>
+                      ))}
+                    </CategorySection>
+
+                    <CategorySection label="Purchase Orders Approved" count={day.poApprovals.length}>
+                      {day.poApprovals.map(a => (
+                        <div key={a.purchaseorder_id} className="px-3 py-2">
+                          <div className="text-[var(--text)] text-xs font-medium">{a.vendor_name || '(unnamed)'}</div>
+                          <div className="text-[var(--muted)] text-xs mt-1">
+                            <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{a.purchaseorder_number}</span> — {formatRp(a.total)} — approved by {a.approved_by}
+                          </div>
+                          {a.stock_items.length > 0 ? (
+                            <div className="mt-1.5 space-y-1">
+                              {a.stock_items.map((it, i) => (
+                                <div key={i} className="text-xs" style={{ color: 'var(--warning)' }}>
+                                  ⚠ {it.item_name} ({it.sku}) — {it.quantity} {it.location_name && `at ${it.location_name}`} —{' '}
+                                  {it.match_status === 'for_stock'
+                                    ? 'no current order needs this'
+                                    : `${it.stock_qty} extra beyond what's needed`}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-[var(--muted)] text-xs mt-1">Fully matched to confirmed Sales Order demand.</div>
+                          )}
                         </div>
                       ))}
                     </CategorySection>

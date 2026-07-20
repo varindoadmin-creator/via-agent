@@ -19,6 +19,13 @@ import { NextResponse } from 'next/server';
 //   - salesperson_auto_assign_log (lib/salespersonMap/sync.ts) — only
 //     success=true rows are shown; failed assignments are logged but not
 //     surfaced here (they just get retried automatically the next run).
+//
+// Plus two logs written live at approval time (not by a scheduled job) —
+// admin approves Sales Orders/Purchase Orders throughout the day, and the
+// Director wants to see that activity each morning without a separate cron:
+//   - so_approval_log (app/api/approvals/so/route.ts)
+//   - po_approval_log (lib/zoho/poApprovalEngine.ts) — only the for_stock/
+//     excess_stock line items are recorded per PO, not every line.
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
 const DAYS_BACK = 14;
@@ -62,6 +69,35 @@ interface SalespersonAssignLogRow {
   assigned_at: string;
 }
 
+interface SOApprovalLogRow {
+  salesorder_id: string;
+  salesorder_number: string;
+  customer_name: string;
+  total: number;
+  item_count: number;
+  approved_by: string;
+  approved_at: string;
+}
+
+interface POStockItem {
+  item_name: string;
+  sku: string;
+  quantity: number;
+  stock_qty: number;
+  match_status: 'for_stock' | 'excess_stock';
+  location_name: string;
+}
+
+interface POApprovalLogRow {
+  purchaseorder_id: string;
+  purchaseorder_number: string;
+  vendor_name: string;
+  total: number;
+  stock_items: POStockItem[];
+  approved_by: string;
+  approved_at: string;
+}
+
 function sbHeaders() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   return { apikey: key, Authorization: `Bearer ${key}` };
@@ -87,12 +123,14 @@ export async function GET() {
   try {
     const cutoff = new Date(Date.now() - DAYS_BACK * 24 * 60 * 60 * 1000).toISOString();
 
-    const [customerRes, invoiceRes, sentInvoiceRes, priceListRes, salespersonRes] = await Promise.all([
+    const [customerRes, invoiceRes, sentInvoiceRes, priceListRes, salespersonRes, soApprovalRes, poApprovalRes] = await Promise.all([
       fetch(sbUrl(`customer_cleanup_log?select=contact_id,contact_name,changes,fixed_at&fixed_at=gte.${cutoff}&order=fixed_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`shipment_invoice_log?select=salesorder_id,salesorder_number,customer_name,invoice_number,converted_at&success=eq.true&converted_at=gte.${cutoff}&order=converted_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`invoice_auto_send_log?select=invoice_id,invoice_number,customer_name,sent_at&success=eq.true&sent_at=gte.${cutoff}&order=sent_at.desc&limit=500`), { headers: sbHeaders() }),
       fetch(sbUrl(`price_list_sync_log?select=item_id,item_name,tier,discount_applied,created_at&action=eq.added&dry_run=eq.false&created_at=gte.${cutoff}&order=created_at.desc&limit=1000`), { headers: sbHeaders() }),
       fetch(sbUrl(`salesperson_auto_assign_log?select=document_type,document_id,document_number,customer_name,salesperson_name,assigned_at&success=eq.true&assigned_at=gte.${cutoff}&order=assigned_at.desc&limit=500`), { headers: sbHeaders() }),
+      fetch(sbUrl(`so_approval_log?select=salesorder_id,salesorder_number,customer_name,total,item_count,approved_by,approved_at&approved_at=gte.${cutoff}&order=approved_at.desc&limit=500`), { headers: sbHeaders() }),
+      fetch(sbUrl(`po_approval_log?select=purchaseorder_id,purchaseorder_number,vendor_name,total,stock_items,approved_by,approved_at&approved_at=gte.${cutoff}&order=approved_at.desc&limit=500`), { headers: sbHeaders() }),
     ]);
 
     if (!customerRes.ok) throw new Error(`Supabase ${customerRes.status}: ${await customerRes.text()}`);
@@ -100,13 +138,15 @@ export async function GET() {
     const repaired = customerRows.filter(r => Array.isArray(r.changes) && r.changes.length > 0);
 
     // shipment_invoice_log / invoice_auto_send_log / price_list_sync_log /
-    // salesperson_auto_assign_log may not exist yet if their SQL migration
-    // hasn't been run — soft-fail to an empty list rather than breaking the
-    // whole Daily Brief.
+    // salesperson_auto_assign_log / so_approval_log / po_approval_log may not
+    // exist yet if their SQL migration hasn't been run — soft-fail to an
+    // empty list rather than breaking the whole Daily Brief.
     const invoiceRows: InvoiceLogRow[] = invoiceRes.ok ? await invoiceRes.json() : [];
     const sentInvoiceRows: SentInvoiceLogRow[] = sentInvoiceRes.ok ? await sentInvoiceRes.json() : [];
     const priceListRows: PriceListSyncLogRow[] = priceListRes.ok ? await priceListRes.json() : [];
     const salespersonRows: SalespersonAssignLogRow[] = salespersonRes.ok ? await salespersonRes.json() : [];
+    const soApprovalRows: SOApprovalLogRow[] = soApprovalRes.ok ? await soApprovalRes.json() : [];
+    const poApprovalRows: POApprovalLogRow[] = poApprovalRes.ok ? await poApprovalRes.json() : [];
 
     const nowJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS).toISOString().split('T')[0];
     const yesterdayJakarta = new Date(Date.now() + JAKARTA_OFFSET_MS - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -159,7 +199,29 @@ export async function GET() {
       else salespersonByDate.set(date, [row]);
     }
 
-    const allDates = new Set([...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys(), ...priceListByDate.keys(), ...salespersonByDate.keys()]);
+    const soApprovalsByDate = new Map<string, SOApprovalLogRow[]>();
+    for (const row of soApprovalRows) {
+      const date = jakartaDate(row.approved_at);
+      const list = soApprovalsByDate.get(date);
+      if (list) list.push(row);
+      else soApprovalsByDate.set(date, [row]);
+    }
+
+    // Every approved PO is counted (matches "how many POs approved"), but
+    // stock_items — the for_stock/excess_stock lines — is what the Director
+    // actually needs to review; a clean PO just has an empty stock_items array.
+    const poApprovalsByDate = new Map<string, POApprovalLogRow[]>();
+    for (const row of poApprovalRows) {
+      const date = jakartaDate(row.approved_at);
+      const list = poApprovalsByDate.get(date);
+      if (list) list.push(row);
+      else poApprovalsByDate.set(date, [row]);
+    }
+
+    const allDates = new Set([
+      ...customersByDate.keys(), ...invoicesByDate.keys(), ...sentInvoicesByDate.keys(),
+      ...priceListByDate.keys(), ...salespersonByDate.keys(), ...soApprovalsByDate.keys(), ...poApprovalsByDate.keys(),
+    ]);
 
     const days = Array.from(allDates)
       .sort((a, b) => b.localeCompare(a))
@@ -198,6 +260,24 @@ export async function GET() {
           customer_name: s.customer_name,
           salesperson_name: s.salesperson_name,
           assigned_at: s.assigned_at,
+        })),
+        soApprovals: (soApprovalsByDate.get(date) || []).map(a => ({
+          salesorder_id: a.salesorder_id,
+          salesorder_number: a.salesorder_number,
+          customer_name: a.customer_name,
+          total: a.total,
+          item_count: a.item_count,
+          approved_by: a.approved_by,
+          approved_at: a.approved_at,
+        })),
+        poApprovals: (poApprovalsByDate.get(date) || []).map(a => ({
+          purchaseorder_id: a.purchaseorder_id,
+          purchaseorder_number: a.purchaseorder_number,
+          vendor_name: a.vendor_name,
+          total: a.total,
+          stock_items: a.stock_items,
+          approved_by: a.approved_by,
+          approved_at: a.approved_at,
         })),
       }));
 

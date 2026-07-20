@@ -8,6 +8,7 @@
 import { zohoRequest } from '@/lib/zoho/client';
 import { getItemWithStock, type ItemStockSummary } from '@/lib/zoho/items';
 import { expectedWarehouseForCustomer, getCustomerRoutingInfo, normalizeWarehouse } from '@/lib/warehouseRouting';
+import type { Role } from '@/lib/auth';
 
 function n(value: unknown): number {
   const num = Number(value);
@@ -522,7 +523,49 @@ export interface ApproveResult {
   error?: string;
 }
 
-export async function approvePurchaseOrders(purchaseorderIds: string[]): Promise<ApproveResult[]> {
+// ─── PO approval logging — feeds the "Purchase Orders — Stock/Excess Items"
+// section of the Daily Brief panel on Home (app/dashboard/page.tsx). Only the
+// for_stock/excess_stock line items are recorded, not every line on the PO —
+// that's the part the Director actually wants visibility into.
+function sbHeaders() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+  return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
+}
+
+function sbUrl(path: string) {
+  const base = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return `${base.replace(/\/$/, '')}/rest/v1/${path}`;
+}
+
+async function logPOApproval(po: ComputedPO, approvedBy: string) {
+  const stockItems = po.line_items
+    .filter(li => li.match_status === 'for_stock' || li.match_status === 'excess_stock')
+    .map(li => ({
+      item_name: li.name, sku: li.sku, quantity: li.quantity, stock_qty: li.stock_qty,
+      match_status: li.match_status, location_name: li.location_name,
+    }));
+  try {
+    const res = await fetch(sbUrl('po_approval_log'), {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify({
+        purchaseorder_id: po.purchaseorder_id,
+        purchaseorder_number: po.purchaseorder_number,
+        vendor_name: po.vendor_name,
+        total: po.total,
+        stock_items: stockItems,
+        approved_by: approvedBy,
+      }),
+    });
+    if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  } catch (err) {
+    // Logging failure must never mask a successful Zoho approval — same
+    // soft-fail convention as invoice_auto_send_log's logAutoSendResults().
+    console.error('[PO Approval] Logging to Supabase failed:', err);
+  }
+}
+
+export async function approvePurchaseOrders(purchaseorderIds: string[], approvedBy: Role | 'unknown' = 'unknown'): Promise<ApproveResult[]> {
   const { purchase_orders } = await computeApprovalData();
   const byId = new Map(purchase_orders.map(po => [po.purchaseorder_id, po]));
 
@@ -553,6 +596,7 @@ export async function approvePurchaseOrders(purchaseorderIds: string[]): Promise
       // Issued and skips the Approved step.
       await zohoRequest(`/purchaseorders/${poId}/approve`, { method: 'POST', body: {} });
       results.push({ purchaseorder_id: poId, purchaseorder_number: po.purchaseorder_number, success: true });
+      await logPOApproval(po, approvedBy);
 
       // Mark every SO this PO covers as "Ordered" in Zoho — best-effort, since the PO
       // itself is already approved at this point and a failure here shouldn't undo that.

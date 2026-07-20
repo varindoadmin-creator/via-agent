@@ -2,8 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { zohoRequest } from '@/lib/zoho/client';
 import { expectedWarehouseForCustomer, getCustomerRoutingInfo, normalizeWarehouse } from '@/lib/warehouseRouting';
 import { normalizeProvince, extractProvinceFromText, extractZipFromText, provinceForCity } from '@/lib/customerCleanup/rules';
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 export const maxDuration = 60;
+
+// ─── SO approval logging — feeds the "Sales Orders Approved" section of the
+// Daily Brief panel on Home (app/dashboard/page.tsx), so the Director sees
+// each day's SO approval activity, not just VIA's own automated actions.
+function sbHeaders() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+  return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
+}
+
+function sbUrl(path: string) {
+  const base = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return `${base.replace(/\/$/, '')}/rest/v1/${path}`;
+}
+
+async function logSOApproval(row: {
+  salesorder_id: string; salesorder_number: string; customer_name: string;
+  total: number; item_count: number; approved_by: string;
+}) {
+  try {
+    const res = await fetch(sbUrl('so_approval_log'), { method: 'POST', headers: sbHeaders(), body: JSON.stringify(row) });
+    if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  } catch (err) {
+    // Logging failure must never mask a successful Zoho approval — same
+    // soft-fail convention as invoice_auto_send_log's logAutoSendResults().
+    console.error('[SO Approval] Logging to Supabase failed:', err);
+  }
+}
 
 interface ZohoSalesOrderListResponse {
   salesorders?: Record<string, unknown>[];
@@ -853,6 +881,16 @@ export async function PUT(req: NextRequest) {
     const response = await zohoRequest<Record<string, unknown>>(`/salesorders/${soId}/approve`, {
       method: 'POST',
       body: {},
+    });
+
+    const role = await verifySessionToken(req.cookies.get(SESSION_COOKIE_NAME)?.value);
+    await logSOApproval({
+      salesorder_id: soId,
+      salesorder_number: so.salesorder_number,
+      customer_name: so.customer_name,
+      total: so.total,
+      item_count: so.line_items.length,
+      approved_by: role || 'unknown',
     });
 
     return NextResponse.json({
