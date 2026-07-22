@@ -5,6 +5,7 @@ import CustomerCleanupModal from '@/components/CustomerCleanupModal';
 import MissingAddressModal from '@/components/MissingAddressModal';
 import CustomerDuplicatesModal from '@/components/CustomerDuplicatesModal';
 import { CopyWAButton } from '@/components/CopyWAButton';
+import CustomerTrendsChart from '@/components/CustomerTrendsChart';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -912,6 +913,9 @@ export default function CustomersPage() {
             </div>
           ))}
         </div>
+
+        {/* Trend chart */}
+        <CustomerTrendsChart />
 
         {/* Tier / Hub breakdown */}
         <div className="grid grid-cols-2 gap-3 mb-5">
