@@ -133,7 +133,7 @@ export default function PurchasesReportsPage() {
           <button onClick={fetchData} disabled={loading}
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50"
             style={mono}>
-            {loading ? '…' : '↻ Refresh'}
+            {loading ? '…' : '↻'}
           </button>
         </div>
 
@@ -294,7 +294,7 @@ export default function PurchasesReportsPage() {
               <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                 <tr>
                   <td colSpan={reportType === 'item' ? 3 : 2} style={{ padding: '8px 12px', ...mono, color: 'var(--text-3)', fontSize: 11, fontWeight: 600 }}>
-                    TOTAL ({filtered.length} rows)
+                    Total Value
                   </td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontWeight: 700 }}>
                     {formatQty(filtered.reduce((s, r) => s + r.quantity, 0))}

@@ -229,7 +229,7 @@ export default function CatalogueRequestsPage() {
             )}
             <button onClick={fetchData} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>

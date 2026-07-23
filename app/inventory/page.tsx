@@ -136,20 +136,19 @@ function LocationTable({
       {/* Table header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-3">
-          <div className={`text-xs font-bold tracking-widest uppercase ${meta.color}`}
-            style={{ fontFamily: "'DM Mono', monospace" }}>
+          <div className={`text-xs font-bold tracking-widest uppercase ${meta.color}`}>
             {location}
           </div>
           <div className="text-[var(--text-4)] text-xs">{meta.city}</div>
           {!loading && (
-            <div className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--text-3)]">
-              {items.length} items
+            <div className="text-xs text-[var(--text-4)]">
+              Total ({items.length} Items)
             </div>
           )}
         </div>
         {!loading && items.length > 0 && (
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4 text-xs text-[var(--text-4)]" style={{ fontFamily: "'DM Mono', monospace" }}>
+            <div className="flex items-center gap-4 text-xs text-[var(--text-4)]">
               <span>SOH: <span className="text-[var(--text-2)]">{formatNum(totals.stock)}</span></span>
               <span>Committed: <span className="text-[var(--warning)]/80">{formatNum(totals.committed)}</span></span>
               <span>Available: <span className="text-[var(--success)]/80">{formatNum(totals.available)}</span></span>
@@ -175,7 +174,6 @@ function LocationTable({
             onChange={e => setEmailTo(e.target.value)}
             placeholder="recipient@example.com"
             className="flex-1 max-w-xs px-3 py-1.5 text-xs bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--text)] placeholder-[var(--text-4)] focus:outline-none focus:border-[var(--accent)]"
-            style={{ fontFamily: "'DM Mono', monospace" }}
           />
           <button onClick={emailCSV} disabled={sending || !emailTo.trim()}
             className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
@@ -265,7 +263,7 @@ function LocationTable({
             {/* Totals footer */}
             <tfoot className="border-t border-[var(--border)] bg-[var(--surface-2)]">
               <tr className="text-xs font-medium">
-                <td className="px-3 py-2.5 text-[var(--text-4)] font-mono" colSpan={3}>TOTAL</td>
+                <td className="px-3 py-2.5 text-[var(--text-4)] font-mono" colSpan={3}>Total Stock</td>
                 <td className="px-3 py-2.5 text-right font-mono text-[var(--text-2)]">{formatNum(totals.stock)}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-[var(--warning)]/80">{formatNum(totals.committed)}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-[var(--success)]">{formatNum(totals.available)}</td>
@@ -343,8 +341,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="bg-[var(--bg)] text-[var(--text)] p-6 pb-24 min-h-full"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="bg-[var(--bg)] text-[var(--text)] p-6 pb-24 min-h-full">
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
@@ -354,7 +351,7 @@ export default function InventoryPage() {
           </div>
           <div className="flex items-center gap-3">
             {lastFetched && (
-              <span className="text-[var(--text-4)] text-xs" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <span className="text-[var(--text-4)] text-xs">
                 Updated {lastFetched}
               </span>
             )}
@@ -378,8 +375,7 @@ export default function InventoryPage() {
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           {/* Brand filter */}
           <div className="flex items-center gap-2">
-            <span className="text-[var(--text-4)] text-xs uppercase tracking-wider"
-              style={{ fontFamily: "'DM Mono', monospace" }}>Brand</span>
+            <span className="text-[var(--text-4)] text-xs uppercase tracking-wider">Brand</span>
             <div className="flex items-center gap-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg p-1">
               {BRANDS.map(b => (
                 <button key={b} onClick={() => handleBrandChange(b)}
@@ -404,7 +400,7 @@ export default function InventoryPage() {
                 onChange={e => setSearchInput(e.target.value)}
                 placeholder="Search item code, name, brand…"
                 className="pl-8 pr-8 py-1.5 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--text)] placeholder-[var(--text-4)] focus:outline-none focus:border-[var(--accent)] w-64"
-                style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px' }}
+                style={{ fontSize: '12px' }}
               />
               {searchInput && (
                 <button type="button" onClick={handleClearSearch}
@@ -421,7 +417,7 @@ export default function InventoryPage() {
         {/* Summary strip */}
         {!loading && totalItems > 0 && (
           <div className="flex items-center gap-6 mb-5 px-1">
-            <span className="text-[var(--text-4)] text-xs" style={{ fontFamily: "'DM Mono', monospace" }}>
+            <span className="text-[var(--text-4)] text-xs">
               {totalItems} items with stock
               {brand !== 'All Brands' && <span className="text-[var(--accent)] ml-2">· {brand}</span>}
               {search && <span className="text-[var(--warning)] ml-2">· "{search}"</span>}

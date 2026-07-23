@@ -296,7 +296,7 @@ function POTable({
           <p className="text-[var(--text-3)] text-xs mt-0.5">{desc}</p>
         </div>
         <div className="flex items-center gap-3">
-          {!loading && <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} POs</span>}
+          {!loading && <span className="text-[var(--text-4)] text-xs">Total ({filtered.length} POs)</span>}
           {!loading && filtered.length > 0 && (
             <span className="text-[var(--text-4)] text-xs" style={mono}>{formatRp(filtered.reduce((s, p) => s + p.total, 0))}</span>
           )}
@@ -369,17 +369,6 @@ function POTable({
                 />
               ))}
             </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-                <td colSpan={selectable ? (showMatching ? 8 : 8) : (showMatching ? 7 : 7)}
-                  style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, ...mono }}>
-                  TOTAL ({filtered.length} POs)
-                </td>
-                <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 600, fontSize: 12 }}>
-                  {formatRp(filtered.reduce((s, p) => s + p.total, 0))}
-                </td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       )}
@@ -814,7 +803,7 @@ function ReceivedNotBilledTable({ onRefresh }: { onRefresh: () => void }) {
           <p className="text-[var(--text-4)] text-xs">Items received, pending bill conversion — tick to convert</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[var(--text-4)] text-xs" style={mono}>{items.length} POs</span>
+          <span className="text-[var(--text-4)] text-xs">Total ({items.length} POs)</span>
           {selected.size > 0 && (
             <button onClick={handleConvert} disabled={converting}
               className="px-3 py-1.5 text-xs bg-[var(--warning-bg)] text-[var(--warning)] border border-[var(--warning-border)] rounded-lg font-medium hover:opacity-90 disabled:opacity-50">
@@ -907,7 +896,7 @@ export default function PurchasesPage() {
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}
             <button onClick={fetchAll} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>

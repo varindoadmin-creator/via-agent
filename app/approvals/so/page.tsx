@@ -190,7 +190,7 @@ export default function SOApprovalCheckPage() {
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Sales Order Approval</h1>
         </div>
-        <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻ Refresh</button>
+        <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -216,7 +216,10 @@ export default function SOApprovalCheckPage() {
           <div>
             <div style={{ color: 'var(--text)', fontWeight: 650 }}>Pending Approval</div>
           </div>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: 'var(--text-4)', fontSize: 12 }}>Total ({filtered.length} SOs)</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>

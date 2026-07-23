@@ -99,7 +99,7 @@ function DailyBriefPanel() {
           <button onClick={load} disabled={loading}
             className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-50"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
-            {loading ? '…' : '↻ Refresh'}
+            {loading ? '…' : '↻'}
           </button>
         </div>
       </div>

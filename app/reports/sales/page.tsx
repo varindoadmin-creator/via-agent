@@ -478,7 +478,7 @@ export default function SalesReportsPage() {
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50"
             style={mono}
           >
-            {loading ? "…" : "↻ Refresh"}
+            {loading ? "…" : "↻"}
           </button>
         </div>
 
@@ -1472,7 +1472,7 @@ export default function SalesReportsPage() {
                           fontWeight: 600,
                         }}
                       >
-                        TOTAL ({filtered.length} rows)
+                        Total Value
                       </td>
                       <td
                         style={{
@@ -1545,7 +1545,7 @@ export default function SalesReportsPage() {
                           fontWeight: 600,
                         }}
                       >
-                        TOTAL ({filtered.length} rows)
+                        Total Value
                       </td>
                       <td
                         style={{

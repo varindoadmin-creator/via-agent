@@ -27,6 +27,10 @@ interface PendingDelivery {
   total: number;
   quantity: number;
   quantity_packed: number;
+  hpl_quantity: number;
+  hpl_quantity_packed: number;
+  edge_quantity: number;
+  edge_quantity_packed: number;
   delivery_method: string;
   is_full: boolean;
   location_name: string;
@@ -292,7 +296,7 @@ function HubShipmentTable({ location, items, loading, error }: {
           </div>
           {!loading && (
             <div className="text-[var(--text-4)] text-xs">
-              Total: {filtered.length} Orders ({filtered.filter(i => i.is_full).length} Full, {filtered.filter(i => !i.is_full).length} Partial)
+              Total ({filtered.length} Orders · {filtered.filter(i => i.is_full).length} Full, {filtered.filter(i => !i.is_full).length} Partial)
             </div>
           )}
         </div>
@@ -333,9 +337,10 @@ function HubShipmentTable({ location, items, loading, error }: {
               <th>SO Date</th>
               <th>Shipment</th>
               <th className="text-right">Aging</th>
-              <th className="text-right">Qty</th>
-              <th className="text-right">Packed</th>
-              <th>Courier</th>
+              <th className="text-right">Qty HPL</th>
+              <th className="text-right">Qty Edge</th>
+              <th className="text-right">Packed HPL</th>
+              <th className="text-right">Packed Edge</th>
               <th>Status</th>
             </tr></thead>
             <tbody>
@@ -373,14 +378,21 @@ function HubShipmentTable({ location, items, loading, error }: {
                           label="in transit"
                         />
                       </td>
-                      <td className="text-right text-[var(--text-2)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{item.quantity}</td>
+                      <td className="text-right text-[var(--text-2)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{item.hpl_quantity || '—'}</td>
+                      <td className="text-right text-[var(--text-2)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{item.edge_quantity || '—'}</td>
                       <td className="text-right text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                        <span className={item.quantity_packed >= item.quantity ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>
-                          {item.quantity_packed}
-                        </span>
+                        {item.hpl_quantity > 0 ? (
+                          <span className={item.hpl_quantity_packed >= item.hpl_quantity ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>
+                            {item.hpl_quantity_packed}
+                          </span>
+                        ) : '—'}
                       </td>
-                      <td className="text-[var(--text-3)] text-xs">
-                        {item.packages[0]?.carrier || item.delivery_method || '—'}
+                      <td className="text-right text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                        {item.edge_quantity > 0 ? (
+                          <span className={item.edge_quantity_packed >= item.edge_quantity ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>
+                            {item.edge_quantity_packed}
+                          </span>
+                        ) : '—'}
                       </td>
                       <td>
                         {item.is_full
@@ -390,7 +402,7 @@ function HubShipmentTable({ location, items, loading, error }: {
                     </tr>
                     {exp && (
                       <tr key={item.salesorder_id + '_detail'}>
-                        <td colSpan={11} className="p-0">
+                        <td colSpan={12} className="p-0">
                           <div className="bg-[var(--surface-2)] px-6 py-4">
                             {/* Packages */}
                             <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>Shipments</div>
@@ -517,7 +529,7 @@ export default function InventoryShipmentsPage() {
             )}
             <button onClick={fetchAll} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>

@@ -566,7 +566,7 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
               label={`Follow Up (${selectedInTable.length})`}
             />
           )}
-          {!loading && <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} customers</span>}
+          {!loading && <span className="text-[var(--text-4)] text-xs">Total ({filtered.length} Customers)</span>}
         </div>
       </div>
 
@@ -692,25 +692,19 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
                 </tr>
               ))}
             </tbody>
-            <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-              <tr>
-                {showActivity ? (
-                  <>
-                    <td colSpan={6} style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, ...mono }}>
-                      TOTAL ({filtered.length} customers)
-                    </td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 600, fontSize: 12 }}>
-                      {formatRp(filtered.reduce((s, c) => s + c.total_90d, 0))}
-                    </td>
-                    <td colSpan={1} />
-                  </>
-                ) : (
-                  <td colSpan={9} style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, ...mono }}>
-                    TOTAL ({filtered.length} customers)
+            {showActivity && (
+              <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                <tr>
+                  <td colSpan={6} style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, ...mono }}>
+                    Total Revenue (90d)
                   </td>
-                )}
-              </tr>
-            </tfoot>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 600, fontSize: 12 }}>
+                    {formatRp(filtered.reduce((s, c) => s + c.total_90d, 0))}
+                  </td>
+                  <td colSpan={1} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       )}
@@ -867,7 +861,7 @@ export default function CustomersPage() {
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}
             <button onClick={fetchAll} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
             {selectedIds.size > 0 && (
               <button onClick={handlePrintLabels} disabled={printing}

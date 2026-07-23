@@ -253,7 +253,7 @@ function CustomersFromRequestsTable() {
           <h2 className="font-bold text-base" style={{ color: 'var(--info)' }}>Leads</h2>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[var(--text-4)] text-xs" style={mono}>{leads.length} leads</span>
+          <span className="text-[var(--text-4)] text-xs">Total ({leads.length} Leads)</span>
           {selectedKeys.size > 0 && (
             <button onClick={markAsCustomers} disabled={marking}
               className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
@@ -262,7 +262,7 @@ function CustomersFromRequestsTable() {
           )}
           <button onClick={fetchLeads} disabled={loading}
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-            {loading ? '…' : '↻ Refresh'}
+            {loading ? '…' : '↻'}
           </button>
         </div>
       </div>
@@ -490,7 +490,7 @@ export default function LeadsPage() {
             </button>
             <button onClick={fetchStatuses} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>
@@ -547,7 +547,7 @@ export default function LeadsPage() {
           <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
             <h2 className="font-bold text-base" style={{ color: 'var(--purple)' }}>Sub-Dealer</h2>
             <div className="flex items-center gap-3">
-              <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} leads</span>
+              <span className="text-[var(--text-4)] text-xs">Total ({filtered.length} Leads)</span>
               {selectedSubDealerIds.size > 0 && (
                 <button onClick={markSubDealersAsCustomers} disabled={markingSubDealers}
                   className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">

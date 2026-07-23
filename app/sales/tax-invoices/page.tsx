@@ -218,7 +218,7 @@ export default function TaxInvoicesPage() {
             <button onClick={fetchData} disabled={loading}
               className="px-3 py-2 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] rounded-lg border border-[var(--border)] disabled:opacity-50"
               style={mono}>
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>
@@ -237,7 +237,7 @@ export default function TaxInvoicesPage() {
           ))}
           <div className="ml-auto flex items-center gap-3">
             <div className="flex items-center gap-4 text-xs text-[var(--text-3)]">
-              <span>{totals.count} invoices</span>
+              <span>Total ({totals.count} Invoices)</span>
               <span className="text-[var(--success)]">{totals.withNPWP} with NPWP</span>
               <span className="text-[var(--warning)]">{totals.count - totals.withNPWP} without NPWP</span>
               <span style={{ color: 'var(--text-3)' }}>📎 {totals.attached} FP attached</span>
@@ -416,7 +416,7 @@ export default function TaxInvoicesPage() {
               <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                 <tr>
                   <td colSpan={7} style={{ padding: '8px 12px', ...mono, color: 'var(--text-3)', fontSize: 11, fontWeight: 600 }}>
-                    TOTAL ({filtered.length} invoices)
+                    Total Value
                   </td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>
                     {formatRp(filtered.reduce((s, i) => s + i.total, 0))}

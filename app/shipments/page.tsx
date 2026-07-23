@@ -108,8 +108,8 @@ function StatusBadge({ label, type }: { label: string; type: 'success' | 'warnin
   return <span className={'via-badge border text-xs ' + styles[type]}>{label}</span>;
 }
 
-function TableShell({ title, groupColor, count, loading, search, onSearch, extra, children }: {
-  title: string; groupColor?: string; count?: number; loading: boolean;
+function TableShell({ title, groupColor, totalLabel, loading, search, onSearch, extra, children }: {
+  title: string; groupColor?: string; totalLabel?: string; loading: boolean;
   search?: string; onSearch?: (v: string) => void;
   extra?: React.ReactNode; children: React.ReactNode;
 }) {
@@ -120,8 +120,8 @@ function TableShell({ title, groupColor, count, loading, search, onSearch, extra
           <h2 className="font-bold text-base" style={{ color: groupColor || 'var(--text)' }}>{title}</h2>
         </div>
         <div className="flex items-center gap-3">
-          {!loading && count !== undefined && (
-            <span className="text-[var(--text-4)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{count} orders</span>
+          {!loading && totalLabel && (
+            <span className="text-[var(--text-4)] text-xs">Total ({totalLabel})</span>
           )}
           {onSearch && (
             <input value={search} onChange={e => onSearch(e.target.value)}
@@ -231,7 +231,7 @@ function PendingApprovalSOTable() {
 
   return (
     <TableShell title="Pending Approval" groupColor="var(--warning)"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
+      totalLabel={`${filtered.length} SOs`} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={handleApprove} disabled={approving}
           className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
@@ -329,7 +329,7 @@ function PendingApprovalSOTable() {
             </tbody>
             <tfoot style={{ borderTop:'1px solid var(--border)', background:'var(--surface-2)' }}>
               <tr>
-                <td colSpan={8} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>TOTAL ({filtered.length} SOs)</td>
+                <td colSpan={8} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>Total Value</td>
                 <td style={{ padding:'7px 12px', textAlign:'right', ...mono, color:'var(--text)', fontWeight:700 }}>{formatRp(filtered.reduce((s,i)=>s+i.total,0))}</td>
               </tr>
             </tfoot>
@@ -410,7 +410,7 @@ function ApprovedSOTable() {
 
   return (
     <TableShell title="Approved" groupColor="var(--good)"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
+      totalLabel={`${filtered.length} SOs`} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={handleMarkConfirmed} disabled={confirming}
           className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
@@ -523,7 +523,7 @@ function ApprovedSOTable() {
             </tbody>
             <tfoot style={{ borderTop:'1px solid var(--border)', background:'var(--surface-2)' }}>
               <tr>
-                <td colSpan={8} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>TOTAL ({filtered.length} SOs)</td>
+                <td colSpan={8} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>Total Value</td>
                 <td style={{ padding:'7px 12px', textAlign:'right', ...mono, color:'var(--text)', fontWeight:700 }}>{formatRp(filtered.reduce((s,i)=>s+i.total,0))}</td>
               </tr>
             </tfoot>
@@ -615,7 +615,7 @@ function DraftSOTable() {
 
   return (
     <TableShell title="Draft" groupColor="var(--neutral)"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
+      totalLabel={`${filtered.length} Drafts`} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <div className="flex items-center gap-2">
           <CopyWAButton message={buildFollowUpMessage()} label={`Follow Up (${selected.size})`} />
@@ -744,7 +744,7 @@ function DraftSOTable() {
             <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
               <tr>
                 <td colSpan={8} style={{ padding: '7px 12px', color: 'var(--text-3)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
-                  TOTAL ({filtered.length} drafts)
+                  Total Value
                 </td>
                 <td style={{ padding: '7px 12px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: 'var(--text)', fontWeight: 700 }}>
                   {formatRp(filtered.reduce((s, i) => s + i.total, 0))}
@@ -788,7 +788,7 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
 
   return (
     <TableShell title="Confirmed — Not Packaged" groupColor="var(--serious)"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}>
+      totalLabel={`${filtered.length} Orders`} loading={loading} search={search} onSearch={setSearch}>
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
       {!loading && !error && filtered.length === 0 && <EmptyState icon="✓" msg="All confirmed orders have packages." />}
@@ -980,7 +980,7 @@ function DeliveredTable({ items, loading, error, onConverted }: {
 
   return (
     <TableShell title="Shipment Delivered — Not Invoiced" groupColor="var(--info)"
-      count={filtered.length} loading={loading} search={search} onSearch={setSearch}
+      totalLabel={`${filtered.length} Orders · ${convertible.length} Ready to Invoice`} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={() => setShowConfirm(true)} disabled={converting}
           className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
@@ -1159,7 +1159,7 @@ function DeliveredTable({ items, loading, error, onConverted }: {
             <tfoot className="border-t border-[var(--border)] bg-[var(--surface-2)]">
               <tr>
                 <td colSpan={10} className="px-3 py-2 text-[var(--text-3)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                  TOTAL ({filtered.length} orders · {convertible.length} ready to invoice)
+                  Total Value
                 </td>
                 <td className="px-3 py-2 text-right text-[var(--text)] text-xs font-medium" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
                   {formatRp(filtered.reduce((s, i) => s + i.total, 0))}
@@ -1257,7 +1257,7 @@ export default function ShipmentsPage() {
             )}
             <button onClick={fetchAll} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>

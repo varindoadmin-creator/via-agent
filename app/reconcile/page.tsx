@@ -785,7 +785,7 @@ export default function ReconcilePage() {
                 disabled={loadingRecorded}
                 className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] border border-[var(--border)] rounded-lg transition-colors disabled:opacity-50"
               >
-                {loadingRecorded ? "…" : "↻ Refresh"}
+                {loadingRecorded ? "…" : "↻"}
               </button>
             </div>
           </div>
@@ -846,7 +846,7 @@ export default function ReconcilePage() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-[var(--surface-2)] border-t border-[var(--border)]">
-                      <td colSpan={2} className="px-4 py-2 text-xs text-[var(--text-3)]">TOTAL ({group.count} rows)</td>
+                      <td colSpan={2} className="px-4 py-2 text-xs text-[var(--text-3)]">Total Value</td>
                       <td className="px-4 py-2 text-right font-mono font-semibold text-[var(--text)]">{formatRp(group.total_amount)}</td>
                       <td colSpan={2} />
                     </tr>

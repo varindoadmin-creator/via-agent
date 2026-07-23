@@ -46,6 +46,10 @@ export interface PendingDelivery {
   total: number;
   quantity: number;
   quantity_packed: number;
+  hpl_quantity: number;
+  hpl_quantity_packed: number;
+  edge_quantity: number;
+  edge_quantity_packed: number;
   delivery_method: string;
   is_full: boolean; // quantity_packed >= quantity
   location_name: string;
@@ -135,6 +139,38 @@ function getQtyStats(so: Record<string, unknown>): { qty: number; qtyPacked: num
     return { qty, qtyPacked };
   }
   return { qty: Number(so.quantity) || 0, qtyPacked: Number(so.quantity_packed) || 0 };
+}
+
+/**
+ * Same as getQtyStats, but also splits qty/packed by item category, inferred
+ * from the item name: "HPL" board items vs. "EDGE"/"NEWEDGE" banding items.
+ * Items matching neither stay out of both category buckets (they still count
+ * toward the plain qty/qtyPacked totals).
+ */
+function getQtyStatsByCategory(so: Record<string, unknown>): {
+  qty: number; qtyPacked: number;
+  hplQty: number; hplPacked: number;
+  edgeQty: number; edgePacked: number;
+} {
+  const lineItems = (so.line_items || []) as Record<string, unknown>[];
+  let qty = 0, qtyPacked = 0, hplQty = 0, hplPacked = 0, edgeQty = 0, edgePacked = 0;
+  if (lineItems.length) {
+    for (const li of lineItems) {
+      const q = Number(li.quantity) || 0;
+      const packed = li.quantity_packed !== undefined
+        ? Number(li.quantity_packed)
+        : (li.quantity_shipped !== undefined ? Number(li.quantity_shipped) : 0);
+      qty += q;
+      qtyPacked += packed;
+      const name = String(li.name || '').toUpperCase();
+      if (name.includes('HPL')) { hplQty += q; hplPacked += packed; }
+      else if (name.includes('EDGE')) { edgeQty += q; edgePacked += packed; }
+    }
+  } else {
+    qty = Number(so.quantity) || 0;
+    qtyPacked = Number(so.quantity_packed) || 0;
+  }
+  return { qty, qtyPacked, hplQty, hplPacked, edgeQty, edgePacked };
 }
 
 /**
@@ -427,7 +463,7 @@ export async function GET(request: NextRequest) {
           const invoicedStatus = String(so.invoiced_status || '');
           if (invoicedStatus === 'invoiced') continue;
 
-          const { qty, qtyPacked } = getQtyStats(so);
+          const { qty, qtyPacked, hplQty, hplPacked, edgeQty, edgePacked } = getQtyStatsByCategory(so);
           const isFull = qty > 0 && qtyPacked >= qty;
 
           const packageRows = pkgs.map(p => {
@@ -455,6 +491,10 @@ export async function GET(request: NextRequest) {
             total: Number(so.total) || 0,
             quantity: qty,
             quantity_packed: qtyPacked,
+            hpl_quantity: hplQty,
+            hpl_quantity_packed: hplPacked,
+            edge_quantity: edgeQty,
+            edge_quantity_packed: edgePacked,
             delivery_method: String(so.delivery_method || ''),
             is_full: isFull,
             location_name: extractLineItemLocation(so),

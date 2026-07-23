@@ -469,7 +469,7 @@ export default function InvoicesPage() {
             {lastRefreshed && <span className="text-[var(--text-4)] text-xs" style={mono}>Updated {lastRefreshed}</span>}
             <button onClick={fetchAll} disabled={loading}
               className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-              {loading ? '…' : '↻ Refresh'}
+              {loading ? '…' : '↻'}
             </button>
           </div>
         </div>
@@ -512,7 +512,7 @@ export default function InvoicesPage() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-[var(--text-4)] text-xs" style={mono}>{draftInvoices.length} invoices</span>
+              <span className="text-[var(--text-4)] text-xs">Total ({draftInvoices.length} Invoices)</span>
               {selected.size > 0 && (
                 <button onClick={() => setShowConfirm(true)} disabled={converting}
                   className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
@@ -580,7 +580,7 @@ export default function InvoicesPage() {
                 </tbody>
                 <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                   <tr>
-                    <td colSpan={8} style={{ padding: '7px 12px', ...mono, color: 'var(--text-3)', fontSize: 11 }}>TOTAL</td>
+                    <td colSpan={8} style={{ padding: '7px 12px', ...mono, color: 'var(--text-3)', fontSize: 11 }}>Total Value</td>
                     <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontWeight: 600 }}>
                       {formatRp(draftInvoices.reduce((s, i) => s + i.total, 0))}
                     </td>
@@ -612,7 +612,7 @@ export default function InvoicesPage() {
                   {exportingPDF ? 'Exporting…' : '↓ Export PDF (' + selectedOverdue.size + ')'}
                 </button>
               )}
-              <span className="text-[var(--text-4)] text-xs" style={mono}>{filteredOverdue.length} invoices</span>
+              <span className="text-[var(--text-4)] text-xs">Total ({filteredOverdue.length} Invoices)</span>
             </div>
           </div>
 
@@ -714,7 +714,7 @@ export default function InvoicesPage() {
                 <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                   <tr>
                     <td colSpan={6} style={{ padding: '7px 12px', ...mono, color: 'var(--text-3)', fontSize: 11 }}>
-                      TOTAL OVERDUE ({filteredOverdue.length} invoices)
+                      Total Balance Due
                     </td>
                     <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--danger)', fontWeight: 700 }}>
                       {formatRp(filteredOverdue.reduce((s, i) => s + i.balance, 0))}

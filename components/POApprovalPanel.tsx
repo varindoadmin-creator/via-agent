@@ -151,7 +151,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
             <div>
               <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Purchase Order Approval</h1>
             </div>
-            <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻ Refresh</button>
+            <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', borderRadius: 8, padding: '9px 14px', fontSize: 12, cursor: 'pointer' }}>↻</button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -181,6 +181,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
             <div style={{ color: 'var(--text-4)', fontSize: 11 }}>POs awaiting approval — matched against SO demand and stock, tick to approve</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: 'var(--text-4)', fontSize: 12 }}>Total ({filtered.length} POs)</span>
             {compact && (
               <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', borderRadius: 8, padding: '8px 12px', fontSize: 11, cursor: 'pointer' }}>↻</button>
             )}
