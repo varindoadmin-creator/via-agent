@@ -605,7 +605,7 @@ export async function approvePurchaseOrders(purchaseorderIds: string[], approved
       ));
       await Promise.all(matchedSOIds.map(async soId => {
         try {
-          await zohoRequest(`/salesorders/${soId}/status/${SO_SUB_STATUS_ORDERED}`, { method: 'POST', body: {} });
+          await zohoRequest(`/salesorders/${soId}/substatus/${SO_SUB_STATUS_ORDERED}`, { method: 'POST', body: {} });
         } catch (e) {
           console.warn(`[PO Approval] Failed to mark SO ${soId} as Ordered:`, e);
         }
