@@ -36,6 +36,7 @@ export async function sendMail(opts: {
   to: string;
   subject: string;
   text?: string;
+  html?: string;
   attachments?: MailAttachment[];
 }) {
   const user = process.env.SMTP_USER;
@@ -44,6 +45,7 @@ export async function sendMail(opts: {
     to: opts.to,
     subject: opts.subject,
     text: opts.text,
+    html: opts.html,
     attachments: opts.attachments,
   });
 }

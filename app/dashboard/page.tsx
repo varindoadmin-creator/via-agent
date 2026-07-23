@@ -20,6 +20,51 @@ type DailyBriefDay = {
 
 const formatRp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
+type PurchaseGapSO = { salesorder_id: string; salesorder_number: string; customer_name: string; total: number; confirmed_at: string; sub_status_formatted: string };
+
+function PurchaseGapAlert() {
+  const [gaps, setGaps] = useState<PurchaseGapSO[] | null>(null);
+
+  async function load() {
+    try {
+      const res = await fetch('/api/salesorders/purchase-gap-check', { cache: 'no-store' });
+      const json = await res.json();
+      if (json.success) setGaps(json.gaps || []);
+    } catch {
+      // Silent — this is a supplementary alert, the daily email is the reliable channel.
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  if (!gaps || gaps.length === 0) return null;
+
+  return (
+    <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>
+          ⚠ {gaps.length} Confirmed SO{gaps.length === 1 ? '' : 's'} not Ordered today
+        </h2>
+        <button onClick={load} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>↻</button>
+      </div>
+      <div className="text-xs mb-2" style={{ color: 'var(--text-2)' }}>
+        Confirmed today but no Purchase Order has been placed yet — Admin may have forgotten.
+      </div>
+      <div className="space-y-1">
+        {gaps.map(g => (
+          <div key={g.salesorder_id} className="flex items-center justify-between text-xs py-1" style={{ borderTop: '1px solid var(--border)' }}>
+            <span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-text)', fontWeight: 500 }}>{g.salesorder_number}</span>
+              {' — '}{g.customer_name || '(unnamed)'}
+            </span>
+            <span style={{ color: 'var(--muted)' }}>{formatRp(g.total)} · {g.sub_status_formatted}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CategorySection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
   if (count === 0) return null;
   return (
@@ -245,6 +290,52 @@ function DailyBriefPanel() {
   );
 }
 
+type AgingPackage = { package_id: string; package_number: string; salesorder_id: string; salesorder_number: string; customer_name: string; date: string; days_aging: number; tracking_number: string; carrier: string };
+
+function ShipmentAgingAlert() {
+  const [packages, setPackages] = useState<AgingPackage[] | null>(null);
+
+  async function load() {
+    try {
+      const res = await fetch('/api/shipments/aging-check', { cache: 'no-store' });
+      const json = await res.json();
+      if (json.success) setPackages(json.packages || []);
+    } catch {
+      // Silent — this is a supplementary alert, the daily email is the reliable channel.
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  if (!packages || packages.length === 0) return null;
+
+  return (
+    <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>
+          ⚠ {packages.length} shipment{packages.length === 1 ? '' : 's'} stuck Not Shipped
+        </h2>
+        <button onClick={load} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>↻</button>
+      </div>
+      <div className="text-xs mb-2" style={{ color: 'var(--text-2)' }}>
+        Packed a day or more ago but still "Not Shipped" in Zoho — likely failed to actually go out.
+      </div>
+      <div className="space-y-1">
+        {packages.map(p => (
+          <div key={p.package_id} className="flex items-center justify-between text-xs py-1" style={{ borderTop: '1px solid var(--border)' }}>
+            <span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-text)', fontWeight: 500 }}>{p.salesorder_number || '—'}</span>
+              {' — '}{p.customer_name || '(unnamed)'}
+              {' · '}<span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{p.package_number}</span>
+            </span>
+            <span style={{ color: 'var(--muted)' }}>{p.days_aging} day{p.days_aging === 1 ? '' : 's'} · {p.carrier || 'no carrier'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
@@ -255,6 +346,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <PurchaseGapAlert />
+        <ShipmentAgingAlert />
         <DailyBriefPanel />
       </div>
     </div>
