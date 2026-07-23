@@ -308,7 +308,7 @@ export default function TaxInvoicesPage() {
 
         {/* Table */}
         <div className="via-card overflow-hidden">
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr>
                 <th style={{ ...thStyle, width: 40 }}>

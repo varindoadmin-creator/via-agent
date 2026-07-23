@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Landmark, Truck,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Landmark, Truck, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -27,6 +27,7 @@ interface NavSection {
 
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
   { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Home' }, hidden: true },
+  { type: 'standalone', item: { id: 'sidekick', href: '/sidekick', icon: Sparkles, label: 'Sidekick' }, hidden: true },
   { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
   {
     type: 'section',

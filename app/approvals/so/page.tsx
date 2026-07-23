@@ -220,7 +220,7 @@ export default function SOApprovalCheckPage() {
         </div>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
@@ -253,11 +253,11 @@ export default function SOApprovalCheckPage() {
               return (
                 <Fragment key={so.salesorder_id}>
                   <tr key={so.salesorder_id} onClick={() => toggle(so)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-2)' }}>
-                    <td style={{ padding: '12px' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
-                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 12 }}>{so.salesorder_number}</td>
-                    <td style={{ padding: '12px', fontWeight: 600 }}>{so.customer_name}</td>
-                    <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{so.date}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700 }}>{formatRp(so.total)}</td>
+                    <td style={{ padding: '12px', borderLeft: `4px solid ${group.color}` }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
+                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 13 }}>{so.salesorder_number}</td>
+                    <td style={{ padding: '12px', fontWeight: 600, fontSize: 14 }}>{so.customer_name}</td>
+                    <td style={{ padding: '12px', ...mono, fontSize: 13 }}>{so.date}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700, fontSize: 14 }}>{formatRp(so.total)}</td>
                     <td style={{ padding: '6px 8px' }}><Badge value={result?.overall_status} size="cell" /></td>
                   </tr>
 

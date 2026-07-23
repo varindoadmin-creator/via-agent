@@ -590,8 +590,8 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
       )}
 
       {!loading && filtered.length > 0 && (
-        <div className="overflow-x-auto">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div className="overflow-x-auto" style={{ borderLeft: `4px solid ${groupColor}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr>
                 <th style={{ ...thStyle, width: 36 }}>

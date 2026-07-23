@@ -552,8 +552,8 @@ export default function InvoicesPage() {
           )}
 
           {!loading && draftInvoices.length > 0 && (
-            <div className="overflow-x-auto">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <div className="overflow-x-auto" style={{ borderLeft: '4px solid var(--neutral)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, width: 36 }}>
@@ -639,7 +639,7 @@ export default function InvoicesPage() {
 
           {!loading && filteredOverdue.length > 0 && (
             <div className="overflow-x-auto">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                 <thead>
                   <tr>
                     <th style={thStyle}><SortHeader label="Invoice No." sortKey="invoice_number" active={overdueSort.key==='invoice_number'} dir={overdueSort.dir} onSort={handleOverdueSort} /></th>
@@ -683,14 +683,14 @@ export default function InvoicesPage() {
                           )}
                           <tr key={inv.invoice_id} style={{ borderBottom: '1px solid var(--border-muted)' }}
                             className="hover:bg-[var(--surface-2)] transition-colors">
-                            <td style={{ padding: '8px 12px', ...mono, fontSize: 12, color: 'var(--accent-text)', fontWeight: 500 }}>{inv.invoice_number}</td>
-                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
-                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.date}</td>
-                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.due_date}</td>
+                            <td style={{ padding: '8px 12px', borderLeft: `4px solid ${bucket.color}`, ...mono, fontSize: 13, color: 'var(--accent-text)', fontWeight: 500 }}>{inv.invoice_number}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{inv.date}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{inv.due_date}</td>
                             <td style={{ padding: '4px 8px' }}><OverdueBadge days={inv.days_overdue} /></td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 12, color: 'var(--text-2)' }}>{formatRp(inv.total)}</td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700, color: 'var(--danger)' }}>{formatRp(inv.balance)}</td>
-                            <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-3)' }}>{inv.salesperson_name || '—'}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 13, color: 'var(--text-2)' }}>{formatRp(inv.total)}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 13, fontWeight: 700, color: 'var(--danger)' }}>{formatRp(inv.balance)}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.salesperson_name || '—'}</td>
                             <td style={{ padding: '8px 12px', width: 40, textAlign: 'center' }}
                               onClick={function(e) { e.stopPropagation(); }}>
                               <input type="checkbox" className="w-3.5 h-3.5 rounded"

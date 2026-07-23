@@ -250,7 +250,7 @@ function CustomersFromRequestsTable() {
     <div className="via-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">Leads</h2>
+          <h2 className="font-bold text-base" style={{ color: 'var(--info)' }}>Leads</h2>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[var(--text-4)] text-xs" style={mono}>{leads.length} leads</span>
@@ -279,8 +279,8 @@ function CustomersFromRequestsTable() {
       )}
 
       {!error && leads.length > 0 && (
-        <div className="overflow-x-auto">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div className="overflow-x-auto" style={{ borderLeft: '4px solid var(--info)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr>
                 <th style={{ ...thStyle, width: 36 }}>
@@ -545,7 +545,7 @@ export default function LeadsPage() {
         {/* Table */}
         <div className="via-card overflow-hidden mb-5">
           <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-            <h2 className="text-[var(--text)] font-semibold text-sm">Sub-Dealer</h2>
+            <h2 className="font-bold text-base" style={{ color: 'var(--purple)' }}>Sub-Dealer</h2>
             <div className="flex items-center gap-3">
               <span className="text-[var(--text-4)] text-xs" style={mono}>{filtered.length} leads</span>
               {selectedSubDealerIds.size > 0 && (
@@ -567,8 +567,8 @@ export default function LeadsPage() {
               <div className="text-[var(--text-3)] text-sm">No leads match your filters.</div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <div className="overflow-x-auto" style={{ borderLeft: '4px solid var(--purple)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, width: 36 }}>

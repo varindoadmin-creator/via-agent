@@ -303,6 +303,7 @@ function POTable({
         </div>
       </div>
 
+      <div style={groupColor ? { borderLeft: `4px solid ${groupColor}` } : undefined}>
       {loading && (
         <div className="p-5 space-y-2">
           {[...Array(3)].map((_, i) => (
@@ -325,7 +326,7 @@ function POTable({
 
       {!loading && filtered.length > 0 && (
         <div className="overflow-x-auto">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr>
                 {selectable && (
@@ -382,6 +383,7 @@ function POTable({
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -831,6 +833,7 @@ function ReceivedNotBilledTable({ onRefresh }: { onRefresh: () => void }) {
           ))}
         </div>
       )}
+      <div style={{ borderLeft: '4px solid var(--serious)' }}>
       <table className="via-table">
         <thead><tr>
           <th className="w-8"><input type="checkbox" className="w-3.5 h-3.5 rounded"
@@ -856,6 +859,7 @@ function ReceivedNotBilledTable({ onRefresh }: { onRefresh: () => void }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

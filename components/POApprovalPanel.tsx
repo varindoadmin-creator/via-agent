@@ -189,7 +189,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
         </div>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', minWidth: 780, borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', minWidth: 780, borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
@@ -222,12 +222,12 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
               return (
                 <Fragment key={po.purchaseorder_id}>
                   <tr onClick={() => toggle(po.purchaseorder_id)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-2)' }}>
-                    <td style={{ padding: '12px' }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
-                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 12 }}>{po.purchaseorder_number}</td>
-                    <td style={{ padding: '12px', fontWeight: 600 }}>{po.vendor_name}</td>
-                    <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{po.date}</td>
-                    <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{po.location_name}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700 }}>{formatRp(po.total)}</td>
+                    <td style={{ padding: '12px', borderLeft: `4px solid ${group.color}` }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
+                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 13 }}>{po.purchaseorder_number}</td>
+                    <td style={{ padding: '12px', fontWeight: 600, fontSize: 14 }}>{po.vendor_name}</td>
+                    <td style={{ padding: '12px', ...mono, fontSize: 13 }}>{po.date}</td>
+                    <td style={{ padding: '12px', ...mono, fontSize: 13 }}>{po.location_name}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700, fontSize: 14 }}>{formatRp(po.total)}</td>
                     <td style={{ padding: '6px 8px' }}><Badge value={po.status} size="cell" /></td>
                   </tr>
 

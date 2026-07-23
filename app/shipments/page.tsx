@@ -130,7 +130,9 @@ function TableShell({ title, groupColor, count, loading, search, onSearch, extra
           {extra}
         </div>
       </div>
-      {children}
+      <div style={groupColor ? { borderLeft: `4px solid ${groupColor}` } : undefined}>
+        {children}
+      </div>
     </div>
   );
 }

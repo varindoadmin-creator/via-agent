@@ -189,7 +189,7 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
 .via-badge-accent   { background: var(--purple);   color: var(--purple-text);   }
 
 /* ─── Tables (Zoho: white bg, uppercase gray headers, subtle row borders) ───── */
-.via-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.via-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .via-table th {
   text-align: left; padding: 9px 12px;
   background: var(--surface-2); color: var(--text-3);

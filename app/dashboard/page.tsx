@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ChatInterface from '@/components/ChatInterface';
 
 type DailyBriefChange = { field: string; from: string; to: string };
 type DailyBriefCustomer = { contact_id: string; contact_name: string; changes: DailyBriefChange[]; fixed_at: string };
@@ -257,10 +256,6 @@ export default function DashboardPage() {
         </div>
 
         <DailyBriefPanel />
-
-        <div style={{ minHeight: 'min(620px, 70dvh)', overflow: 'hidden', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--panel)' }}>
-          <ChatInterface />
-        </div>
       </div>
     </div>
   );
