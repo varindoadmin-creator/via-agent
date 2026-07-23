@@ -54,9 +54,24 @@ function monthLabel(key: string) {
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }
 
+// ─── In-memory response cache ──────────────────────────────────────────────────
+// This route pages through every active contact plus every SO/invoice from the
+// last 12 months (up to 8,000 records each, fetched in parallel) just to build
+// monthly aggregates that don't change within a day. Uncached, every Customers
+// page load re-runs the full Zoho fetch — cheap for one visit, but the process
+// went dark for ~20h on 2026-07-23 right after this route shipped, on a host
+// capped at 3GB RAM, so a short cache trades a bit of staleness for not redoing
+// this work on every page view.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+let cache: { points: unknown; expiresAt: number } | null = null;
+
 // ─── GET /api/customers/trends ─────────────────────────────────────────────────
 
 export async function GET() {
+  if (cache && cache.expiresAt > Date.now()) {
+    return NextResponse.json({ success: true, points: cache.points });
+  }
+
   try {
     await getZohoAccessToken();
 
@@ -102,6 +117,7 @@ export async function GET() {
       };
     });
 
+    cache = { points, expiresAt: Date.now() + CACHE_TTL_MS };
     return NextResponse.json({ success: true, points });
 
   } catch (err) {
