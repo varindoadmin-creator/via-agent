@@ -496,7 +496,7 @@ function ReceiveItemsModal({ poId, onClose, onDone }: {
         </div>
 
         <div className="overflow-y-auto flex-1 px-5 py-4">
-          {loading && <div className="text-[var(--text-3)] text-sm animate-pulse">Loading PO details…</div>}
+          {loading && <div className="text-[var(--text-3)] text-sm animate-pulse">Loading…</div>}
           {error && <div className="p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs mb-4">{error}</div>}
 
           {result && (
@@ -920,7 +920,7 @@ export default function PurchasesPage() {
         {/* Search */}
         <div className="flex items-center gap-3 mb-5">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search PO number, vendor, SO number, item, customer…"
+            placeholder="Search…"
             className="via-input text-xs py-1.5 px-3 w-80" />
         </div>
 

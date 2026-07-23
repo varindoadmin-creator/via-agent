@@ -288,7 +288,7 @@ export default function GoodsCollectionMemoPage() {
               </span>
             </label>
             {loading ? (
-              <div className="text-[var(--text-4)] text-xs py-3">Loading issued Purchase Orders...</div>
+              <div className="text-[var(--text-4)] text-xs py-3">Loading…</div>
             ) : eligiblePOs.length === 0 ? (
               <div className="text-[var(--text-4)] text-xs py-3">No POs within the last 7 days.</div>
             ) : (

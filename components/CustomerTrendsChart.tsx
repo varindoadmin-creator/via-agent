@@ -85,7 +85,7 @@ export default function CustomerTrendsChart() {
   if (loading) {
     return (
       <div className="via-card px-4 py-3 mb-5">
-        <div className="text-[var(--text-3)] text-xs">Loading customer trend…</div>
+        <div className="text-[var(--text-3)] text-xs">Loading…</div>
       </div>
     );
   }

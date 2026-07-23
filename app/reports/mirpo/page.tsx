@@ -409,7 +409,7 @@ export default function MirpoAnalysisPage() {
                           <td className="py-2">
                             <div className="text-[var(--text)] font-medium">{i.sku || i.name}</div>
                             <div className="text-[var(--text-4)]">{i.name}</div>
-                            <div className="text-[var(--text-4)]">{i.purchaseorder_number}</div>
+                            <div className="text-[var(--accent-text)] font-medium">{i.purchaseorder_number}</div>
                           </td>
                           <td className="py-2 text-right" style={mono}>{fQty(i.remaining)}</td>
                           <td className="py-2 text-right" style={mono}>{fRp(i.inventory_value_remaining || 0)}</td>
@@ -604,7 +604,7 @@ export default function MirpoAnalysisPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading && <tr><td colSpan={10} className="p-6 text-center text-[var(--text-4)]">Loading MIRPO analysis…</td></tr>}
+                  {loading && <tr><td colSpan={10} className="p-6 text-center text-[var(--text-4)]">Loading…</td></tr>}
                   {!loading && rows.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-[var(--text-4)]">No MIRPO PO found. Put MIRPO in the PO reference field.</td></tr>}
                   {rows.map(row => (
                     <Fragment key={row.purchaseorder_id}>
@@ -612,7 +612,7 @@ export default function MirpoAnalysisPage() {
                         className="cursor-pointer hover:bg-[var(--surface-2)] border-b border-[var(--border)]">
                         <td className="p-3">
                           <span className="text-[var(--accent)] mr-1.5">{expanded === row.purchaseorder_id ? '−' : '+'}</span>
-                          <span className="font-semibold text-[var(--text)]">{row.purchaseorder_number}</span>
+                          <span className="font-medium text-[var(--accent-text)]">{row.purchaseorder_number}</span>
                           <div className="text-[var(--text-4)] text-xs">Ref: {row.reference_number || 'MIRPO'}</div>
                         </td>
                         <td className="p-3 text-[var(--text-3)]" style={mono}>{row.date}</td>
@@ -695,7 +695,7 @@ export default function MirpoAnalysisPage() {
                 <div>
                   <label className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-1 block">SKU / Name</label>
                   <input value={filterSku} onChange={e => setFilterSku(e.target.value)}
-                    placeholder="Search SKU or name…"
+                    placeholder="Search…"
                     className="w-full px-3 py-2 text-xs bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--text)] placeholder:text-[var(--text-4)] outline-none focus:border-[var(--accent)]" />
                 </div>
                 <div>
@@ -753,8 +753,8 @@ export default function MirpoAnalysisPage() {
                           <div className="text-[var(--text)] font-medium">{i.sku || i.name}</div>
                           <div className="text-[var(--text-4)]">{i.name}</div>
                         </td>
-                        <td className="p-3 text-[var(--text-3)]" style={mono}>
-                          <div>{i.purchaseorder_number}</div>
+                        <td className="p-3" style={mono}>
+                          <div className="text-[var(--accent-text)] font-medium">{i.purchaseorder_number}</div>
                           <div className="text-[var(--text-4)]">{i.po_date}</div>
                         </td>
                         <td className="p-3"><StatusBadge status={i.stock_status} /></td>

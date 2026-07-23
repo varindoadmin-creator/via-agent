@@ -535,8 +535,8 @@ export async function GET(request: NextRequest) {
         paid_only: paidOnly,
         include_details: includeDetails,
         basis: paidOnly
-          ? "Paid invoices with assigned Sales Person only. Revenue before PPN minus Purchase Rate × quantity invoiced."
-          : "All invoices with assigned Sales Person only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
+          ? "Paid invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced."
+          : "All invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
         tiers: [
           { min_gp: 0, max_gp: 25_000_000, rate: 0.1 },
           { min_gp: 25_000_000, max_gp: 50_000_000, rate: 0.15 },

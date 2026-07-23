@@ -225,7 +225,7 @@ export default function CommissionReportPage() {
           <div>
             <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Sales Commission</h1>
             <p className="text-[var(--text-3)] text-sm mt-0.5">
-              {dateRange || 'Loading date range…'} · Paid invoices only · GP before PPN
+              {dateRange || 'Loading…'} · Paid invoices only · GP before PPN
             </p>
           </div>
           <button onClick={fetchData} disabled={loading}
@@ -263,7 +263,7 @@ export default function CommissionReportPage() {
             Tier rules: paid monthly GP &lt; Rp25m = 10%, Rp25m–&lt;Rp50m = 15%, Rp50m+ = 20%.
           </div>
           <div className="ml-auto">
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search salesperson…" className="via-input text-xs py-1.5 px-3 w-56" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="via-input text-xs py-1.5 px-3 w-56" />
           </div>
         </div>
 
@@ -278,7 +278,7 @@ export default function CommissionReportPage() {
             <thead>
               <tr>
                 <th style={{ ...thStyle, width: 40, textAlign: 'center' }}>#</th>
-                <th style={thStyle} onClick={() => handleSort('name')}>Sales Person <SortIcon active={sortKey === 'name'} dir={sortDir} /></th>
+                <th style={thStyle} onClick={() => handleSort('name')}>Salesperson <SortIcon active={sortKey === 'name'} dir={sortDir} /></th>
                 <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => handleSort('amount')}>Paid Revenue <SortIcon active={sortKey === 'amount'} dir={sortDir} /></th>
                 <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => handleSort('cost')}>Cost <SortIcon active={sortKey === 'cost'} dir={sortDir} /></th>
                 <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => handleSort('gross_profit')}>Gross Profit <SortIcon active={sortKey === 'gross_profit'} dir={sortDir} /></th>
@@ -342,7 +342,7 @@ export default function CommissionReportPage() {
                               {row.invoices.map(inv => (
                                 <tr key={inv.invoice_id} style={{ borderBottom: '1px solid var(--border-muted)' }}>
                                   <td style={{ padding: '10px 12px', verticalAlign: 'top', minWidth: 130 }}>
-                                    <div className="text-[var(--text)] text-xs font-semibold">{inv.invoice_number}</div>
+                                    <div className="text-[var(--accent-text)] text-xs font-medium">{inv.invoice_number}</div>
                                     <div className="text-[var(--text-4)] text-[10px]">{inv.date}</div>
                                     <div className="text-[var(--success)] text-[10px] mt-1">Paid</div>
                                   </td>

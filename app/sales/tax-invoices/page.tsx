@@ -243,7 +243,7 @@ export default function TaxInvoicesPage() {
               <span style={{ color: 'var(--text-3)' }}>📎 {totals.attached} FP attached</span>
             </div>
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search invoice, customer, NPWP…"
+              placeholder="Search…"
               className="via-input text-xs py-1.5 px-3 w-56" />
           </div>
         </div>

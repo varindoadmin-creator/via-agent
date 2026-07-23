@@ -218,25 +218,25 @@ export default function SOApprovalCheckPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ color: 'var(--text-4)', fontSize: 12 }}>Total ({filtered.length} SOs)</span>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO/customer..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
           </div>
         </div>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
-            <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
+            <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>SO NUMBER</th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>CUSTOMER</th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>DATE</th>
-              <th style={{ padding: '11px 12px', textAlign: 'right' }}>TOTAL</th>
-              <th style={{ padding: '11px 12px', textAlign: 'center' }}>AI STATUS</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>SO Number</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>Customer</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>Date</th>
+              <th style={{ padding: '11px 12px', textAlign: 'right' }}>Total</th>
+              <th style={{ padding: '11px 12px', textAlign: 'center' }}>AI Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading pending approval SOs...</td></tr>
+              <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>No Pending Approval Sales Orders found.</td></tr>
             ) : GROUP_ORDER.flatMap(groupKey => {
@@ -257,7 +257,7 @@ export default function SOApprovalCheckPage() {
                 <Fragment key={so.salesorder_id}>
                   <tr key={so.salesorder_id} onClick={() => toggle(so)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-2)' }}>
                     <td style={{ padding: '12px', borderLeft: `4px solid ${group.color}` }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
-                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 13 }}>{so.salesorder_number}</td>
+                    <td style={{ padding: '12px', ...mono, color: 'var(--accent-text)', fontWeight: 500, fontSize: 13 }}>{so.salesorder_number}</td>
                     <td style={{ padding: '12px', fontWeight: 600, fontSize: 14 }}>{so.customer_name}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 13 }}>{so.date}</td>
                     <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700, fontSize: 14 }}>{formatRp(so.total)}</td>
@@ -271,10 +271,10 @@ export default function SOApprovalCheckPage() {
                           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
                             <div>
                               <h3 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: 15 }}>Item Details</h3>
-                              {!detail || busyId === so.salesorder_id && !detail ? <div style={{ color: 'var(--text-3)' }}>Loading SO detail...</div> : (
+                              {!detail || busyId === so.salesorder_id && !detail ? <div style={{ color: 'var(--text-3)' }}>Loading…</div> : (
                                 <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                                 <table style={{ width: '100%', minWidth: 420, borderCollapse: 'collapse' }}>
-                                  <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 9, textAlign: 'left' }}>ITEM</th><th style={{ padding: 9, textAlign: 'left' }}>SKU</th><th style={{ padding: 9, textAlign: 'right' }}>QTY</th><th style={{ padding: 9, textAlign: 'right' }}>RATE</th></tr></thead>
+                                  <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}><th style={{ padding: 9, textAlign: 'left' }}>Item</th><th style={{ padding: 9, textAlign: 'left' }}>SKU</th><th style={{ padding: 9, textAlign: 'right' }}>Qty</th><th style={{ padding: 9, textAlign: 'right' }}>Rate</th></tr></thead>
                                   <tbody>{detail.line_items.map((li, idx) => <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 9 }}>{li.name}</td><td style={{ padding: 9, ...mono, fontSize: 11 }}>{li.sku}</td><td style={{ padding: 9, textAlign: 'right', ...mono }}>{fmt(li.quantity)} {li.unit}</td><td style={{ padding: 9, textAlign: 'right', ...mono }}>{formatRp(li.rate)}</td></tr>)}</tbody>
                                 </table>
                                 </div>
@@ -369,7 +369,7 @@ export default function SOApprovalCheckPage() {
 
                               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                               <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
-                                <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 10, textAlign: 'left' }}>SO ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>SO QTY</th><th style={{ padding: 10, textAlign: 'left' }}>PROOF ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>PROOF QTY</th><th style={{ padding: 10, textAlign: 'center' }}>STATUS</th><th style={{ padding: 10, textAlign: 'left' }}>NOTES</th></tr></thead>
+                                <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}><th style={{ padding: 10, textAlign: 'left' }}>SO Item</th><th style={{ padding: 10, textAlign: 'right' }}>SO Qty</th><th style={{ padding: 10, textAlign: 'left' }}>Proof Item</th><th style={{ padding: 10, textAlign: 'right' }}>Proof Qty</th><th style={{ padding: 10, textAlign: 'center' }}>Status</th><th style={{ padding: 10, textAlign: 'left' }}>Notes</th></tr></thead>
                                 <tbody>{(result.comparison || []).map((row, idx) => <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 10 }}>{row.so_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.so_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.so_qty}</td><td style={{ padding: 10 }}>{row.proof_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.proof_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.proof_qty ?? '—'}</td><td style={{ padding: '5px 6px' }}><Badge value={row.status} size="cell" /></td><td style={{ padding: 10, color: 'var(--text-3)', fontSize: 12 }}>{row.notes}</td></tr>)}</tbody>
                               </table>
                               </div>

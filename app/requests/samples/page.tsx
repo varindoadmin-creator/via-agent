@@ -315,7 +315,7 @@ export default function SampleRequestsPage() {
 
         <div className="mb-4">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search name, phone, address, sample code…"
+            placeholder="Search…"
             className="via-input text-xs py-1.5 px-3 w-72" />
         </div>
 

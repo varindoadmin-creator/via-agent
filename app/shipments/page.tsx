@@ -1109,7 +1109,7 @@ function DeliveredTable({ items, loading, error, onConverted }: {
                               Items
                             </div>
                             {loadingLines.has(item.salesorder_id) ? (
-                              <div className="text-[var(--text-4)] text-xs">Loading items…</div>
+                              <div className="text-[var(--text-4)] text-xs">Loading…</div>
                             ) : soLineItems[item.salesorder_id] ? (
                               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                                 <thead>

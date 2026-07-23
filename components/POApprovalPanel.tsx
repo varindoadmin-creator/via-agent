@@ -185,26 +185,26 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
             {compact && (
               <button onClick={load} disabled={loading} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', borderRadius: 8, padding: '8px 12px', fontSize: 11, cursor: 'pointer' }}>↻</button>
             )}
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search PO/vendor..." style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)', padding: '9px 12px', borderRadius: 8, width: 230, outline: 'none' }} />
           </div>
         </div>
 
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <table style={{ width: '100%', minWidth: 780, borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
-            <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
+            <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               <th style={{ width: 44, padding: '11px 12px', textAlign: 'left' }}></th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>PO NUMBER</th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>VENDOR</th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>DATE</th>
-              <th style={{ padding: '11px 12px', textAlign: 'left' }}>WAREHOUSE</th>
-              <th style={{ padding: '11px 12px', textAlign: 'right' }}>TOTAL</th>
-              <th style={{ padding: '11px 12px', textAlign: 'center' }}>STATUS</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>PO Number</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>Vendor</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>Date</th>
+              <th style={{ padding: '11px 12px', textAlign: 'left' }}>Warehouse</th>
+              <th style={{ padding: '11px 12px', textAlign: 'right' }}>Total</th>
+              <th style={{ padding: '11px 12px', textAlign: 'center' }}>Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading pending approval POs...</td></tr>
+              <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>No Pending Approval Purchase Orders found.</td></tr>
             ) : PO_GROUP_ORDER.flatMap(statusKey => {
@@ -224,7 +224,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                 <Fragment key={po.purchaseorder_id}>
                   <tr onClick={() => toggle(po.purchaseorder_id)} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-2)' }}>
                     <td style={{ padding: '12px', borderLeft: `4px solid ${group.color}` }}><span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: '50%', background: isOpen ? 'var(--accent-light)' : 'var(--surface-3)', color: isOpen ? 'var(--accent)' : 'var(--text-3)', fontSize: 11 }}>{isOpen ? '⌄' : '›'}</span></td>
-                    <td style={{ padding: '12px', ...mono, color: 'var(--text)', fontSize: 13 }}>{po.purchaseorder_number}</td>
+                    <td style={{ padding: '12px', ...mono, color: 'var(--accent-text)', fontWeight: 500, fontSize: 13 }}>{po.purchaseorder_number}</td>
                     <td style={{ padding: '12px', fontWeight: 600, fontSize: 14 }}>{po.vendor_name}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 13 }}>{po.date}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 13 }}>{po.location_name}</td>
@@ -279,14 +279,14 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                           <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                           <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
                             <thead>
-                              <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}>
-                                <th style={{ padding: 9, textAlign: 'left' }}>ITEM</th>
-                                <th style={{ padding: 9, textAlign: 'left' }}>LOCATION</th>
-                                <th style={{ padding: 9, textAlign: 'right' }}>STOCK ON HAND</th>
-                                <th style={{ padding: 9, textAlign: 'right' }}>PO QTY</th>
-                                <th style={{ padding: 9, textAlign: 'left' }}>MATCHED SO(s)</th>
-                                <th style={{ padding: 9, textAlign: 'right' }}>EXCESS QTY</th>
-                                <th style={{ padding: 9, textAlign: 'center' }}>STATUS</th>
+                              <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                <th style={{ padding: 9, textAlign: 'left' }}>Item</th>
+                                <th style={{ padding: 9, textAlign: 'left' }}>Location</th>
+                                <th style={{ padding: 9, textAlign: 'right' }}>Stock on Hand</th>
+                                <th style={{ padding: 9, textAlign: 'right' }}>PO Qty</th>
+                                <th style={{ padding: 9, textAlign: 'left' }}>Matched SO(s)</th>
+                                <th style={{ padding: 9, textAlign: 'right' }}>Excess Qty</th>
+                                <th style={{ padding: 9, textAlign: 'center' }}>Status</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -299,7 +299,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                                   <td style={{ padding: 9 }}>
                                     {li.matches.length === 0 ? <span style={{ color: 'var(--text-4)' }}>—</span> : li.matches.map((m, i) => (
                                       <div key={i} style={{ fontSize: 12 }}>
-                                        <span style={mono}>{m.salesorder_number}</span> {m.customer_name}
+                                        <span style={{ ...mono, color: 'var(--accent-text)', fontWeight: 500 }}>{m.salesorder_number}</span> {m.customer_name}
                                         {m.customer_region && <span style={{ color: 'var(--text-4)' }}> ({m.customer_region})</span>}
                                         <span style={{ ...mono, color: 'var(--text-3)' }}> — {fmt(m.fulfilled_qty)} of {fmt(m.so_quantity)} {li.unit} SO qty</span>
                                         {!m.fully_covered && <span style={{ color: 'var(--warning)' }}> (remainder still needed)</span>}
@@ -335,12 +335,12 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10, letterSpacing: '0.08em' }}>
-                <th style={{ padding: '10px 12px', textAlign: 'left' }}>ITEM</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left' }}>LOCATION</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left' }}>SO NUMBER</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left' }}>CUSTOMER</th>
-                <th style={{ padding: '10px 12px', textAlign: 'right' }}>QTY</th>
+              <tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                <th style={{ padding: '10px 12px', textAlign: 'left' }}>Item</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left' }}>Location</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left' }}>SO Number</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left' }}>Customer</th>
+                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Qty</th>
               </tr>
             </thead>
             <tbody>
@@ -348,7 +348,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                 <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 12px' }}>{u.name}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{u.sku}</div></td>
                   <td style={{ padding: '10px 12px', ...mono, fontSize: 12 }}>{u.location_name}</td>
-                  <td style={{ padding: '10px 12px', ...mono, fontSize: 12 }}>{u.salesorder_number}</td>
+                  <td style={{ padding: '10px 12px', ...mono, color: 'var(--accent-text)', fontWeight: 500, fontSize: 12 }}>{u.salesorder_number}</td>
                   <td style={{ padding: '10px 12px' }}>{u.customer_name}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, fontWeight: 700 }}>{fmt(u.qty)}</td>
                 </tr>

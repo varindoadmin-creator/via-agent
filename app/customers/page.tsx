@@ -950,7 +950,7 @@ export default function CustomersPage() {
         {/* Search */}
         <div className="mb-5">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search customers"
+            placeholder="Search…"
             className="via-input text-xs py-1.5 px-3 w-80" />
         </div>
 

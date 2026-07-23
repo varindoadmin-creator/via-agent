@@ -238,7 +238,7 @@ function LocationTable({
               {sorted.map((item, idx) => (
                 <tr key={`${item.item_id}-${idx}`}
                   className="hover:bg-[var(--surface-2)] transition-colors group">
-                  <td className={`${tdClass} font-mono text-[var(--accent)] text-xs`}>{item.item_code}</td>
+                  <td className={`${tdClass} font-mono text-[var(--accent-text)] text-xs`}>{item.item_code}</td>
                   <td className={`${tdClass} text-[var(--text-2)] max-w-xs`}>
                     <div className="truncate" title={item.item_name}>{item.item_name}</div>
                   </td>
@@ -398,7 +398,7 @@ export default function InventoryPage() {
                 type="text"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
-                placeholder="Search item code, name, brand…"
+                placeholder="Search…"
                 className="pl-8 pr-8 py-1.5 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--text)] placeholder-[var(--text-4)] focus:outline-none focus:border-[var(--accent)] w-64"
                 style={{ fontSize: '12px' }}
               />

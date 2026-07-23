@@ -522,7 +522,7 @@ export default function LeadsPage() {
         {/* Filters */}
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search store, city, province…"
+            placeholder="Search…"
             className="via-input text-xs py-1.5 px-3 w-72" />
           <select value={tierFilter} onChange={e => setTierFilter(e.target.value as typeof tierFilter)}
             className="via-input text-xs py-1.5 px-3">

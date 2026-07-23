@@ -118,7 +118,7 @@ const REPORT_TYPES: {
   },
   {
     key: "salesperson",
-    label: "Sales by Sales Person",
+    label: "Sales by Salesperson",
     desc: "GP and commission by salesperson",
     icon: "◇",
   },
@@ -469,7 +469,7 @@ export default function SalesReportsPage() {
               Sales Reports
             </h1>
             <p className="text-[var(--text-3)] text-sm mt-0.5">
-              {dateRange ? `${dateRange}` : "Loading date range…"}
+              {dateRange ? `${dateRange}` : "Loading…"}
             </p>
           </div>
           <button
@@ -640,7 +640,7 @@ export default function SalesReportsPage() {
                       : reportType === "location"
                         ? "Location"
                         : reportType === "salesperson"
-                          ? "Sales Person"
+                          ? "Salesperson"
                           : "Customer"}
                   <SortIcon active={sortKey === "name"} dir={sortDir} />
                 </th>
@@ -1174,7 +1174,8 @@ export default function SalesReportsPage() {
                                               padding: "8px 10px",
                                               ...mono,
                                               fontSize: 11,
-                                              color: "var(--text)",
+                                              color: "var(--accent-text)",
+                                              fontWeight: 500,
                                             }}
                                           >
                                             {inv.invoice_number}
@@ -1585,7 +1586,7 @@ export default function SalesReportsPage() {
         {/* Note for brand/location/customer */}
         {!loading && reportType !== "item" && (
           <p className="text-[var(--text-4)] text-xs mt-3">
-            Sales by Sales Person includes paid invoices with assigned Sales Person only. GP uses
+            Sales by Salesperson includes paid invoices with assigned Salesperson only. GP uses
             Revenue before PPN minus Item Purchase Rate × quantity invoiced.
             Commission tiers: GP &lt; Rp25m = 10%, Rp25m–&lt;Rp50m = 15%, Rp50m+
             = 20%.
