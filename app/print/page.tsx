@@ -41,6 +41,7 @@ interface OverdueInvoice {
   invoice_id: string;
   invoice_number: string;
   customer_name: string;
+  customer_id: string;
   date: string;
   due_date: string;
   total: number;
@@ -236,6 +237,7 @@ export default function InvoicesPage() {
   const [overdueSort, setOverdueSort] = useState<{ key: string; dir: SortDir }>({ key: 'days_overdue', dir: 'desc' });
   const [selectedOverdue, setSelectedOverdue] = useState<Set<string>>(new Set());
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [overdueCustomerId, setOverdueCustomerId] = useState('');
 
 
 
@@ -353,6 +355,25 @@ export default function InvoicesPage() {
     sortData(overdueInvoices as unknown as Record<string, unknown>[], overdueSort.key, overdueSort.dir) as unknown as OverdueInvoice[],
     [overdueInvoices, overdueSort]);
 
+  // Distinct customers with at least one overdue invoice, for the Overdue table's customer filter
+  const overdueCustomerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inv of overdueInvoices) {
+      if (inv.customer_id && !map.has(inv.customer_id)) map.set(inv.customer_id, inv.customer_name);
+    }
+    return Array.from(map, ([customer_id, customer_name]) => ({ customer_id, customer_name }))
+      .sort((a, b) => a.customer_name.localeCompare(b.customer_name));
+  }, [overdueInvoices]);
+
+  const filteredOverdue = useMemo(() =>
+    overdueCustomerId ? sortedOverdue.filter(inv => inv.customer_id === overdueCustomerId) : sortedOverdue,
+    [sortedOverdue, overdueCustomerId]);
+
+  function handleOverdueCustomerChange(id: string) {
+    setOverdueCustomerId(id);
+    setSelectedOverdue(new Set());
+  }
+
   // Selection — only allow all_available invoices
   const selectableIds = sortedDraft.filter(inv => inv.all_available).map(inv => inv.invoice_id);
   function toggleAll() {
@@ -392,24 +413,39 @@ export default function InvoicesPage() {
     whiteSpace: 'nowrap',
   };
 
-  function handleExportPDF() {
+  async function handleExportPDF() {
+    if (selectedOverdue.size === 0) return;
     setExportingPDF(true);
-    let count = 0;
-    const ids = Array.from(selectedOverdue);
-    const total = ids.length;
-    ids.forEach(invId => {
-      fetch('/api/invoices-page?mode=pdf_url&id=' + invId)
-        .then(function(r) { return r.json(); })
-        .then(function(d: Record<string, unknown>) {
-          if (d.url) window.open(d.url as string, '_blank');
-          count++;
-          if (count >= total) setExportingPDF(false);
-        })
-        .catch(function() {
-          count++;
-          if (count >= total) setExportingPDF(false);
-        });
-    });
+    try {
+      const invoices = overdueInvoices
+        .filter(inv => selectedOverdue.has(inv.invoice_id))
+        .map(inv => ({
+          invoice_id: inv.invoice_id,
+          invoice_number: inv.invoice_number,
+          customer_name: inv.customer_name,
+          date: inv.date,
+          due_date: inv.due_date,
+          total: inv.total,
+          balance: inv.balance,
+        }));
+      const res = await fetch('/api/invoices/unpaid-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoices }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to generate PDF');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setExportingPDF(false);
+    }
   }
 
   return (
@@ -549,19 +585,26 @@ export default function InvoicesPage() {
 
         {/* ── TABLE 2: Overdue ── */}
         <div className="via-card overflow-hidden mb-6">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)] flex-wrap gap-2">
             <div>
               <h2 className="text-[var(--text)] font-semibold text-sm">Overdue</h2>
               <p className="text-[var(--text-3)] text-xs mt-0.5">Invoices past due date — sorted by overdue days</p>
             </div>
             <div className="flex items-center gap-2">
+              <select value={overdueCustomerId} onChange={e => handleOverdueCustomerChange(e.target.value)}
+                className="via-input text-xs py-1.5 px-3 w-56">
+                <option value="">All Customers</option>
+                {overdueCustomerOptions.map(c => (
+                  <option key={c.customer_id} value={c.customer_id}>{c.customer_name}</option>
+                ))}
+              </select>
               {selectedOverdue.size > 0 && (
                 <button onClick={handleExportPDF} disabled={exportingPDF}
                   className="px-3 py-1.5 text-xs bg-[var(--danger-bg)] text-[var(--danger)] border border-[var(--danger-border)] rounded-lg font-medium hover:opacity-80 disabled:opacity-50 transition-opacity">
                   {exportingPDF ? 'Exporting…' : '↓ Export PDF (' + selectedOverdue.size + ')'}
                 </button>
               )}
-              <span className="text-[var(--text-4)] text-xs" style={mono}>{overdueInvoices.length} invoices</span>
+              <span className="text-[var(--text-4)] text-xs" style={mono}>{filteredOverdue.length} invoices</span>
             </div>
           </div>
 
@@ -577,14 +620,16 @@ export default function InvoicesPage() {
             </div>
           )}
 
-          {!loading && overdueInvoices.length === 0 && (
+          {!loading && filteredOverdue.length === 0 && (
             <div className="flex flex-col items-center py-10">
               <div className="text-3xl mb-2 opacity-20">✓</div>
-              <div className="text-[var(--text-3)] text-sm">No overdue invoices.</div>
+              <div className="text-[var(--text-3)] text-sm">
+                {overdueCustomerId ? 'No overdue invoices for this customer.' : 'No overdue invoices.'}
+              </div>
             </div>
           )}
 
-          {!loading && overdueInvoices.length > 0 && (
+          {!loading && filteredOverdue.length > 0 && (
             <div className="overflow-x-auto">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
@@ -599,12 +644,12 @@ export default function InvoicesPage() {
                     <th style={thStyle}>Salesperson</th>
                     <th style={{ ...thStyle, width: 40, textAlign: 'center' }}>
                       <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                        checked={selectedOverdue.size === sortedOverdue.length && sortedOverdue.length > 0}
+                        checked={selectedOverdue.size === filteredOverdue.length && filteredOverdue.length > 0}
                         onChange={function() {
-                          if (selectedOverdue.size === sortedOverdue.length) {
+                          if (selectedOverdue.size === filteredOverdue.length) {
                             setSelectedOverdue(new Set());
                           } else {
-                            setSelectedOverdue(new Set(sortedOverdue.map(function(x) { return x.invoice_id; })));
+                            setSelectedOverdue(new Set(filteredOverdue.map(function(x) { return x.invoice_id; })));
                           }
                         }} />
                     </th>
@@ -612,7 +657,7 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedOverdue.map(inv => (
+                  {filteredOverdue.map(inv => (
                     <tr key={inv.invoice_id} style={{ borderBottom: '1px solid var(--border-muted)' }}
                       className="hover:bg-[var(--surface-2)] transition-colors">
                       <td style={{ padding: '8px 12px', ...mono, fontSize: 12, color: 'var(--accent-text)', fontWeight: 500 }}>{inv.invoice_number}</td>
@@ -643,10 +688,10 @@ export default function InvoicesPage() {
                 <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                   <tr>
                     <td colSpan={6} style={{ padding: '7px 12px', ...mono, color: 'var(--text-3)', fontSize: 11 }}>
-                      TOTAL OVERDUE ({overdueInvoices.length} invoices)
+                      TOTAL OVERDUE ({filteredOverdue.length} invoices)
                     </td>
                     <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, color: 'var(--danger)', fontWeight: 700 }}>
-                      {formatRp(overdueInvoices.reduce((s, i) => s + i.balance, 0))}
+                      {formatRp(filteredOverdue.reduce((s, i) => s + i.balance, 0))}
                     </td>
                     <td />
                   </tr>
