@@ -287,19 +287,12 @@ function HubShipmentTable({ location, items, loading, error }: {
       {/* Table header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className={`text-xs font-bold tracking-widest uppercase ${meta.color}`}
-            style={{ fontFamily: "'DM Mono', monospace" }}>
+          <div className={`text-xs font-bold tracking-widest uppercase ${meta.color}`}>
             {location}
           </div>
-          <div className="text-[var(--text-4)] text-xs">{meta.city}</div>
           {!loading && (
-            <div className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-3)] text-[var(--text-3)]">
-              {filtered.length} orders
-            </div>
-          )}
-          {!loading && items.length > 0 && (
-            <div className="text-[var(--text-4)] text-xs" style={{ fontFamily: "'DM Mono', monospace" }}>
-              {items.filter(i => i.is_full).length} full · {items.filter(i => !i.is_full).length} partial
+            <div className="text-[var(--text-4)] text-xs">
+              Total: {filtered.length} Orders ({filtered.filter(i => i.is_full).length} Full, {filtered.filter(i => !i.is_full).length} Partial)
             </div>
           )}
         </div>
@@ -308,7 +301,7 @@ function HubShipmentTable({ location, items, loading, error }: {
             placeholder="Search…" className="via-input text-xs py-1.5 px-3 w-44" />
           <button onClick={exportTablePDF} disabled={exporting || filtered.length === 0}
             className="px-3 py-1.5 text-xs bg-[var(--accent-hover)] hover:bg-[var(--accent)] text-white rounded-lg transition-colors disabled:opacity-50">
-            {exporting ? '…' : '⬇ Export PDF'}
+            {exporting ? '…' : '⬇ Export'}
           </button>
           {selectedIds.size > 0 && (
             <button onClick={printSelectedShipments} disabled={printing}
