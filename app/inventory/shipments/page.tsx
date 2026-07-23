@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,14 +78,14 @@ function AgingBadge({ date, label }: { date: string; label?: string }) {
 }
 
 function StatusBadge({ label, type }: { label: string; type: 'success' | 'warning' | 'info' | 'muted' | 'danger' }) {
-  const styles = {
-    success: 'bg-[var(--success-bg)] text-[var(--success)] border-[var(--success-border)]',
-    warning: 'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]',
-    info:    'bg-[var(--info-bg)] text-[var(--info)] border-[var(--info-border)]',
-    muted:   'bg-[var(--surface-3)] text-[var(--text-3)] border-[var(--border)]',
-    danger:  'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]',
+  const tones: Record<typeof type, PillTone> = {
+    success: 'good',
+    warning: 'warning',
+    info:    'info',
+    muted:   'neutral',
+    danger:  'critical',
   };
-  return <span className={'via-badge border text-xs ' + styles[type]}>{label}</span>;
+  return <StatusPill tone={tones[type]}>{label}</StatusPill>;
 }
 
 function LoadingSkeleton() {

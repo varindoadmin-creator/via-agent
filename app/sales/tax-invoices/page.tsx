@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
 
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 const formatRp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
@@ -21,13 +22,13 @@ interface TaxInvoice {
   document_sent_at: string | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  'draft':           'var(--text-4)',
-  'sent':            'var(--info)',
-  'overdue':         'var(--danger)',
-  'paid':            'var(--success)',
-  'partially_paid':  'var(--warning)',
-  'void':            'var(--text-4)',
+const STATUS_TONES: Record<string, PillTone> = {
+  'draft':           'neutral',
+  'sent':            'info',
+  'overdue':         'critical',
+  'paid':            'good',
+  'partially_paid':  'warning',
+  'void':            'neutral',
 };
 
 export default function TaxInvoicesPage() {
@@ -380,13 +381,10 @@ export default function TaxInvoicesPage() {
                       <span style={{ fontSize: 11, color: 'var(--text-4)' }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: '9px 12px' }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 500, textTransform: 'capitalize',
-                      color: STATUS_COLORS[inv.status] || 'var(--text-3)',
-                    }}>
-                      {inv.status?.replace('_', ' ')}
-                    </span>
+                  <td style={{ padding: '5px 6px' }}>
+                    <StatusPill tone={STATUS_TONES[inv.status] || 'neutral'} size="cell">
+                      <span style={{ textTransform: 'capitalize' }}>{inv.status?.replace('_', ' ')}</span>
+                    </StatusPill>
                   </td>
                   <td style={{ padding: '9px 12px' }}>
                     {inv.document_sent ? (

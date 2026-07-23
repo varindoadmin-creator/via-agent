@@ -1,6 +1,8 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
+import BoardGroupHeader from '@/components/ui/BoardGroupHeader';
 
 type MatchRow = { salesorder_number: string; customer_name: string; customer_region: string; so_quantity: number; fulfilled_qty: number; fully_covered: boolean };
 
@@ -40,18 +42,27 @@ const formatRp = (n: number) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID
 const fmt = (n: number) => Number(n || 0).toLocaleString('id-ID');
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
-function badgeColor(status?: string) {
-  const v = (status || '').toUpperCase();
-  if (v === 'OK' || v === 'MATCHED' || v === 'MULTI_MATCH') return { color: 'var(--success)', bg: 'var(--success-bg)', border: 'var(--success-border)' };
-  if (v === 'REGION_MIX' || v === 'NEEDS_REVIEW') return { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)' };
-  if (v === 'PARTIAL' || v === 'PARTIAL_SO' || v === 'EXCESS_STOCK') return { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'var(--warning-border)' };
-  return { color: 'var(--text-3)', bg: 'var(--surface-3)', border: 'var(--border)' };
+function toneForValue(value?: string): PillTone {
+  const v = (value || '').toUpperCase();
+  if (v === 'OK' || v === 'MATCHED' || v === 'MULTI_MATCH') return 'good';
+  if (v === 'REGION_MIX' || v === 'NEEDS_REVIEW') return 'critical';
+  if (v === 'PARTIAL' || v === 'PARTIAL_SO' || v === 'EXCESS_STOCK') return 'warning';
+  return 'neutral';
 }
 
-function Badge({ value }: { value?: string }) {
-  const c = badgeColor(value);
-  return <span style={{ ...mono, fontSize: 10, padding: '4px 8px', borderRadius: 999, color: c.color, background: c.bg, border: `1px solid ${c.border}` }}>{value || 'UNKNOWN'}</span>;
+function Badge({ value, size = 'inline' }: { value?: string; size?: 'inline' | 'cell' }) {
+  return <StatusPill tone={toneForValue(value)} size={size}>{value || 'UNKNOWN'}</StatusPill>;
 }
+
+// ─── PO-level board grouping — the 4 known PurchaseOrder.status values,
+// problems surfaced first. ──────────────────────────────────────────────────
+const PO_GROUPS: Record<PurchaseOrder['status'], { label: string; color: string }> = {
+  NEEDS_REVIEW: { label: 'Needs Review',      color: 'var(--critical)' },
+  REGION_MIX:   { label: 'Region Mix',        color: 'var(--critical)' },
+  PARTIAL:      { label: 'Partial Coverage',  color: 'var(--warning)' },
+  OK:           { label: 'Ready to Approve',  color: 'var(--good)' },
+};
+const PO_GROUP_ORDER: PurchaseOrder['status'][] = ['NEEDS_REVIEW', 'REGION_MIX', 'PARTIAL', 'OK'];
 
 // Shared Pending Approval panel — matches Purchase Orders against Confirmed Sales
 // Order demand and current stock, and is the ONLY surface that can approve a
@@ -195,7 +206,17 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
               <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading pending approval POs...</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={7} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>No Pending Approval Purchase Orders found.</td></tr>
-            ) : filtered.map(po => {
+            ) : PO_GROUP_ORDER.flatMap(statusKey => {
+              const group = PO_GROUPS[statusKey];
+              const items = filtered.filter(po => po.status === statusKey);
+              if (items.length === 0) return [];
+              return [
+                <tr key={`group-${statusKey}`}>
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <BoardGroupHeader label={group.label} count={items.length} color={group.color} />
+                  </td>
+                </tr>,
+                ...items.map(po => {
               const isOpen = expanded === po.purchaseorder_id;
               const canApprove = po.status === 'OK';
               return (
@@ -207,7 +228,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                     <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{po.date}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{po.location_name}</td>
                     <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700 }}>{formatRp(po.total)}</td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}><Badge value={po.status} /></td>
+                    <td style={{ padding: '6px 8px' }}><Badge value={po.status} size="cell" /></td>
                   </tr>
 
                   {isOpen && (
@@ -285,7 +306,7 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                                     ))}
                                   </td>
                                   <td style={{ padding: 9, textAlign: 'right', ...mono }}>{li.stock_qty > 0 ? `+${fmt(li.stock_qty)} ${li.unit}` : '—'}</td>
-                                  <td style={{ padding: 9, textAlign: 'center' }}><Badge value={li.match_status} /></td>
+                                  <td style={{ padding: '5px 6px' }}><Badge value={li.match_status} size="cell" /></td>
                                 </tr>
                               ))}
                             </tbody>
@@ -297,6 +318,8 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                   )}
                 </Fragment>
               );
+            }),
+              ];
             })}
           </tbody>
         </table>

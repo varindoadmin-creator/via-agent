@@ -108,8 +108,8 @@ function StatusBadge({ label, type }: { label: string; type: 'success' | 'warnin
   return <span className={'via-badge border text-xs ' + styles[type]}>{label}</span>;
 }
 
-function TableShell({ title, count, loading, search, onSearch, extra, children }: {
-  title: string; count?: number; loading: boolean;
+function TableShell({ title, groupColor, count, loading, search, onSearch, extra, children }: {
+  title: string; groupColor?: string; count?: number; loading: boolean;
   search?: string; onSearch?: (v: string) => void;
   extra?: React.ReactNode; children: React.ReactNode;
 }) {
@@ -117,7 +117,7 @@ function TableShell({ title, count, loading, search, onSearch, extra, children }
     <div className="via-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
         <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
+          <h2 className="font-bold text-base" style={{ color: groupColor || 'var(--text)' }}>{title}</h2>
         </div>
         <div className="flex items-center gap-3">
           {!loading && count !== undefined && (
@@ -228,7 +228,7 @@ function PendingApprovalSOTable() {
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
   return (
-    <TableShell title="Pending Approval"
+    <TableShell title="Pending Approval" groupColor="var(--warning)"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={handleApprove} disabled={approving}
@@ -407,7 +407,7 @@ function ApprovedSOTable() {
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
   return (
-    <TableShell title="Approved"
+    <TableShell title="Approved" groupColor="var(--good)"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={handleMarkConfirmed} disabled={confirming}
@@ -612,7 +612,7 @@ function DraftSOTable() {
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
   return (
-    <TableShell title="Draft"
+    <TableShell title="Draft" groupColor="var(--neutral)"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <div className="flex items-center gap-2">
@@ -785,7 +785,7 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
   }, [items, search]);
 
   return (
-    <TableShell title="Confirmed — Not Packaged"
+    <TableShell title="Confirmed — Not Packaged" groupColor="var(--serious)"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}>
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
@@ -977,7 +977,7 @@ function DeliveredTable({ items, loading, error, onConverted }: {
   const totalSelected = selectedItems.reduce((s, i) => s + i.total, 0);
 
   return (
-    <TableShell title="Shipment Delivered — Not Invoiced"
+    <TableShell title="Shipment Delivered — Not Invoiced" groupColor="var(--info)"
       count={filtered.length} loading={loading} search={search} onSearch={setSearch}
       extra={selected.size > 0 ? (
         <button onClick={() => setShowConfirm(true)} disabled={converting}

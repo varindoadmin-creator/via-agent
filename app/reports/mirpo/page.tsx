@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Period = 'this_month' | 'prev_month' | 'this_year' | 'prev_year' | 'custom';
@@ -109,19 +110,15 @@ const VIEWS: { key: View; label: string }[] = [
 ];
 
 // ─── Stock status badge ───────────────────────────────────────────────────────
+const STOCK_STATUS_TONES: Record<string, PillTone> = {
+  'Sold Out':        'purple',
+  'Fast Moving':     'good',
+  'Healthy':         'info',
+  'Slow Moving':     'warning',
+  'Dead Stock Risk': 'critical',
+};
 function StatusBadge({ status }: { status: string }) {
-  const cls: Record<string, string> = {
-    'Sold Out':        'bg-[var(--accent-light)] text-[var(--accent)]',
-    'Fast Moving':     'bg-[var(--success-bg)]   text-[var(--success)]',
-    'Healthy':         'bg-[var(--info-bg)]      text-[var(--info)]',
-    'Slow Moving':     'bg-[var(--warning-bg)]   text-[var(--warning)]',
-    'Dead Stock Risk': 'bg-[var(--danger-bg)]    text-[var(--danger)]',
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${cls[status] || 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>
-      {status}
-    </span>
-  );
+  return <StatusPill tone={STOCK_STATUS_TONES[status] || 'neutral'}>{status}</StatusPill>;
 }
 
 // ─── Summary card ─────────────────────────────────────────────────────────────
@@ -405,9 +402,9 @@ export default function MirpoAnalysisPage() {
                         <tr key={`${i.purchaseorder_number || 'po'}-${i.sku || i.name}-${idx}`}
                           className="border-b border-[var(--border)] last:border-0">
                           <td className="py-2">
-                            <span className={`px-2 py-1 rounded text-[10px] font-medium ${i.reduction_priority === 'High' ? 'bg-[var(--danger-bg)] text-[var(--danger)]' : i.reduction_priority === 'Medium' ? 'bg-[var(--warning-bg)] text-[var(--warning)]' : 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>
+                            <StatusPill tone={i.reduction_priority === 'High' ? 'critical' : i.reduction_priority === 'Medium' ? 'warning' : 'neutral'}>
                               {i.reduction_priority || 'Low'}
-                            </span>
+                            </StatusPill>
                           </td>
                           <td className="py-2">
                             <div className="text-[var(--text)] font-medium">{i.sku || i.name}</div>

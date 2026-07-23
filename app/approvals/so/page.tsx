@@ -1,6 +1,8 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
+import BoardGroupHeader from '@/components/ui/BoardGroupHeader';
 
 type SOList = {
   salesorder_id: string;
@@ -48,16 +50,25 @@ const formatRp = (n: number) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID
 const fmt = (n: number) => Number(n || 0).toLocaleString('id-ID');
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
-function badgeColor(status?: string) {
-  if (status === 'MATCH' || status === 'APPROVE' || status === 'OK') return { color: 'var(--success)', bg: 'var(--success-bg)', border: 'var(--success-border)' };
-  if (status === 'MISMATCH' || status === 'REJECT' || status === 'INCOMPLETE') return { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)' };
-  if (status === 'PARTIAL_MATCH' || status === 'REVIEW') return { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'var(--warning-border)' };
-  return { color: 'var(--text-3)', bg: 'var(--surface-3)', border: 'var(--border)' };
+// ─── Status grouping — same key drives both the row's StatusPill tone and
+// which board group the row is bucketed under. ────────────────────────────────
+const STATUS_GROUPS: Record<string, { label: string; tone: PillTone; color: string }> = {
+  pending:  { label: 'Needs Review (Not Yet Checked)', tone: 'neutral',  color: 'var(--neutral)' },
+  mismatch: { label: 'Mismatch',                        tone: 'critical', color: 'var(--critical)' },
+  partial:  { label: 'Partial Match',                   tone: 'warning',  color: 'var(--warning)' },
+  match:    { label: 'Match / Approved',                tone: 'good',     color: 'var(--good)' },
+};
+const GROUP_ORDER = ['pending', 'mismatch', 'partial', 'match'] as const;
+
+function groupKeyFor(status?: string): keyof typeof STATUS_GROUPS {
+  if (status === 'MATCH' || status === 'APPROVE' || status === 'OK') return 'match';
+  if (status === 'MISMATCH' || status === 'REJECT' || status === 'INCOMPLETE') return 'mismatch';
+  if (status === 'PARTIAL_MATCH' || status === 'REVIEW') return 'partial';
+  return 'pending';
 }
 
-function Badge({ value }: { value?: string }) {
-  const c = badgeColor(value);
-  return <span style={{ ...mono, fontSize: 10, padding: '4px 8px', borderRadius: 999, color: c.color, background: c.bg, border: `1px solid ${c.border}` }}>{value || 'UNCLEAR'}</span>;
+function Badge({ value, size = 'inline' }: { value?: string; size?: 'inline' | 'cell' }) {
+  return <StatusPill tone={STATUS_GROUPS[groupKeyFor(value)].tone} size={size}>{value || 'UNCLEAR'}</StatusPill>;
 }
 
 export default function SOApprovalCheckPage() {
@@ -225,7 +236,17 @@ export default function SOApprovalCheckPage() {
               <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>Loading pending approval SOs...</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: 28, color: 'var(--text-3)', textAlign: 'center' }}>No Pending Approval Sales Orders found.</td></tr>
-            ) : filtered.map(so => {
+            ) : GROUP_ORDER.flatMap(groupKey => {
+              const group = STATUS_GROUPS[groupKey];
+              const items = filtered.filter(so => groupKeyFor(analysis[so.salesorder_id]?.overall_status) === groupKey);
+              if (items.length === 0) return [];
+              return [
+                <tr key={`group-${groupKey}`}>
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    <BoardGroupHeader label={group.label} count={items.length} color={group.color} />
+                  </td>
+                </tr>,
+                ...items.map(so => {
               const isOpen = expanded === so.salesorder_id;
               const detail = details[so.salesorder_id];
               const result = analysis[so.salesorder_id];
@@ -237,7 +258,7 @@ export default function SOApprovalCheckPage() {
                     <td style={{ padding: '12px', fontWeight: 600 }}>{so.customer_name}</td>
                     <td style={{ padding: '12px', ...mono, fontSize: 12 }}>{so.date}</td>
                     <td style={{ padding: '12px', textAlign: 'right', ...mono, fontWeight: 700 }}>{formatRp(so.total)}</td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}><Badge value={result?.overall_status} /></td>
+                    <td style={{ padding: '6px 8px' }}><Badge value={result?.overall_status} size="cell" /></td>
                   </tr>
 
                   {isOpen && (
@@ -346,7 +367,7 @@ export default function SOApprovalCheckPage() {
                               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                               <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
                                 <thead><tr style={{ background: 'var(--surface-3)', color: 'var(--text-4)', ...mono, fontSize: 10 }}><th style={{ padding: 10, textAlign: 'left' }}>SO ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>SO QTY</th><th style={{ padding: 10, textAlign: 'left' }}>PROOF ITEM</th><th style={{ padding: 10, textAlign: 'right' }}>PROOF QTY</th><th style={{ padding: 10, textAlign: 'center' }}>STATUS</th><th style={{ padding: 10, textAlign: 'left' }}>NOTES</th></tr></thead>
-                                <tbody>{(result.comparison || []).map((row, idx) => <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 10 }}>{row.so_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.so_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.so_qty}</td><td style={{ padding: 10 }}>{row.proof_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.proof_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.proof_qty ?? '—'}</td><td style={{ padding: 10, textAlign: 'center' }}><Badge value={row.status} /></td><td style={{ padding: 10, color: 'var(--text-3)', fontSize: 12 }}>{row.notes}</td></tr>)}</tbody>
+                                <tbody>{(result.comparison || []).map((row, idx) => <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 10 }}>{row.so_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.so_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.so_qty}</td><td style={{ padding: 10 }}>{row.proof_item}<div style={{ ...mono, color: 'var(--text-4)', fontSize: 10 }}>{row.proof_sku}</div></td><td style={{ padding: 10, textAlign: 'right', ...mono }}>{row.proof_qty ?? '—'}</td><td style={{ padding: '5px 6px' }}><Badge value={row.status} size="cell" /></td><td style={{ padding: 10, color: 'var(--text-3)', fontSize: 12 }}>{row.notes}</td></tr>)}</tbody>
                               </table>
                               </div>
                             </div>
@@ -357,6 +378,8 @@ export default function SOApprovalCheckPage() {
                   )}
                 </Fragment>
               );
+            }),
+              ];
             })}
           </tbody>
         </table>

@@ -9,18 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // VIA brand palette
+        // VIA brand palette — kept in sync with app/globals.css CSS vars
         via: {
           bg: '#f7f8fa',
           surface: '#ffffff',
           surfaceHover: '#f3f4f6',
           border: '#e5e7eb',
           borderMuted: '#eef0f2',
-          accent: '#2563eb',
-          accentMuted: '#1d4ed8',
-          success: '#16a34a',
-          warning: '#d97706',
-          danger: '#dc2626',
+          accent: '#4a3aa7',
+          accentMuted: '#3a2d85',
+          good: '#0ca30c',
+          warning: '#fab219',
+          serious: '#ec835a',
+          critical: '#d03b3b',
+          info: '#1c5cab',
           muted: '#6b7280',
           text: '#111827',
           textMuted: '#374151',

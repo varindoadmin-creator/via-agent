@@ -185,7 +185,7 @@ function NavContent({
     width: '100%', display: 'flex', alignItems: 'center', gap: 9,
     border: 'none', borderRadius: 6, transition: 'all 0.1s',
     position: 'relative', background: 'transparent',
-    fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+    fontFamily: 'Figtree, sans-serif', cursor: 'pointer',
   };
 
   return (
@@ -307,6 +307,33 @@ function NavContent({
 }
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
+// A small stack of colorful offset blocks behind the "V" mark — an original
+// multi-color treatment (not a copy of any third-party logo), built from the
+// board-group categorical tokens so it reads as part of the same palette.
+
+function LogoMark({ size = 26 }: { size?: number }) {
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <div style={{
+        position: 'absolute', width: size * 0.62, height: size * 0.62,
+        top: -2, left: -2, borderRadius: size * 0.2,
+        background: 'var(--cat-aqua)', transform: 'rotate(-10deg)',
+      }} />
+      <div style={{
+        position: 'absolute', width: size * 0.62, height: size * 0.62,
+        bottom: -2, right: -2, borderRadius: size * 0.2,
+        background: 'var(--cat-orange)', transform: 'rotate(10deg)',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: size * 0.27,
+        background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+      }}>
+        <span style={{ color: 'white', fontSize: size * 0.46, fontWeight: 700, letterSpacing: '-0.5px' }}>V</span>
+      </div>
+    </div>
+  );
+}
 
 function Logo({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
   return (
@@ -321,11 +348,9 @@ function Logo({ collapsed, onClick }: { collapsed: boolean; onClick: () => void 
         background: 'none', border: 'none', borderBottomWidth: 1, borderBottomStyle: 'solid',
         borderBottomColor: 'var(--sidebar-border)', cursor: 'pointer', width: '100%',
       }}>
-      <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: 'white', fontSize: 12, fontWeight: 600, letterSpacing: '-0.5px' }}>V</span>
-      </div>
+      <LogoMark />
       {!collapsed && (
-        <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, letterSpacing: '0.01em', fontFamily: 'Inter, sans-serif' }}>VIA</div>
+        <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, letterSpacing: '0.01em', fontFamily: 'Figtree, sans-serif' }}>VIA</div>
       )}
     </button>
   );
@@ -456,10 +481,8 @@ export default function AppShell({ children, role }: { children: React.ReactNode
             onClick={() => router.push('/dashboard')}
             title="Go to Home"
             style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: 'white', fontSize: 12, fontWeight: 600 }}>V</span>
-            </div>
-            <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>VIA</div>
+            <LogoMark />
+            <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Figtree, sans-serif' }}>VIA</div>
           </button>
           <button
             onClick={() => setMobileOpen(true)}
@@ -495,10 +518,8 @@ export default function AppShell({ children, role }: { children: React.ReactNode
               onClick={() => { setMobileOpen(false); router.push('/dashboard'); }}
               title="Go to Home"
               style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: 'white', fontSize: 12, fontWeight: 600 }}>V</span>
-              </div>
-              <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>VIA</div>
+              <LogoMark />
+              <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, fontFamily: 'Figtree, sans-serif' }}>VIA</div>
             </button>
             <button
               onClick={() => setMobileOpen(false)}
@@ -520,8 +541,8 @@ export default function AppShell({ children, role }: { children: React.ReactNode
 
           {role && (
             <div style={{ padding: '10px 14px', borderTop: '1px solid var(--sidebar-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <span style={{ color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', textTransform: 'capitalize' }}>{role}</span>
-              <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', padding: 0 }}>Logout</button>
+              <span style={{ color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Figtree, sans-serif', textTransform: 'capitalize' }}>{role}</span>
+              <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Figtree, sans-serif', padding: 0 }}>Logout</button>
             </div>
           )}
 
@@ -558,8 +579,8 @@ export default function AppShell({ children, role }: { children: React.ReactNode
 
         {role && (
           <div style={{ padding: collapsed ? '8px 0' : '10px 14px', borderTop: '1px solid var(--sidebar-border)', display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexShrink: 0 }}>
-            {!collapsed && <span style={{ color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', textTransform: 'capitalize' }}>{role}</span>}
-            <button onClick={handleLogout} title="Log out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Inter, sans-serif', padding: 0 }}>{collapsed ? '⎋' : 'Logout'}</button>
+            {!collapsed && <span style={{ color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Figtree, sans-serif', textTransform: 'capitalize' }}>{role}</span>}
+            <button onClick={handleLogout} title="Log out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sidebar-section)', fontSize: 11, fontFamily: 'Figtree, sans-serif', padding: 0 }}>{collapsed ? '⎋' : 'Logout'}</button>
           </div>
         )}
 
@@ -572,7 +593,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
               borderTop: '1px solid var(--sidebar-border)',
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--sidebar-section)', fontSize: 12,
-              fontFamily: 'Inter, sans-serif', flexShrink: 0,
+              fontFamily: 'Figtree, sans-serif', flexShrink: 0,
             }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-text)'}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--sidebar-section)'}

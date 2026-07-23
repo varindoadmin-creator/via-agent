@@ -1,7 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ─── VIA — Zoho Books–style Light Theme ──────────────────────────────────── */
 
@@ -27,38 +27,68 @@
   --panel:        var(--surface);
   --muted:        var(--text-3);
 
-  /* Accent — Navy blue (links, focus, interactive) */
-  --accent:       #1e3a5f;
-  --accent-hover: #16293f;
-  --accent-light: #eaeef5;
-  --accent-text:  #1e3a5f;
-  --accent-border:#b8c4d9;
+  /* Accent / Brand — violet (links, focus, interactive, primary CTAs) */
+  --accent:       #4a3aa7;
+  --accent-hover: #3a2d85;
+  --accent-light: #f1eefa;
+  --accent-text:  #4a3aa7;
+  --accent-border:#cfc6ef;
 
-  /* Primary action — Zoho's near-black buttons */
-  --primary:      #18181b;
-  --primary-hover:#2a2a2e;
+  /* Primary action — same violet brand color as accent (monday.com-style: one brand color, not a separate near-black) */
+  --primary:      #4a3aa7;
+  --primary-hover:#3a2d85;
   --primary-text: #ffffff;
 
-  /* Semantic */
-  --success:      #16a34a;
+  /* Status tones — monday.com's actual board-status palette (Done/Working on
+     it/Stuck greens-oranges-reds), sampled from the real product, not a
+     substitute. monday uses white text on every saturated tone and dark text
+     only on the palest ones — matched here rather than computed. */
+  --good:         #00c875;
+  --good-text:    #ffffff;
+  --warning:      #fdab3d;
+  --warning-text: #ffffff;
+  --serious:      #ff642e;
+  --serious-text: #ffffff;
+  --critical:     #e2445c;
+  --critical-text:#ffffff;
+  --info:         #0073ea;
+  --info-text:    #ffffff;
+  --purple:       #a25ddc;
+  --purple-text:  #ffffff;
+  --neutral:      #c4c4c4;
+  --neutral-text: #292f4c;
+
+  /* Deprecated aliases — many pages still read these directly for plain
+     text/icon color outside of any badge; keep them pointing at the new tones
+     rather than rewriting every call site. */
+  --success:      var(--good);
   --success-bg:   #f0fdf4;
   --success-border:#bbf7d0;
-  --warning:      #d97706;
   --warning-bg:   #fffbeb;
   --warning-border:#fde68a;
-  --danger:       #dc2626;
+  --danger:       var(--critical);
   --danger-bg:    #fef2f2;
   --danger-border:#fecaca;
-  --info:         #1e3a5f;
   --info-bg:      #eaeef5;
   --info-border:  #b8c4d9;
 
-  /* Sidebar — white with near-black active state */
+  /* Categorical — board-group identity colors (BoardGroupHeader group-name
+     text + summary bars), matched to monday.com's actual group-color set. */
+  --cat-blue:     #0073ea;
+  --cat-orange:   #fdab3d;
+  --cat-aqua:     #66ccff;
+  --cat-yellow:   #ffcb00;
+  --cat-magenta:  #ff158a;
+  --cat-green:    #00c875;
+  --cat-violet:   #a25ddc;
+  --cat-red:      #e2445c;
+
+  /* Sidebar — white with violet active state */
   --sidebar-bg:     #ffffff;
   --sidebar-border: #e5e7eb;
   --sidebar-text:   #4b5563;
   --sidebar-hover:  #f3f4f6;
-  --sidebar-active-bg: #18181b;
+  --sidebar-active-bg: #4a3aa7;
   --sidebar-active-text: #ffffff;
   --sidebar-section:#9ca3af;
 }
@@ -68,7 +98,7 @@ html { color-scheme: light; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13.5px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -138,23 +168,25 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
 }
 .via-btn-link:hover:not(:disabled) { text-decoration: underline; }
 
-/* ─── Badges (Zoho: flat colored text/pills, no heavy borders) ──────────────── */
+/* ─── Badges (monday.com-style: solid saturated pills, fully rounded) ───────── */
 .via-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: none;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.via-badge-success  { background: var(--success-bg);  color: var(--success); border: 1px solid var(--success-border); }
-.via-badge-warning  { background: var(--warning-bg);  color: var(--warning); border: 1px solid var(--warning-border); }
-.via-badge-danger   { background: var(--danger-bg);   color: var(--danger);  border: 1px solid var(--danger-border);  }
-.via-badge-info     { background: var(--info-bg);     color: var(--info);    border: 1px solid var(--info-border);    }
-.via-badge-open     { background: var(--accent-light);color: var(--accent);  border: 1px solid var(--accent-border);  }
-.via-badge-muted    { background: var(--surface-3);   color: var(--text-3);  border: 1px solid var(--border);         }
-.via-badge-accent   { background: var(--accent-light);color: var(--accent-text); border: 1px solid var(--accent-border); }
+.via-badge-success  { background: var(--good);     color: var(--good-text);     }
+.via-badge-warning  { background: var(--warning);  color: var(--warning-text);  }
+.via-badge-serious  { background: var(--serious);  color: var(--serious-text);  }
+.via-badge-danger   { background: var(--critical); color: var(--critical-text); }
+.via-badge-info     { background: var(--info);     color: var(--info-text);     }
+.via-badge-open     { background: var(--purple);   color: var(--purple-text);   }
+.via-badge-muted    { background: var(--neutral);  color: var(--neutral-text);  }
+.via-badge-accent   { background: var(--purple);   color: var(--purple-text);   }
 
 /* ─── Tables (Zoho: white bg, uppercase gray headers, subtle row borders) ───── */
 .via-table { width: 100%; border-collapse: collapse; font-size: 13px; }

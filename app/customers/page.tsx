@@ -6,6 +6,8 @@ import MissingAddressModal from '@/components/MissingAddressModal';
 import CustomerDuplicatesModal from '@/components/CustomerDuplicatesModal';
 import { CopyWAButton } from '@/components/CopyWAButton';
 import CustomerTrendsChart from '@/components/CustomerTrendsChart';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
+import BoardGroupHeader from '@/components/ui/BoardGroupHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,16 +78,16 @@ function DaysBadge({ days, suffix }: { days: number; suffix: string }) {
   );
 }
 
+const TIER_TONES: Record<string, PillTone> = {
+  'Platinum': 'purple',
+  'Gold':     'warning',
+  'Silver':   'neutral',
+  'Bronze':   'serious',
+};
+
 function TierBadge({ tier }: { tier: string }) {
   if (!tier) return null;
-  const colors: Record<string, string> = {
-    'Gold':     'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]',
-    'Silver':   'bg-[var(--surface-3)] text-[var(--text-2)] border-[var(--border)]',
-    'Bronze':   'bg-[var(--accent-light)] text-[var(--accent-text)] border-[var(--accent-border)]',
-    'Platinum': 'bg-[var(--info-bg)] text-[var(--info)] border-[var(--info-border)]',
-  };
-  const cls = colors[tier] || 'bg-[var(--surface-3)] text-[var(--text-3)] border-[var(--border)]';
-  return <span className={`via-badge border text-xs ${cls}`}>{tier}</span>;
+  return <StatusPill tone={TIER_TONES[tier] || 'neutral'} size="cell">{tier}</StatusPill>;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -460,8 +462,8 @@ function EditablePhone({ contactId, value, email }: {
   );
 }
 
-function CustomerTable({ title, customers, loading, search, showActivity, showInactive, emptyIcon, emptyMsg, selectedIds, onToggleSelect }: {
-  title: string; customers: Customer[];
+function CustomerTable({ title, groupColor, customers, loading, search, showActivity, showInactive, emptyIcon, emptyMsg, selectedIds, onToggleSelect }: {
+  title: string; groupColor: string; customers: Customer[];
   loading: boolean; search: string;
   showActivity: boolean; showInactive: boolean;
   emptyIcon: string; emptyMsg: string;
@@ -555,7 +557,7 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
     <div className="via-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
+          <h2 className="font-bold text-base" style={{ color: groupColor }}>{title}</h2>
         </div>
         <div className="flex items-center gap-2">
           {showInactive && selectedInTable.length > 0 && (
@@ -648,7 +650,7 @@ function CustomerTable({ title, customers, loading, search, showActivity, showIn
                   <td style={{ padding: '8px 12px' }}>
                     <span className="text-[var(--text-3)] text-xs">{c.cf_region || '—'}</span>
                   </td>
-                  <td style={{ padding: '8px 12px' }}>
+                  <td style={{ padding: '4px 8px' }}>
                     <TierBadge tier={c.cf_tier} />
                   </td>
                   {showActivity && <>
@@ -961,21 +963,21 @@ export default function CustomersPage() {
         {/* Tables */}
         <div className="space-y-6">
           <CustomerTable
-            title="New Customers"
+            title="New Customers" groupColor="var(--cat-aqua)"
             customers={newCustomers} loading={loading} search={search}
             showActivity={false} showInactive={false}
             emptyIcon="○" emptyMsg="No new customers in the last 7 days."
             selectedIds={selectedIds} onToggleSelect={toggleSelect}
           />
           <CustomerTable
-            title="Active Customers"
+            title="Active Customers" groupColor="var(--cat-blue)"
             customers={activeCustomers} loading={loading} search={search}
             showActivity={true} showInactive={false}
             emptyIcon="○" emptyMsg="No active customers found."
             selectedIds={selectedIds} onToggleSelect={toggleSelect}
           />
           <CustomerTable
-            title="Inactive Customers"
+            title="Inactive Customers" groupColor="var(--cat-orange)"
             customers={inactiveCustomers} loading={loading} search={search}
             showActivity={false} showInactive={true}
             emptyIcon="○" emptyMsg="No inactive customers. Everyone is buying!"

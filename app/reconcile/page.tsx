@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import StatusPill, { PillTone } from "@/components/ui/StatusPill";
 
 interface BankTransaction {
   row_hash: string;
@@ -420,6 +421,9 @@ export default function ReconcilePage() {
         ? "◐ Possible"
         : "○ No Match";
 
+  const statusTone = (s: string): PillTone =>
+    s === "matched" ? "good" : s === "possible" ? "warning" : "neutral";
+
   return (
     <div className="text-[var(--text)] p-6 pb-24 min-h-full">
       <div className="max-w-6xl mx-auto">
@@ -611,11 +615,9 @@ export default function ReconcilePage() {
                       <span className="w-6 h-6 rounded-full border border-[var(--border)] flex items-center justify-center text-xs">
                         {isOpen ? "−" : "+"}
                       </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium border ${statusColor(result.status)}`}
-                      >
+                      <StatusPill tone={statusTone(result.status)}>
                         {statusLabel(result.status)}
-                      </span>
+                      </StatusPill>
                       <span className="text-[var(--text-3)] text-sm w-24 flex-shrink-0">
                         {result.transaction.date}
                       </span>

@@ -257,10 +257,10 @@ function PORow({
 // ─── Table ────────────────────────────────────────────────────────────────────
 
 function POTable({
-  title, desc, pos, loading, search, showMatching,
+  title, groupColor, desc, pos, loading, search, showMatching,
   selectable, selected, onToggleAll, onToggle, showReceipt, onReceive,
 }: {
-  title: string; desc: string; pos: PO[]; loading: boolean; search: string;
+  title: string; groupColor?: string; desc: string; pos: PO[]; loading: boolean; search: string;
   showMatching: boolean; selectable: boolean; showReceipt?: boolean;
   selected?: Set<string>; onToggleAll?: () => void; onToggle?: (id: string) => void;
   onReceive?: (poId: string) => void;
@@ -292,7 +292,7 @@ function POTable({
     <div className="via-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">{title}</h2>
+          <h2 className="font-bold text-base" style={{ color: groupColor || 'var(--text)' }}>{title}</h2>
           <p className="text-[var(--text-3)] text-xs mt-0.5">{desc}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -808,7 +808,7 @@ function ReceivedNotBilledTable({ onRefresh }: { onRefresh: () => void }) {
     <div className="via-card mb-4">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
         <div>
-          <h3 className="text-[var(--text)] font-semibold text-sm">Received — Not Billed</h3>
+          <h3 className="font-bold text-base" style={{ color: 'var(--serious)' }}>Received — Not Billed</h3>
           <p className="text-[var(--text-4)] text-xs">Items received, pending bill conversion — tick to convert</p>
         </div>
         <div className="flex items-center gap-2">
@@ -934,7 +934,7 @@ export default function PurchasesPage() {
         {/* Table 1 — Draft POs (real Zoho draft status — not yet submitted for approval, no checks) */}
         <div className="mb-6">
           <POTable
-            title="Draft"
+            title="Draft" groupColor="var(--neutral)"
             desc="Not yet submitted for approval — plain list, no SO matching"
             pos={draftPOs} loading={loading} search={search} showMatching={false}
             selectable={false}
@@ -959,7 +959,7 @@ export default function PurchasesPage() {
           </div>
         )}
         <POTable
-          title="Issued"
+          title="Issued" groupColor="var(--warning)"
           desc="Approved & sent to vendor — tick to receive"
           pos={issuedPOs} loading={loading} search={search} showMatching={true}
           selectable={true} showReceipt={true}

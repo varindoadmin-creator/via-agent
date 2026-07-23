@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import StatusPill, { PillTone } from '@/components/ui/StatusPill';
+import BoardGroupHeader from '@/components/ui/BoardGroupHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,12 +116,18 @@ function StockBadge({ inv }: { inv: DraftInvoice }) {
   );
 }
 
+interface AgingBucket { key: string; label: string; tone: PillTone; color: string }
+
+function agingBucket(days: number): AgingBucket {
+  if (days >= 60) return { key: '60', label: '60+ Days Overdue', tone: 'critical', color: 'var(--critical)' };
+  if (days >= 30) return { key: '30', label: '30–59 Days Overdue', tone: 'serious', color: 'var(--serious)' };
+  if (days >= 14) return { key: '14', label: '14–29 Days Overdue', tone: 'warning', color: 'var(--warning)' };
+  return { key: '0', label: '0–13 Days Overdue', tone: 'neutral', color: 'var(--neutral)' };
+}
+
 function OverdueBadge({ days }: { days: number }) {
-  const color = days >= 60 ? 'var(--danger)'
-    : days >= 30 ? 'var(--warning)'
-    : days >= 14 ? 'var(--accent-text)'
-    : 'var(--text-3)';
-  return <span style={{ ...mono, fontSize: 12, fontWeight: 700, color }}>{days}d overdue</span>;
+  const bucket = agingBucket(days);
+  return <StatusPill tone={bucket.tone} size="cell">{days}d overdue</StatusPill>;
 }
 
 // ─── Draft Invoice Row with expandable line items ─────────────────────────────
@@ -657,33 +665,51 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOverdue.map(inv => (
-                    <tr key={inv.invoice_id} style={{ borderBottom: '1px solid var(--border-muted)' }}
-                      className="hover:bg-[var(--surface-2)] transition-colors">
-                      <td style={{ padding: '8px 12px', ...mono, fontSize: 12, color: 'var(--accent-text)', fontWeight: 500 }}>{inv.invoice_number}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.date}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.due_date}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}><OverdueBadge days={inv.days_overdue} /></td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 12, color: 'var(--text-2)' }}>{formatRp(inv.total)}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700, color: 'var(--danger)' }}>{formatRp(inv.balance)}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-3)' }}>{inv.salesperson_name || '—'}</td>
-                      <td style={{ padding: '8px 12px', width: 40, textAlign: 'center' }}
-                        onClick={function(e) { e.stopPropagation(); }}>
-                        <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                          checked={selectedOverdue.has(inv.invoice_id)}
-                          onChange={function() {
-                            const id = inv.invoice_id;
-                            setSelectedOverdue(function(prev) {
-                              const n = new Set(prev);
-                              if (n.has(id)) { n.delete(id); } else { n.add(id); }
-                              return n;
-                            });
-                          }} />
-                      </td>
+                  {(() => {
+                    let lastBucketKey: string | null = null;
+                    const groupedBySort = overdueSort.key === 'days_overdue';
+                    return filteredOverdue.map(inv => {
+                      const bucket = agingBucket(inv.days_overdue);
+                      const showDivider = groupedBySort && bucket.key !== lastBucketKey;
+                      lastBucketKey = bucket.key;
+                      return (
+                        <Fragment key={inv.invoice_id}>
+                          {showDivider && (
+                            <tr>
+                              <td colSpan={9} style={{ padding: 0 }}>
+                                <BoardGroupHeader label={bucket.label} color={bucket.color} />
+                              </td>
+                            </tr>
+                          )}
+                          <tr key={inv.invoice_id} style={{ borderBottom: '1px solid var(--border-muted)' }}
+                            className="hover:bg-[var(--surface-2)] transition-colors">
+                            <td style={{ padding: '8px 12px', ...mono, fontSize: 12, color: 'var(--accent-text)', fontWeight: 500 }}>{inv.invoice_number}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.date}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.due_date}</td>
+                            <td style={{ padding: '4px 8px' }}><OverdueBadge days={inv.days_overdue} /></td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 12, color: 'var(--text-2)' }}>{formatRp(inv.total)}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700, color: 'var(--danger)' }}>{formatRp(inv.balance)}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-3)' }}>{inv.salesperson_name || '—'}</td>
+                            <td style={{ padding: '8px 12px', width: 40, textAlign: 'center' }}
+                              onClick={function(e) { e.stopPropagation(); }}>
+                              <input type="checkbox" className="w-3.5 h-3.5 rounded"
+                                checked={selectedOverdue.has(inv.invoice_id)}
+                                onChange={function() {
+                                  const id = inv.invoice_id;
+                                  setSelectedOverdue(function(prev) {
+                                    const n = new Set(prev);
+                                    if (n.has(id)) { n.delete(id); } else { n.add(id); }
+                                    return n;
+                                  });
+                                }} />
+                            </td>
 
-                  </tr>
-                  ))}
+                        </tr>
+                        </Fragment>
+                      );
+                    });
+                  })()}
                 </tbody>
                 <tfoot style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                   <tr>
