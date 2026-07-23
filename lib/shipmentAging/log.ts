@@ -1,4 +1,4 @@
-// ─── Supabase log for Aging Not-Shipped Package alerts ────────────────────────
+// ─── Supabase log for Aging Undelivered Package alerts ────────────────────────
 // Same REST-call pattern as lib/purchaseGap/log.ts — no supabase-js client,
 // just plain fetch against PostgREST.
 
@@ -43,6 +43,7 @@ export async function logAgingPackages(packages: AgingPackage[], checkDate: stri
       salesorder_id: p.salesorder_id,
       salesorder_number: p.salesorder_number,
       customer_name: p.customer_name,
+      status: p.status,
       days_aging: p.days_aging,
       check_date: checkDate,
       flagged_at: new Date().toISOString(),

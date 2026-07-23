@@ -1,9 +1,15 @@
-// ─── Aging Not-Shipped Package detection ────────────────────────────────────
-// A package that's still sitting in Zoho as `not_shipped` a full calendar day
-// (or more) after it was created most likely failed to actually go out —
-// traffic, courier no-show, etc. — rather than just being "packed today,
-// ships today". Checked every morning so today's failures surface the next
-// day, not days later. Server-side only.
+// ─── Aging Undelivered Package detection ────────────────────────────────────
+// This org marks a package `status: 'shipped'` the moment it's dispatched —
+// that flag never reflects whether it actually arrived (delivery completion
+// is tracked at the shipmentorder level, not the package level, and most
+// packages here never even reach `status: 'not_shipped'` at all; they go
+// straight to 'shipped' on dispatch). So "stuck due to traffic" shows up as
+// a package sitting at status 'shipped' for more than a day, not as
+// 'not_shipped' — same "active package" definition already used for the
+// Pending Delivery table on app/inventory/shipments/page.tsx (packages with
+// status 'shipped' OR 'not_shipped' both count as not-yet-delivered).
+// Checked every morning so today's failures surface the next day, not days
+// later. Server-side only.
 
 import { zohoRequest } from '@/lib/zoho/client';
 
@@ -15,7 +21,8 @@ export interface AgingPackage {
   salesorder_id: string;
   salesorder_number: string;
   customer_name: string;
-  date: string; // package creation date (the "should have shipped since" reference)
+  status: string; // 'shipped' | 'not_shipped' — Zoho package status
+  date: string; // shipment_date (preferred) or package creation date — the "should have arrived by now" reference
   days_aging: number;
   tracking_number: string;
   carrier: string;
@@ -31,14 +38,14 @@ function daysBetweenJakarta(fromDateStr: string, today: string): number {
   return Math.round((to.getTime() - from.getTime()) / 86400000);
 }
 
-async function fetchNotShippedPackages(): Promise<Record<string, unknown>[]> {
+async function fetchPackagesByStatus(status: 'shipped' | 'not_shipped'): Promise<Record<string, unknown>[]> {
   const items: Record<string, unknown>[] = [];
   let page = 1;
   let hasMore = true;
   while (hasMore) {
     try {
       const res = await zohoRequest<Record<string, unknown>>('/packages', {
-        queryParams: { status: 'not_shipped', per_page: 200, page, sort_column: 'date', sort_order: 'A' },
+        queryParams: { status, per_page: 200, page, sort_column: 'date', sort_order: 'A' },
       });
       const batch = (res.packages || []) as Record<string, unknown>[];
       items.push(...batch);
@@ -47,21 +54,24 @@ async function fetchNotShippedPackages(): Promise<Record<string, unknown>[]> {
       if (page > 10) break;
     } catch (err) {
       // Some Zoho orgs 1000-error on this filter combo — same tolerance as app/api/shipments/route.ts.
-      console.warn('[ShipmentAging] Skipping /packages?status=not_shipped:', err);
+      console.warn(`[ShipmentAging] Skipping /packages?status=${status}:`, err);
       return items;
     }
   }
   return items;
 }
 
-/** Packages still `not_shipped` a day or more after their creation date. */
-export async function findAgingNotShippedPackages(): Promise<AgingPackage[]> {
-  const packages = await fetchNotShippedPackages();
+/** Active (not-yet-delivered) packages — 'shipped' or 'not_shipped' — a day or more past their dispatch/creation date. */
+export async function findAgingUndeliveredPackages(): Promise<AgingPackage[]> {
+  const [shipped, notShipped] = await Promise.all([
+    fetchPackagesByStatus('shipped'),
+    fetchPackagesByStatus('not_shipped'),
+  ]);
   const today = jakartaDateStr(new Date());
 
-  const aging = packages
+  const aging = [...shipped, ...notShipped]
     .map((p): AgingPackage | null => {
-      const date = String(p.date || '');
+      const date = String(p.shipment_date || p.date || '');
       if (!date) return null;
       const daysAging = daysBetweenJakarta(date, today);
       if (daysAging < 1) return null;
@@ -71,6 +81,7 @@ export async function findAgingNotShippedPackages(): Promise<AgingPackage[]> {
         salesorder_id: String(p.salesorder_id || ''),
         salesorder_number: '',
         customer_name: '',
+        status: String(p.status || ''),
         date,
         days_aging: daysAging,
         tracking_number: String(p.tracking_number || ''),
@@ -81,8 +92,8 @@ export async function findAgingNotShippedPackages(): Promise<AgingPackage[]> {
 
   if (aging.length === 0) return aging;
 
-  // Small set expected ("one or two" per day) — fine to fetch each SO individually
-  // rather than paginating the full confirmed-SO list just for name lookups.
+  // Small set expected — fine to fetch each SO individually rather than
+  // paginating the full confirmed-SO list just for name lookups.
   const soIds = Array.from(new Set(aging.map(p => p.salesorder_id))).filter(Boolean);
   const soMap = new Map<string, { salesorder_number: string; customer_name: string }>();
   await Promise.all(soIds.map(async id => {

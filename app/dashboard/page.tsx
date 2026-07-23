@@ -290,7 +290,7 @@ function DailyBriefPanel() {
   );
 }
 
-type AgingPackage = { package_id: string; package_number: string; salesorder_id: string; salesorder_number: string; customer_name: string; date: string; days_aging: number; tracking_number: string; carrier: string };
+type AgingPackage = { package_id: string; package_number: string; salesorder_id: string; salesorder_number: string; customer_name: string; status: string; date: string; days_aging: number; tracking_number: string; carrier: string };
 
 function ShipmentAgingAlert() {
   const [packages, setPackages] = useState<AgingPackage[] | null>(null);
@@ -313,12 +313,12 @@ function ShipmentAgingAlert() {
     <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>
-          ⚠ {packages.length} shipment{packages.length === 1 ? '' : 's'} stuck Not Shipped
+          ⚠ {packages.length} shipment{packages.length === 1 ? '' : 's'} not delivered
         </h2>
         <button onClick={load} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>↻</button>
       </div>
       <div className="text-xs mb-2" style={{ color: 'var(--text-2)' }}>
-        Packed a day or more ago but still "Not Shipped" in Zoho — likely failed to actually go out.
+        Dispatched a day or more ago but still not marked Delivered in Zoho — likely stuck in transit.
       </div>
       <div className="space-y-1">
         {packages.map(p => (
@@ -327,6 +327,7 @@ function ShipmentAgingAlert() {
               <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-text)', fontWeight: 500 }}>{p.salesorder_number || '—'}</span>
               {' — '}{p.customer_name || '(unnamed)'}
               {' · '}<span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{p.package_number}</span>
+              {' · '}{p.status === 'shipped' ? 'shipped, not delivered' : 'never shipped'}
             </span>
             <span style={{ color: 'var(--muted)' }}>{p.days_aging} day{p.days_aging === 1 ? '' : 's'} · {p.carrier || 'no carrier'}</span>
           </div>

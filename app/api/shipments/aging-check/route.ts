@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findAgingNotShippedPackages } from '@/lib/shipmentAging/check';
+import { findAgingUndeliveredPackages } from '@/lib/shipmentAging/check';
 import { logAgingPackages } from '@/lib/shipmentAging/log';
 import { sendMail } from '@/lib/email/sendMail';
 
@@ -11,11 +11,11 @@ function jakartaDateStr(): string {
 }
 
 // Live check for the in-app alert on Home — always reflects current Zoho
-// state (self-clears once a package actually ships), independent of whether/
-// when the cron below last ran.
+// state (self-clears once a package is actually delivered), independent of
+// whether/when the cron below last ran.
 export async function GET() {
   try {
-    const packages = await findAgingNotShippedPackages();
+    const packages = await findAgingUndeliveredPackages();
     return NextResponse.json({ success: true, packages });
   } catch (err) {
     return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
@@ -27,14 +27,15 @@ export async function GET() {
 // Node.js Web App hosting has no cron support of its own). Also callable
 // manually while authenticated in the app, for testing.
 //
-// Flags packages still `not_shipped` a day or more after their creation date
-// — the shipments that were meant to go out but didn't (traffic, courier
-// no-show, etc.) — so it's caught the next morning instead of days later.
-// Emails every run while any are still stuck, not just the first day, since
-// an unresolved failure staying silent after day one defeats the point.
+// Flags packages still not delivered a day or more after being dispatched
+// (or, less often in this org, never even marked shipped) — the shipments
+// that were meant to arrive but didn't (traffic, courier no-show, etc.) — so
+// it's caught the next morning instead of days later. Emails every run while
+// any are still stuck, not just the first day, since an unresolved failure
+// staying silent after day one defeats the point.
 export async function POST() {
   try {
-    const packages = await findAgingNotShippedPackages();
+    const packages = await findAgingUndeliveredPackages();
     const today = jakartaDateStr();
 
     if (packages.length === 0) {
@@ -46,18 +47,20 @@ export async function POST() {
         <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5;font-family:monospace">${p.salesorder_number || '—'}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${p.customer_name || '(unnamed)'}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5;font-family:monospace">${p.package_number}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${p.status === 'shipped' ? 'Shipped, not delivered' : 'Never shipped'}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5;text-align:right">${p.days_aging} day${p.days_aging === 1 ? '' : 's'}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${p.carrier || '—'}</td>
       </tr>`).join('');
 
     const html = `
-      <p>${packages.length} package${packages.length === 1 ? ' is' : 's are'} still marked "Not Shipped" in Zoho a day or more after being packed — most likely failed to actually go out:</p>
-      <table style="border-collapse:collapse;width:100%;max-width:680px">
+      <p>${packages.length} package${packages.length === 1 ? ' has' : 's have'} not been delivered a day or more after being dispatched:</p>
+      <table style="border-collapse:collapse;width:100%;max-width:720px">
         <thead>
           <tr style="background:#f5f5f5;text-align:left;font-size:12px;text-transform:uppercase;color:#666">
             <th style="padding:6px 10px">SO Number</th>
             <th style="padding:6px 10px">Customer</th>
             <th style="padding:6px 10px">Package</th>
+            <th style="padding:6px 10px">Status</th>
             <th style="padding:6px 10px;text-align:right">Aging</th>
             <th style="padding:6px 10px">Carrier</th>
           </tr>
@@ -65,15 +68,15 @@ export async function POST() {
         <tbody>${rows}</tbody>
       </table>
       <p style="margin-top:16px"><a href="https://varindoapp.com/inventory/shipments">Open Shipments in VIA →</a></p>
-      <p style="color:#999;font-size:12px;margin-top:24px">Checked at 09:00 Asia/Jakarta. Stays on this list every morning until the package is marked Shipped.</p>
+      <p style="color:#999;font-size:12px;margin-top:24px">Checked at 09:00 Asia/Jakarta. Stays on this list every morning until the package is marked Delivered.</p>
     `;
-    const text = `${packages.length} package(s) still Not Shipped a day or more after being packed:\n\n` +
-      packages.map(p => `${p.salesorder_number || '—'} — ${p.customer_name || '(unnamed)'} — ${p.package_number} — ${p.days_aging}d — ${p.carrier || 'no carrier'}`).join('\n') +
+    const text = `${packages.length} package(s) not delivered a day or more after being dispatched:\n\n` +
+      packages.map(p => `${p.salesorder_number || '—'} — ${p.customer_name || '(unnamed)'} — ${p.package_number} — ${p.status === 'shipped' ? 'shipped, not delivered' : 'never shipped'} — ${p.days_aging}d — ${p.carrier || 'no carrier'}`).join('\n') +
       `\n\nOpen Shipments in VIA: https://varindoapp.com/inventory/shipments`;
 
     await sendMail({
       to: ALERT_TO,
-      subject: `VIA Alert: ${packages.length} shipment${packages.length === 1 ? '' : 's'} stuck Not Shipped`,
+      subject: `VIA Alert: ${packages.length} shipment${packages.length === 1 ? '' : 's'} not delivered`,
       text,
       html,
     });

@@ -5,6 +5,7 @@ create table if not exists public.shipment_aging_log (
   salesorder_id text not null,
   salesorder_number text,
   customer_name text,
+  status text,
   days_aging integer not null default 1,
   check_date date not null,     -- Jakarta calendar date this check ran on
   flagged_at timestamptz not null default now(),
