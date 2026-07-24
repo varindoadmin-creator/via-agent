@@ -177,6 +177,7 @@ export interface MatchRow {
   customer_region: string;
   so_quantity: number;
   fulfilled_qty: number;
+  transfer_qty: number;
   fully_covered: boolean;
 }
 
@@ -281,7 +282,7 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
   // For each group: the portion of demand within stock_on_hand is already covered;
   // everything beyond it is a shortfall queue, attributed to the specific SOs driving it
   // (oldest SOs get stock first — a reasonable, explainable FIFO allocation).
-  interface ShortfallEntry { salesorder_id: string; salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number; excluded_from_demand: boolean }
+  interface ShortfallEntry { salesorder_id: string; salesorder_number: string; customer_name: string; customer_region: string; location_name: string; date: string; original_qty: number; qty: number; transfer_qty: number; excluded_from_demand: boolean }
   const shortfallByGroup = new Map<string, ShortfallEntry[]>();
   for (const [k, entries] of soByGroup) {
     const [itemId, locationId] = k.split('::');
@@ -300,13 +301,54 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
           customer_name: so.customer_name,
           customer_region: regionByCustomer.get(so.customer_id) || '',
           location_name: item.location_name,
+          date: so.date,
           original_qty: item.need,
           qty: shortfall,
+          transfer_qty: 0,
           excluded_from_demand: so.current_sub_status === SO_SUB_STATUS_ORDERED || so.current_sub_status === SO_SUB_STATUS_STOCK_READY,
         });
       }
     }
     shortfallByGroup.set(k, queue);
+  }
+
+  // ─── HEAD OFFICE → HUB transfer allowance ──────────────────────────────────
+  // Varindo's actual practice: a HUB-BDG/HUB-MDN shortfall is first checked against
+  // HEAD OFFICE inventory — stock gets physically transferred over rather than
+  // triggering a new purchase. So any HEAD OFFICE stock left over after covering
+  // HEAD OFFICE's *own* confirmed SO demand counts as available to shrink hub
+  // shortfalls too (oldest hub SO first, across both hubs, since it's one shared
+  // pool of transferable stock). HEAD OFFICE's own group is untouched — it always
+  // gets first claim on its own stock.
+  const HEAD_OFFICE_LOCATION_ID = process.env.ZOHO_LOCATION_HO || '8607767000000093103';
+  const itemIdsWithHubShortfall = Array.from(new Set(
+    Array.from(shortfallByGroup.keys())
+      .filter(k => k.split('::')[1] !== HEAD_OFFICE_LOCATION_ID)
+      .map(k => k.split('::')[0])
+  ));
+  for (const itemId of itemIdsWithHubShortfall) {
+    const hoKey = groupKey(itemId, HEAD_OFFICE_LOCATION_ID);
+    const hoStock = stockOnHandAt(itemId, HEAD_OFFICE_LOCATION_ID);
+    const hoTotalNeed = (soByGroup.get(hoKey) || []).reduce((sum, e) => sum + e.item.need, 0);
+    let hoSurplus = Math.max(0, hoStock - hoTotalNeed);
+    if (hoSurplus <= 0) continue;
+
+    const hubEntries: ShortfallEntry[] = [];
+    for (const [k, queue] of shortfallByGroup) {
+      const [kItemId, kLocationId] = k.split('::');
+      if (kItemId !== itemId || kLocationId === HEAD_OFFICE_LOCATION_ID) continue;
+      hubEntries.push(...queue);
+    }
+    hubEntries.sort((a, b) => a.date.localeCompare(b.date));
+
+    for (const entry of hubEntries) {
+      if (hoSurplus <= 0) break;
+      if (entry.qty <= 0) continue;
+      const take = Math.min(entry.qty, hoSurplus);
+      entry.qty -= take;
+      entry.transfer_qty += take;
+      hoSurplus -= take;
+    }
   }
 
   // Mutable remaining-quantity view of each shortfall queue, consumed as pending POs allocate against it.
@@ -352,12 +394,18 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
           customer_region: slot.entry.customer_region,
           so_quantity: slot.entry.original_qty,
           fulfilled_qty: take,
-          // Whether this SO's shortfall (its need beyond stock already on hand) is now
-          // fully drained — possibly by this PO alone, possibly combined with earlier POs
-          // that already claimed part of the same slot. This, not a raw quantity compare
-          // against the SO's full original need, is what "matched" vs "partial_so" means:
-          // stock_on_hand already legitimately covers part of the SO, so a PO only needs
-          // to cover the remainder to fully clear it.
+          // Portion of this SO's need that's covered not by this PO or local stock, but by
+          // a HEAD OFFICE → HUB transfer of HEAD OFFICE's own surplus stock (see the
+          // "HEAD OFFICE → HUB transfer allowance" pass above) — already subtracted out of
+          // slot.remaining, so the PO genuinely only needs to cover what's left.
+          transfer_qty: slot.entry.transfer_qty,
+          // Whether this SO's shortfall (its need beyond stock already on hand, and beyond
+          // any HEAD OFFICE transfer) is now fully drained — possibly by this PO alone,
+          // possibly combined with earlier POs that already claimed part of the same slot.
+          // This, not a raw quantity compare against the SO's full original need, is what
+          // "matched" vs "partial_so" means: stock_on_hand and transferable HEAD OFFICE
+          // stock already legitimately cover part of the SO, so a PO only needs to cover
+          // the remainder to fully clear it.
           fully_covered: slot.remaining <= 0,
         });
         remaining -= take;

@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import StatusPill, { PillTone } from '@/components/ui/StatusPill';
 import BoardGroupHeader from '@/components/ui/BoardGroupHeader';
 
-type MatchRow = { salesorder_number: string; customer_name: string; customer_region: string; so_quantity: number; fulfilled_qty: number; fully_covered: boolean };
+type MatchRow = { salesorder_number: string; customer_name: string; customer_region: string; so_quantity: number; fulfilled_qty: number; transfer_qty: number; fully_covered: boolean };
 
 type LineItem = {
   item_id: string;
@@ -308,6 +308,9 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
                                         <span style={{ ...mono, color: 'var(--accent-text)', fontWeight: 500 }}>{m.salesorder_number}</span> {m.customer_name}
                                         {m.customer_region && <span style={{ color: 'var(--text-4)' }}> ({m.customer_region})</span>}
                                         <span style={{ ...mono, color: 'var(--text-3)' }}> — {fmt(m.fulfilled_qty)} of {fmt(m.so_quantity)} {li.unit} SO qty</span>
+                                        {m.transfer_qty > 0 && (
+                                          <span style={{ color: 'var(--info)' }}> (+{fmt(m.transfer_qty)} {li.unit} via HEAD OFFICE transfer)</span>
+                                        )}
                                         {!m.fully_covered && <span style={{ color: 'var(--warning)' }}> (remainder still needed)</span>}
                                       </div>
                                     ))}
