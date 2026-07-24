@@ -67,7 +67,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
       id: 'purchases', label: 'Purchases', icon: Package,
       items: [
         { id: 'purchaseorders', href: '/purchases', label: 'Purchase Orders' },
-        { id: 'bills',          href: '/bills',     label: 'Bills'           },
       ],
     },
     hidden: true,
@@ -125,7 +124,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
   { type: 'standalone', item: { id: 'guide', href: '/guide', icon: BookOpen, label: 'Guide' } },
 ];
 
-const COMING_SOON = ['/bills', '/orders', '/prices', '/reports'];
+const COMING_SOON = ['/orders', '/prices', '/reports'];
 
 // All nav hrefs, flattened once — used to resolve exactly one "active" item per
 // route even when one item's href is a literal path-prefix of another's (e.g.
