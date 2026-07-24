@@ -57,6 +57,14 @@ interface CommissionRow {
   invoices: InvoiceDetail[];
 }
 
+interface TeamData {
+  revenue: number;
+  rate: number;
+  commission: number;
+  paid_invoice_count: number;
+  unpaid_invoice_count: number;
+}
+
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 const formatRp = (n: number) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
 const formatPct = (n: number) => ((n || 0) * 100).toFixed(1) + '%';
@@ -156,6 +164,10 @@ export default function CommissionReportPage() {
   const [search, setSearch] = useState('');
   const [selectedName, setSelectedName] = useState('');
 
+  const [team, setTeam] = useState<TeamData | null>(null);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [teamError, setTeamError] = useState('');
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -173,7 +185,23 @@ export default function CommissionReportPage() {
     }
   }, [period]);
 
+  const fetchTeamData = useCallback(async () => {
+    setTeamLoading(true);
+    setTeamError('');
+    try {
+      const res = await fetch(`/api/reports?type=team&period=${period}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load team commission');
+      setTeam(data as TeamData);
+    } catch (e) {
+      setTeamError(String(e));
+    } finally {
+      setTeamLoading(false);
+    }
+  }, [period]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchTeamData(); }, [fetchTeamData]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -223,15 +251,15 @@ export default function CommissionReportPage() {
       <div style={{ maxWidth: 1500, margin: '0 auto' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Sales Commission</h1>
+            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Commission</h1>
             <p className="text-[var(--text-3)] text-sm mt-0.5">
-              {dateRange || 'Loading…'} · Paid invoices only · GP before PPN
+              {dateRange || 'Loading…'} · Paid invoices only · Before PPN
             </p>
           </div>
-          <button onClick={fetchData} disabled={loading}
+          <button onClick={() => { fetchData(); fetchTeamData(); }} disabled={loading || teamLoading}
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50"
             style={mono}>
-            {loading ? '…' : '↻'}
+            {loading || teamLoading ? '…' : '↻'}
           </button>
         </div>
 
@@ -247,6 +275,50 @@ export default function CommissionReportPage() {
             </button>
           ))}
         </div>
+
+        {/* ─── Team ─────────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[var(--text)] font-semibold text-sm">Team</h2>
+          <span className="text-[var(--text-4)] text-xs">0.5% of total paid Sales Revenue before PPN, company-wide</span>
+        </div>
+
+        {teamError && (
+          <div className="p-4 mb-4 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-sm">
+            {teamError}
+          </div>
+        )}
+
+        <div className="via-card overflow-hidden mb-8">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ ...thStyle, cursor: 'default' }}>Team</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Paid Revenue Before PPN</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Rate</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamLoading && (
+                <tr><td colSpan={4} style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>Loading…</td></tr>
+              )}
+              {!teamLoading && team && (
+                <tr>
+                  <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>
+                    All Salespeople
+                    <div style={{ color: 'var(--text-4)', fontSize: 10 }}>{team.paid_invoice_count} paid invoices</div>
+                  </td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontSize: 12 }}>{formatRp(team.revenue)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontSize: 12 }}>{formatPct(team.rate)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(team.commission)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ─── Salesperson ──────────────────────────────────────────────── */}
+        <h2 className="text-[var(--text)] font-semibold text-sm mb-3">Salesperson</h2>
 
         {!loading && rows.length > 0 && (
           <div className="grid grid-cols-5 gap-3 mb-5">

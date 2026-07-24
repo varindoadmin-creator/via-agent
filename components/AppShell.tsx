@@ -115,8 +115,9 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
     section: {
       id: 'reports', label: 'Reports', icon: BarChart2,
       items: [
-        { id: 'sales-report',     href: '/reports/sales',     label: 'Sales'          },
-        { id: 'purchases-report', href: '/reports/purchases',  label: 'Purchases'      },
+        { id: 'sales-report',      href: '/reports/sales',      label: 'Sales'      },
+        { id: 'purchases-report',  href: '/reports/purchases',  label: 'Purchases'  },
+        { id: 'commission-report', href: '/reports/commission', label: 'Commission' },
       ],
     },
     hidden: true,

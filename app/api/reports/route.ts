@@ -285,13 +285,9 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") || "item";
   const period = searchParams.get("period") || "this_month";
   const paidOnly =
-    searchParams.get("paid_only") === "true" ||
-    type === "commission" ||
-    type === "salesperson";
+    searchParams.get("paid_only") === "true" || type === "commission";
   const includeDetails =
-    searchParams.get("include_details") === "true" ||
-    type === "commission" ||
-    type === "salesperson";
+    searchParams.get("include_details") === "true" || type === "commission";
 
   try {
     const { from, to } = getDateRange(period);
@@ -314,6 +310,88 @@ export async function GET(request: NextRequest) {
     }
 
     const allInvoices = await fetchAllInvoices(from, to);
+
+    if (type === "team") {
+      // Company-wide commission pool: 0.5% of total paid Revenue before PPN,
+      // across ALL invoices regardless of Salesperson assignment (unlike the
+      // per-salesperson commission below, which only counts assigned invoices).
+      const detailedInvoices = await fetchInvoiceDetailsForReport(allInvoices);
+      let revenue = 0;
+      let paidInvoiceCount = 0;
+      let unpaidInvoiceCount = 0;
+
+      for (const { inv, detailInvoice } of detailedInvoices) {
+        const paid = isInvoicePaid(inv, detailInvoice);
+        if (paid) paidInvoiceCount += 1;
+        else unpaidInvoiceCount += 1;
+        if (!paid) continue;
+
+        const lineItems = (detailInvoice.line_items || []) as AnyRecord[];
+        for (const li of lineItems) {
+          revenue += parseMoney(li.item_total ?? li.amount ?? 0);
+        }
+      }
+
+      const rate = 0.005;
+      return NextResponse.json({
+        success: true,
+        revenue,
+        rate,
+        commission: revenue * rate,
+        from,
+        to,
+        invoice_count: allInvoices.length,
+        paid_invoice_count: paidInvoiceCount,
+        unpaid_invoice_count: unpaidInvoiceCount,
+        basis: "0.5% of total paid Revenue before PPN across all invoices (company-wide), regardless of Salesperson assignment.",
+      });
+    }
+
+    if (type === "salesperson") {
+      // Lightweight revenue-by-salesperson for the Sales Reports page — no
+      // cost/GP/commission here, that lives under Reports > Commission.
+      const detailedInvoices = await fetchInvoiceDetailsForReport(allInvoices);
+      const aggregated = new Map<
+        string,
+        { amount: number; invoice_ids: Set<string>; customer_names: Set<string> }
+      >();
+
+      for (const { inv, detailInvoice } of detailedInvoices) {
+        const salesPerson = getSalesPerson(inv, detailInvoice);
+        if (!salesPerson || salesPerson.toLowerCase() === "unassigned") continue;
+
+        const lineItems = (detailInvoice.line_items || []) as AnyRecord[];
+        let invoiceRevenue = 0;
+        for (const li of lineItems) {
+          invoiceRevenue += parseMoney(li.item_total ?? li.amount ?? 0);
+        }
+
+        const current = aggregated.get(salesPerson) || {
+          amount: 0,
+          invoice_ids: new Set<string>(),
+          customer_names: new Set<string>(),
+        };
+        current.amount += invoiceRevenue;
+        current.invoice_ids.add(String(inv.invoice_id));
+        current.customer_names.add(String(inv.customer_name || "Unknown"));
+        aggregated.set(salesPerson, current);
+      }
+
+      const rows = Array.from(aggregated.entries()).map(([name, val]) => ({
+        name,
+        amount: val.amount,
+        invoice_count: val.invoice_ids.size,
+        customer_count: val.customer_names.size,
+      }));
+
+      return NextResponse.json({
+        success: true,
+        rows,
+        from,
+        to,
+        invoice_count: allInvoices.length,
+      });
+    }
 
     if (type === "brand" || type === "location" || type === "customer") {
       const aggregated = new Map<
@@ -377,7 +455,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (type === "salesperson" || type === "commission") {
+    if (type === "commission") {
       // Performance note:
       // This report needs invoice line items to calculate GP from Purchase Rate.
       // Fetch invoice details in parallel instead of one-by-one, and cache item purchase rates briefly.
