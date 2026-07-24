@@ -61,6 +61,7 @@ interface TeamData {
   revenue: number;
   rate: number;
   commission: number;
+  invoice_count: number;
   paid_invoice_count: number;
   unpaid_invoice_count: number;
 }
@@ -279,7 +280,7 @@ export default function CommissionReportPage() {
         {/* ─── Team ─────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[var(--text)] font-semibold text-sm">Team</h2>
-          <span className="text-[var(--text-4)] text-xs">0.5% of total paid Sales Revenue before PPN, company-wide</span>
+          <span className="text-[var(--text-4)] text-xs">0.5% of total Sales Revenue before PPN, company-wide · distributed across all employees</span>
         </div>
 
         {teamError && (
@@ -293,7 +294,7 @@ export default function CommissionReportPage() {
             <thead>
               <tr>
                 <th style={{ ...thStyle, cursor: 'default' }}>Team</th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Paid Revenue Before PPN</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Revenue Before PPN</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Rate</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission</th>
               </tr>
@@ -305,8 +306,8 @@ export default function CommissionReportPage() {
               {!teamLoading && team && (
                 <tr>
                   <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>
-                    All Salespeople
-                    <div style={{ color: 'var(--text-4)', fontSize: 10 }}>{team.paid_invoice_count} paid invoices</div>
+                    Employees
+                    <div style={{ color: 'var(--text-4)', fontSize: 10 }}>{team.invoice_count} invoices ({team.paid_invoice_count} paid, {team.unpaid_invoice_count} unpaid)</div>
                   </td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontSize: 12 }}>{formatRp(team.revenue)}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontSize: 12 }}>{formatPct(team.rate)}</td>

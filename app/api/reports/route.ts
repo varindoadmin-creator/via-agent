@@ -312,9 +312,10 @@ export async function GET(request: NextRequest) {
     const allInvoices = await fetchAllInvoices(from, to);
 
     if (type === "team") {
-      // Company-wide commission pool: 0.5% of total paid Revenue before PPN,
-      // across ALL invoices regardless of Salesperson assignment (unlike the
-      // per-salesperson commission below, which only counts assigned invoices).
+      // Company-wide commission pool distributed across all employees: 0.5%
+      // of total Revenue before PPN across ALL invoices (paid or not),
+      // regardless of Salesperson assignment — unlike the per-salesperson
+      // commission below, which only counts paid, assigned invoices.
       const detailedInvoices = await fetchInvoiceDetailsForReport(allInvoices);
       let revenue = 0;
       let paidInvoiceCount = 0;
@@ -324,7 +325,6 @@ export async function GET(request: NextRequest) {
         const paid = isInvoicePaid(inv, detailInvoice);
         if (paid) paidInvoiceCount += 1;
         else unpaidInvoiceCount += 1;
-        if (!paid) continue;
 
         const lineItems = (detailInvoice.line_items || []) as AnyRecord[];
         for (const li of lineItems) {
@@ -343,7 +343,7 @@ export async function GET(request: NextRequest) {
         invoice_count: allInvoices.length,
         paid_invoice_count: paidInvoiceCount,
         unpaid_invoice_count: unpaidInvoiceCount,
-        basis: "0.5% of total paid Revenue before PPN across all invoices (company-wide), regardless of Salesperson assignment.",
+        basis: "0.5% of total Revenue before PPN across all invoices (company-wide, paid or not), regardless of Salesperson assignment. Distributed across all employees.",
       });
     }
 
