@@ -853,6 +853,152 @@ function ReceivedNotBilledTable({ onRefresh }: { onRefresh: () => void }) {
   );
 }
 
+// ─── Create PO ────────────────────────────────────────────────────────────────
+// One click, per brand: raises a Draft PO per warehouse (HEAD OFFICE / HUB-BDG /
+// HUB-MDN) covering only the still-unpurchased portion of Confirmed SO demand
+// for that brand (net of stock on hand and anything already on order). Draft
+// status — Admin reviews/revises in Zoho before it goes to Pending Approval.
+
+interface BrandVendor { brand: string; vendor_name: string }
+
+interface CreatePOLinePreview {
+  item_id: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  covers: Array<{ salesorder_number: string; customer_name: string; qty: number }>;
+}
+
+interface CreatePOHubResult {
+  location_name: string;
+  purchaseorder_id?: string;
+  purchaseorder_number?: string;
+  line_items: CreatePOLinePreview[];
+  total: number;
+  error?: string;
+}
+
+interface CreatePOSummary {
+  brand: string;
+  vendor_name: string;
+  hubs: CreatePOHubResult[];
+}
+
+function CreatePOPanel({ onCreated }: { onCreated: () => void }) {
+  const [brands, setBrands] = useState<BrandVendor[]>([]);
+  const [brand, setBrand] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [summary, setSummary] = useState<CreatePOSummary | null>(null);
+
+  useEffect(() => {
+    fetch('/api/purchases/create-po')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          setBrands(d.brands || []);
+          if (d.brands?.length) setBrand(d.brands[0].brand);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleCreate() {
+    if (!brand) return;
+    const bv = brands.find(b => b.brand === brand);
+    const ok = window.confirm(`Create Draft Purchase Order(s) in Zoho for brand ${brand} (vendor: ${bv?.vendor_name || '—'})? One PO will be raised per warehouse with unmet Confirmed SO demand.`);
+    if (!ok) return;
+
+    setCreating(true); setError(''); setSummary(null);
+    try {
+      const res = await fetch('/api/purchases/create-po', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to create Purchase Order(s)');
+      setSummary(data);
+      onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="via-card mb-6 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+        <div>
+          <h2 className="font-bold text-base text-[var(--text)]">Create Purchase Order</h2>
+          <p className="text-[var(--text-3)] text-xs mt-0.5">Raises Draft POs per warehouse, covering only unmet Confirmed SO demand for the selected brand</p>
+        </div>
+      </div>
+      <div className="px-5 py-4 flex items-center gap-3">
+        <select
+          value={brand}
+          onChange={e => { setBrand(e.target.value); setSummary(null); setError(''); }}
+          className="via-input text-xs py-1.5 px-3 w-56"
+        >
+          {brands.map(b => <option key={b.brand} value={b.brand}>{b.brand}</option>)}
+        </select>
+        <span className="text-[var(--text-4)] text-xs">
+          Vendor: {brands.find(b => b.brand === brand)?.vendor_name || '—'}
+        </span>
+        <button
+          onClick={handleCreate}
+          disabled={creating || !brand}
+          className="ml-auto px-4 py-2 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+        >
+          {creating ? 'Creating…' : '+ Create PO'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mx-5 mb-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">{error}</div>
+      )}
+
+      {summary && (
+        <div className="mx-5 mb-4 space-y-2">
+          <div className="text-[var(--text-3)] text-xs font-medium uppercase tracking-wider" style={mono}>
+            PO Created Summary — {summary.brand} ({summary.vendor_name})
+          </div>
+          {summary.hubs.length === 0 && (
+            <div className="p-3 bg-[var(--success-bg)] border border-[var(--success-border)] rounded-lg text-[var(--success)] text-xs">
+              No purchase needed — every Confirmed SO for {summary.brand} is already covered by stock or an existing PO.
+            </div>
+          )}
+          {summary.hubs.map((h, i) => (
+            <div key={i} className={`p-3 rounded-lg border text-xs ${h.error ? 'bg-[var(--danger-bg)] border-[var(--danger-border)]' : 'bg-[var(--success-bg)] border-[var(--success-border)]'}`}>
+              <div className="flex items-center justify-between">
+                <span className={`font-semibold ${h.error ? 'text-[var(--danger)]' : 'text-[var(--success)]'}`}>
+                  {h.error ? '✗' : '✓'} {h.location_name}
+                  {h.purchaseorder_number && <span style={mono} className="ml-2 text-[var(--accent-text)]">{h.purchaseorder_number}</span>}
+                </span>
+                {!h.error && <span style={mono} className="text-[var(--text-2)]">{h.line_items.length} item{h.line_items.length !== 1 ? 's' : ''} · {formatRp(h.total)}</span>}
+              </div>
+              {h.error && <div className="mt-1 text-[var(--danger)]">{h.error}</div>}
+              {!h.error && (
+                <div className="mt-2 space-y-1">
+                  {h.line_items.map((li, li_i) => (
+                    <div key={li_i} className="flex items-center justify-between text-[var(--text-3)]">
+                      <span className="truncate max-w-[300px]" title={li.name}>{li.name}</span>
+                      <span style={mono}>{li.quantity} {li.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PurchasesPage() {
   const [draftPOs, setDraftPOs] = useState<PO[]>([]);
   const [issuedPOs, setIssuedPOs] = useState<PO[]>([]);
@@ -923,6 +1069,9 @@ export default function PurchasesPage() {
             placeholder="Search…"
             className="via-input text-xs py-1.5 px-3 w-80" />
         </div>
+
+        {/* Create PO — brand-batched Draft PO generation, covers unmet Confirmed SO demand */}
+        <CreatePOPanel onCreated={fetchAll} />
 
         {/* Table 1 — Draft POs (real Zoho draft status — not yet submitted for approval, no checks) */}
         <div className="mb-6">

@@ -132,6 +132,12 @@ export default function POApprovalPanel({ compact = false, onApproved }: { compa
       if (!data.success) throw new Error(data.error || 'Failed to approve Purchase Order');
       const result = (data.results || [])[0];
       if (result && !result.success) throw new Error(result.error || 'Failed to approve Purchase Order');
+
+      const failedSOs = ((result?.so_status_updates || []) as { salesorder_number: string; success: boolean }[])
+        .filter(u => !u.success);
+      if (failedSOs.length > 0) {
+        setError(`${po.purchaseorder_number} approved, but VIA could not confirm the covered Sales Order(s) flipped to "Ordered" in Zoho: ${failedSOs.map(u => u.salesorder_number).join(', ')}. Check these manually.`);
+      }
       setApproveMessage(`${po.purchaseorder_number} approved in Zoho.`);
       setPurchaseOrders(prev => prev.filter(item => item.purchaseorder_id !== po.purchaseorder_id));
       setExpanded(prev => prev === po.purchaseorder_id ? null : prev);

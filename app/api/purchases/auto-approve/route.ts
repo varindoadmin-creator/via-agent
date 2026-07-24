@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       success: true,
       sent: approved,
       failed,
-      results: results.map(r => ({ po_number: r.purchaseorder_number, success: r.success, error: r.error })),
+      results: results.map(r => ({ po_number: r.purchaseorder_number, success: r.success, error: r.error, so_status_updates: r.so_status_updates })),
     });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });

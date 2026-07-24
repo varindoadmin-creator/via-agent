@@ -9,9 +9,12 @@ import { zohoRequest } from '@/lib/zoho/client';
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
 
-// Same code used in lib/zoho/poApprovalEngine.ts — Zoho's own confirmed-SO
-// sub-status meaning "a PO already exists for this SO's demand".
+// Same codes used in lib/zoho/poApprovalEngine.ts — Zoho's own confirmed-SO
+// sub-statuses. 'cs_awaitin' means a PO already exists for this SO's demand;
+// 'cs_readyfo' ("Stock Ready") means Admin has already confirmed inventory
+// covers it, so it never needed a PO in the first place — ignore both.
 const SO_SUB_STATUS_ORDERED = 'cs_awaitin';
+const SO_SUB_STATUS_STOCK_READY = 'cs_readyfo';
 
 export interface PurchaseGapSO {
   salesorder_id: string;
@@ -58,7 +61,8 @@ export async function findSameDayPurchaseGaps(): Promise<PurchaseGapSO[]> {
     if (!confirmedAt) continue;
     if (jakartaDateStr(new Date(confirmedAt)) !== today) continue;
 
-    if (String(so.current_sub_status || '') === SO_SUB_STATUS_ORDERED) continue;
+    const subStatus = String(so.current_sub_status || '');
+    if (subStatus === SO_SUB_STATUS_ORDERED || subStatus === SO_SUB_STATUS_STOCK_READY) continue;
 
     gaps.push({
       salesorder_id: String(so.salesorder_id || ''),

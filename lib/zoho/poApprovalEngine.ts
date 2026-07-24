@@ -103,8 +103,10 @@ interface ConfirmedSO {
 // Zoho's own confirmed-SO sub-status codes (same as app/api/so-stock-check/route.ts).
 // 'cs_awaitin' ("Ordered") means a PO already exists for this SO's demand — even if that
 // PO isn't sitting in Pending Approval right now (it may already be open/issued), so this
-// demand shouldn't be re-flagged as uncovered.
+// demand shouldn't be re-flagged as uncovered. 'cs_readyfo' ("Stock Ready") means Admin has
+// already confirmed inventory covers this SO — it never needed a PO, so treat it the same way.
 const SO_SUB_STATUS_ORDERED = 'cs_awaitin';
+const SO_SUB_STATUS_STOCK_READY = 'cs_readyfo';
 
 async function getPODetail(id: string): Promise<PendingPO | null> {
   try {
@@ -279,7 +281,7 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
   // For each group: the portion of demand within stock_on_hand is already covered;
   // everything beyond it is a shortfall queue, attributed to the specific SOs driving it
   // (oldest SOs get stock first — a reasonable, explainable FIFO allocation).
-  interface ShortfallEntry { salesorder_id: string; salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number; already_ordered: boolean }
+  interface ShortfallEntry { salesorder_id: string; salesorder_number: string; customer_name: string; customer_region: string; location_name: string; original_qty: number; qty: number; excluded_from_demand: boolean }
   const shortfallByGroup = new Map<string, ShortfallEntry[]>();
   for (const [k, entries] of soByGroup) {
     const [itemId, locationId] = k.split('::');
@@ -300,7 +302,7 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
           location_name: item.location_name,
           original_qty: item.need,
           qty: shortfall,
-          already_ordered: so.current_sub_status === SO_SUB_STATUS_ORDERED,
+          excluded_from_demand: so.current_sub_status === SO_SUB_STATUS_ORDERED || so.current_sub_status === SO_SUB_STATUS_STOCK_READY,
         });
       }
     }
@@ -491,10 +493,11 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
     const sample = (soByGroup.get(k) || [])[0]?.item;
     for (const slot of queue) {
       if (slot.remaining <= 0) continue;
-      // Zoho already shows this SO as "Ordered" — a PO exists for it (possibly already
-      // approved/issued, so it's no longer in our Pending Approval set). Don't tell Admin
-      // to raise a new one.
-      if (slot.entry.already_ordered) continue;
+      // Zoho already shows this SO as "Ordered" (a PO exists — possibly already
+      // approved/issued, so it's no longer in our Pending Approval set) or "Stock Ready"
+      // (Admin already confirmed inventory covers it). Either way, don't tell Admin to
+      // raise a new PO for it.
+      if (slot.entry.excluded_from_demand) continue;
       uncovered_demand.push({
         item_id: itemId,
         name: sample?.name || '',
@@ -516,11 +519,18 @@ export async function computeApprovalData(): Promise<{ purchase_orders: Computed
 // data, not whatever the client happened to have on screen, and rejects any PO
 // whose coverage isn't clean (PARTIAL / REGION_MIX / NEEDS_REVIEW).
 
+export interface SOStatusUpdate {
+  salesorder_id: string;
+  salesorder_number: string;
+  success: boolean;
+}
+
 export interface ApproveResult {
   purchaseorder_id: string;
   purchaseorder_number: string;
   success: boolean;
   error?: string;
+  so_status_updates?: SOStatusUpdate[];
 }
 
 // ─── PO approval logging — feeds the "Purchase Orders — Stock/Excess Items"
@@ -595,21 +605,36 @@ export async function approvePurchaseOrders(purchaseorderIds: string[], approved
       // mirroring /salesorders/{id}/approve). Not /status/open, which jumps straight to
       // Issued and skips the Approved step.
       await zohoRequest(`/purchaseorders/${poId}/approve`, { method: 'POST', body: {} });
-      results.push({ purchaseorder_id: poId, purchaseorder_number: po.purchaseorder_number, success: true });
       await logPOApproval(po, approvedBy);
 
       // Mark every SO this PO covers as "Ordered" in Zoho — best-effort, since the PO
       // itself is already approved at this point and a failure here shouldn't undo that.
-      const matchedSOIds = Array.from(new Set(
-        po.line_items.flatMap(li => li.matches.map(m => m.salesorder_id)).filter(Boolean)
-      ));
-      await Promise.all(matchedSOIds.map(async soId => {
+      // Each update is then re-verified by re-fetching the SO, since Zoho has previously
+      // 404'd on this call while still returning 200 further up the chain — a silent
+      // catch here isn't enough, Admin needs to see when a covered SO didn't actually flip.
+      const matchedSOs = Array.from(new Map(
+        po.line_items.flatMap(li => li.matches.map(m => [m.salesorder_id, m.salesorder_number] as const))
+      ).entries()).filter(([soId]) => soId);
+
+      const so_status_updates: SOStatusUpdate[] = await Promise.all(matchedSOs.map(async ([soId, soNumber]) => {
         try {
           await zohoRequest(`/salesorders/${soId}/substatus/${SO_SUB_STATUS_ORDERED}`, { method: 'POST', body: {} });
         } catch (e) {
           console.warn(`[PO Approval] Failed to mark SO ${soId} as Ordered:`, e);
+          return { salesorder_id: soId, salesorder_number: soNumber, success: false };
+        }
+        try {
+          const check = await zohoRequest<{ salesorder?: Record<string, unknown> }>(`/salesorders/${soId}`);
+          const ok = s(check.salesorder?.current_sub_status) === SO_SUB_STATUS_ORDERED;
+          if (!ok) console.warn(`[PO Approval] SO ${soId} substatus call returned OK but current_sub_status is still "${s(check.salesorder?.current_sub_status)}"`);
+          return { salesorder_id: soId, salesorder_number: soNumber, success: ok };
+        } catch (e) {
+          console.warn(`[PO Approval] Failed to verify SO ${soId} status after update:`, e);
+          return { salesorder_id: soId, salesorder_number: soNumber, success: false };
         }
       }));
+
+      results.push({ purchaseorder_id: poId, purchaseorder_number: po.purchaseorder_number, success: true, so_status_updates });
     } catch (e) {
       results.push({ purchaseorder_id: poId, purchaseorder_number: po?.purchaseorder_number || poId, success: false, error: e instanceof Error ? e.message : String(e) });
     }
