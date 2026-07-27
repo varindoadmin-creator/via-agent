@@ -12,8 +12,12 @@ let tokenExpiresAt: number = 0;
  * Get the Zoho API base URL based on the DC (data center) setting.
  */
 export function getZohoApiBaseUrl(): string {
-  if (process.env.ZOHO_API_BASE_URL) {
-    return process.env.ZOHO_API_BASE_URL;
+  const configuredUrl =
+    process.env.ZOHO_BOOKS_BASE_URL ||
+    process.env.ZOHO_API_BASE_URL ||
+    process.env.ZOHO_BASE_URL;
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, '');
   }
   const dc = (process.env.ZOHO_DC || 'com').toLowerCase();
   const dcMap: Record<string, string> = {
@@ -32,6 +36,9 @@ export function getZohoApiBaseUrl(): string {
  * Get the Zoho OAuth base URL based on the DC.
  */
 export function getZohoOAuthUrl(): string {
+  if (process.env.ZOHO_ACCOUNTS_BASE_URL) {
+    return process.env.ZOHO_ACCOUNTS_BASE_URL.replace(/\/+$/, '');
+  }
   const dc = (process.env.ZOHO_DC || 'com').toLowerCase();
   const dcMap: Record<string, string> = {
     us: 'https://accounts.zoho.com',

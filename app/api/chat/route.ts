@@ -439,7 +439,7 @@ async function handleSOStockPOCheckIntent(
       ? (await getItemWithStock(String(lineItem.item_id)))
       : null;
 
-    const availableStock = zohoItem?.available_stock ?? null;
+    const availableStock = zohoItem?.total_available_stock ?? null;
     const soQty = lineItem.quantity;
     const stockStatus =
       availableStock === null

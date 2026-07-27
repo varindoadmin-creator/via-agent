@@ -188,7 +188,14 @@ async function fetchInvoiceDetailsForReport(invoices: AnyRecord[]) {
     }
   });
 
-  return details.filter((d) => d.detailInvoice) as {
+  const failed = details.filter((d) => !d.detailInvoice);
+  if (failed.length > 0) {
+    throw new Error(
+      `Could not load ${failed.length} of ${invoices.length} invoice details from Zoho. Please retry; no partial report was returned.`,
+    );
+  }
+
+  return details as {
     inv: AnyRecord;
     detailInvoice: AnyRecord;
     error: null;
@@ -330,6 +337,12 @@ export async function GET(request: NextRequest) {
         for (const li of lineItems) {
           revenue += parseMoney(li.item_total ?? li.amount ?? 0);
         }
+
+        // Shipping is part of invoice revenue before PPN but is not represented
+        // by an item line. Omitting it understated June 2026 by exactly Rp 50,000.
+        revenue += parseMoney(
+          detailInvoice.shipping_charge ?? inv.shipping_charge ?? 0,
+        );
       }
 
       const rate = 0.005;

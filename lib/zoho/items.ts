@@ -1,12 +1,9 @@
 // ─── Zoho Books Items + Stock ─────────────────────────────────────────────────
 // Server-side only. Never import in client components.
 
-import { getZohoAccessToken, getZohoApiBaseUrl } from './auth';
+import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from './auth';
 import { fetchWithRetry } from './retry';
 import { ZohoItem } from '@/types/zoho';
-
-// Read lazily at call time so env vars are always fresh
-function getOrgId() { return process.env.ZOHO_ORGANIZATION_ID || ''; }
 
 function getLocationLabels(): Record<string, string> {
   return {
@@ -39,7 +36,7 @@ async function zohoRequest(path: string) {
   const token = await getZohoAccessToken();
   const base = getZohoApiBaseUrl();
   const sep = path.includes('?') ? '&' : '?';
-  const url = `${base}${path}${sep}organization_id=${getOrgId()}`;
+  const url = `${base}${path}${sep}organization_id=${encodeURIComponent(getZohoOrgId())}`;
   const res = await fetchWithRetry(url, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
@@ -51,11 +48,12 @@ async function zohoRequest(path: string) {
 /**
  * Search items by name or SKU.
  */
-export async function searchItems(query: string): Promise<ZohoItem[]> {
+export async function searchItems(query: string, limit = 10): Promise<ZohoItem[]> {
   if (!query?.trim()) return [];
+  const perPage = Math.max(1, Math.min(200, Math.trunc(limit) || 10));
   try {
-    const url = `/items?search_text=${encodeURIComponent(query.trim())}&per_page=10`;
-    console.log('[searchItems] URL:', url, '| OrgID:', getOrgId());
+    const url = `/items?search_text=${encodeURIComponent(query.trim())}&per_page=${perPage}`;
+    console.log('[searchItems] URL:', url);
     const res = await zohoRequest(url);
     console.log('[searchItems] Returned:', res.items?.length ?? 0, 'items');
     if (res.items?.length === 0) {
@@ -63,12 +61,12 @@ export async function searchItems(query: string): Promise<ZohoItem[]> {
       const prefix = query.trim().split(' ')[0];
       if (prefix !== query.trim()) {
         console.log('[searchItems] Retrying with prefix:', prefix);
-        const res2 = await zohoRequest(`/items?search_text=${encodeURIComponent(prefix)}&per_page=10`);
+        const res2 = await zohoRequest(`/items?search_text=${encodeURIComponent(prefix)}&per_page=${perPage}`);
         console.log('[searchItems] Prefix retry returned:', res2.items?.length ?? 0, 'items');
-        return res2.items || [];
+        return (res2.items || []).slice(0, perPage);
       }
     }
-    return res.items || [];
+    return (res.items || []).slice(0, perPage);
   } catch (err) {
     console.error('[searchItems] Error:', err);
     return [];
