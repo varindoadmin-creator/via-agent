@@ -4,7 +4,7 @@ import {
   getZohoApiBaseUrl,
   getZohoOrgId,
 } from "@/lib/zoho/auth";
-import { fetchWithRetry } from "@/lib/zoho/retry";
+import { fetchWithRetry, type RetryOptions } from "@/lib/zoho/retry";
 
 // Yearly commission reports fetch and aggregate many Zoho invoice details.
 // Vercel's default function duration can terminate the request and return an
@@ -40,18 +40,23 @@ async function mapLimit<T, R>(
   return results;
 }
 
-async function zohoGet(path: string) {
+async function zohoGet(path: string, retryOptions?: RetryOptions) {
   const token = await getZohoAccessToken();
   const base = getZohoApiBaseUrl();
   const orgId = getZohoOrgId();
   const sep = path.includes("?") ? "&" : "?";
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timeoutMs = retryOptions ? 120_000 : 8_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetchWithRetry(`${base}${path}${sep}organization_id=${orgId}`, {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      signal: controller.signal,
-    });
+    const res = await fetchWithRetry(
+      `${base}${path}${sep}organization_id=${orgId}`,
+      {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+        signal: controller.signal,
+      },
+      retryOptions,
+    );
     const body = await res.json();
     if (!res.ok) throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
     return body;
@@ -173,7 +178,15 @@ async function buildPurchaseRateMap() {
 }
 
 async function fetchInvoiceDetailsForReport(invoices: AnyRecord[]) {
-  const details = await mapLimit(invoices, 8, async (inv) => {
+  // Zoho applies an organization-wide requests-per-minute limit. Annual
+  // reports used to fire eight detail requests concurrently, which could make
+  // every request in the batch return code 43/HTTP 429. Pace detail reads to
+  // stay below that threshold and use longer backoff if another process is
+  // using the same Zoho organization at the same time.
+  const details = await mapLimit(invoices, 1, async (inv, index) => {
+    if (index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
     const invId = String(inv.invoice_id || "");
     if (!invId)
       return {
@@ -182,7 +195,10 @@ async function fetchInvoiceDetailsForReport(invoices: AnyRecord[]) {
         error: new Error("Missing invoice_id"),
       };
     try {
-      const detail = await zohoGet(`/invoices/${invId}`);
+      const detail = await zohoGet(`/invoices/${invId}`, {
+        retries: 4,
+        baseDelayMs: 5_000,
+      });
       return {
         inv,
         detailInvoice: (detail.invoice || {}) as AnyRecord,
@@ -196,8 +212,15 @@ async function fetchInvoiceDetailsForReport(invoices: AnyRecord[]) {
 
   const failed = details.filter((d) => !d.detailInvoice);
   if (failed.length > 0) {
+    const rateLimited = failed.some(({ error }) =>
+      /Zoho 429|code["']?:\s*43|maximum number of requests per minute/i.test(
+        String(error),
+      ),
+    );
     throw new Error(
-      `Could not load ${failed.length} of ${invoices.length} invoice details from Zoho. Please retry; no partial report was returned.`,
+      rateLimited
+        ? "Zoho Books temporarily rate-limited this organization. Please wait a few minutes and retry; no partial report was returned."
+        : `Could not load ${failed.length} of ${invoices.length} invoice details from Zoho. Please retry; no partial report was returned.`,
     );
   }
 
