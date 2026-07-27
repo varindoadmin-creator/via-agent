@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { findAgingUndeliveredPackages } from '@/lib/shipmentAging/check';
 import { logAgingPackages } from '@/lib/shipmentAging/log';
 import { sendMail } from '@/lib/email/sendMail';
+import { recordCronRun } from '@/lib/cron/runLog';
+
+export const maxDuration = 300;
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
 const ALERT_TO = process.env.VIA_ALERT_EMAIL || 'varindo.admin@gmail.com';
@@ -34,11 +37,16 @@ export async function GET() {
 // any are still stuck, not just the first day, since an unresolved failure
 // staying silent after day one defeats the point.
 export async function POST() {
+  const startedAt = new Date().toISOString();
   try {
     const packages = await findAgingUndeliveredPackages();
     const today = jakartaDateStr();
 
     if (packages.length === 0) {
+      await recordCronRun('shipments-aging-check', 'success', startedAt, {
+        package_count: 0,
+        emailed: false,
+      });
       return NextResponse.json({ success: true, package_count: 0, emailed: false });
     }
 
@@ -83,9 +91,15 @@ export async function POST() {
 
     await logAgingPackages(packages, today);
 
+    await recordCronRun('shipments-aging-check', 'success', startedAt, {
+      package_count: packages.length,
+      emailed: true,
+    });
     return NextResponse.json({ success: true, package_count: packages.length, emailed: true });
   } catch (err) {
     console.error('[ShipmentAgingCheck] error:', err);
-    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    const error = err instanceof Error ? err.message : String(err);
+    await recordCronRun('shipments-aging-check', 'failed', startedAt, {}, error);
+    return NextResponse.json({ success: false, error }, { status: 500 });
   }
 }

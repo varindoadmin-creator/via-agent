@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runPriceListSync } from '@/lib/zoho/priceListSync';
+import { recordCronRun } from '@/lib/cron/runLog';
 
 // Triggered daily at 09:00 Asia/Jakarta by an external cron-job.org scheduled
 // job (see middleware.ts for the x-cron-secret auth bypass — Hostinger's
@@ -33,6 +34,7 @@ async function logRows(rows: Array<Record<string, unknown>>) {
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = new Date().toISOString();
   try {
     const body = await req.json().catch(() => ({}));
     const dryRun = (body as { dry_run?: boolean }).dry_run !== false; // default true — must explicitly pass false to write
@@ -55,9 +57,17 @@ export async function POST(req: NextRequest) {
     const skipped = result.rows.filter(r => r.action === 'skipped').length;
     console.log('[PriceListSync] Run complete:', { dryRun, scanned: result.scanned_items, added, skipped });
 
+    await recordCronRun('inventory-price-list-sync', 'success', startedAt, {
+      dry_run: dryRun,
+      scanned: result.scanned_items,
+      added,
+      skipped,
+    });
     return NextResponse.json({ success: true, ...result, added, skipped });
   } catch (err) {
     console.error('[PriceListSync] Error:', err);
-    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    const error = err instanceof Error ? err.message : String(err);
+    await recordCronRun('inventory-price-list-sync', 'failed', startedAt, {}, error);
+    return NextResponse.json({ success: false, error }, { status: 500 });
   }
 }

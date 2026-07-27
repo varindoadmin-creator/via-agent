@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { findSameDayPurchaseGaps } from '@/lib/purchaseGap/check';
 import { getLoggedGapIds, logPurchaseGaps } from '@/lib/purchaseGap/log';
 import { sendMail } from '@/lib/email/sendMail';
+import { recordCronRun } from '@/lib/cron/runLog';
+
+export const maxDuration = 300;
 
 // Live check for the in-app alert on Home — always reflects current Zoho
 // state (self-clears the moment a PO is placed), independent of whether/when
@@ -36,11 +39,16 @@ function formatRp(n: number) {
 // is how Admin forgetting to purchase items for a confirmed SO gets caught
 // the same day, instead of days later.
 export async function POST() {
+  const startedAt = new Date().toISOString();
   try {
     const gaps = await findSameDayPurchaseGaps();
     const today = jakartaDateStr();
 
     if (gaps.length === 0) {
+      await recordCronRun('salesorders-purchase-gap-check', 'success', startedAt, {
+        gap_count: 0,
+        emailed: false,
+      });
       return NextResponse.json({ success: true, gap_count: 0, emailed: false });
     }
 
@@ -88,9 +96,16 @@ export async function POST() {
 
     await logPurchaseGaps(gaps, today, true);
 
+    await recordCronRun('salesorders-purchase-gap-check', 'success', startedAt, {
+      gap_count: gaps.length,
+      new_count: newGaps.length,
+      emailed,
+    });
     return NextResponse.json({ success: true, gap_count: gaps.length, new_count: newGaps.length, emailed });
   } catch (err) {
     console.error('[PurchaseGapCheck] error:', err);
-    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    const error = err instanceof Error ? err.message : String(err);
+    await recordCronRun('salesorders-purchase-gap-check', 'failed', startedAt, {}, error);
+    return NextResponse.json({ success: false, error }, { status: 500 });
   }
 }

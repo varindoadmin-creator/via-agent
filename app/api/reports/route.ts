@@ -177,15 +177,18 @@ async function buildPurchaseRateMap() {
   return rates;
 }
 
-async function fetchInvoiceDetailsForReport(invoices: AnyRecord[]) {
+async function fetchInvoiceDetailsForReport(
+  invoices: AnyRecord[],
+  options: { concurrency?: number; delayMs?: number } = {},
+) {
+  const concurrency = options.concurrency ?? 8;
+  const delayMs = options.delayMs ?? 0;
   // Zoho applies an organization-wide requests-per-minute limit. Annual
-  // reports used to fire eight detail requests concurrently, which could make
-  // every request in the batch return code 43/HTTP 429. Pace detail reads to
-  // stay below that threshold and use longer backoff if another process is
-  // using the same Zoho organization at the same time.
-  const details = await mapLimit(invoices, 1, async (inv, index) => {
-    if (index > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 750));
+  // reports need pacing, but applying that delay to monthly reports can exceed
+  // the browser/serverless request window. Callers select the appropriate mode.
+  const details = await mapLimit(invoices, concurrency, async (inv, index) => {
+    if (delayMs > 0 && index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
     const invId = String(inv.invoice_id || "");
     if (!invId)
@@ -394,7 +397,13 @@ export async function GET(request: NextRequest) {
     if (type === "salesperson") {
       // Lightweight revenue-by-salesperson for the Sales Reports page — no
       // cost/GP/commission here, that lives under Reports > Commission.
-      const detailedInvoices = await fetchInvoiceDetailsForReport(allInvoices);
+      const isAnnual = period === "this_year" || period === "prev_year";
+      const detailedInvoices = await fetchInvoiceDetailsForReport(
+        allInvoices,
+        isAnnual
+          ? { concurrency: 1, delayMs: 750 }
+          : { concurrency: 8 },
+      );
       const aggregated = new Map<
         string,
         { amount: number; invoice_ids: Set<string>; customer_names: Set<string> }
@@ -503,9 +512,15 @@ export async function GET(request: NextRequest) {
       // Performance note:
       // This report needs invoice line items to calculate GP from Purchase Rate.
       // Fetch invoice details in parallel instead of one-by-one, and cache item purchase rates briefly.
+      const isAnnual = period === "this_year" || period === "prev_year";
       const [purchaseRates, detailedInvoices] = await Promise.all([
         buildPurchaseRateMap(),
-        fetchInvoiceDetailsForReport(allInvoices),
+        fetchInvoiceDetailsForReport(
+          allInvoices,
+          isAnnual
+            ? { concurrency: 1, delayMs: 750 }
+            : { concurrency: 8 },
+        ),
       ]);
       const aggregated = new Map<
         string,

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
 import { fetchWithRetry } from '@/lib/zoho/retry';
+import { recordCronRun } from '@/lib/cron/runLog';
+
+export const maxDuration = 300;
 
 // Triggered daily at 09:00 Asia/Jakarta by an external cron-job.org scheduled
 // job (see middleware.ts for the x-cron-secret auth bypass — Hostinger's
@@ -59,13 +62,18 @@ async function zohoGet(path: string) {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       signal: controller.signal,
     });
-    return res.json();
+    const body = await res.json();
+    if (!res.ok || (body.code !== undefined && body.code !== 0)) {
+      throw new Error(`Zoho ${res.status}: ${JSON.stringify(body)}`);
+    }
+    return body;
   } finally {
     clearTimeout(timer);
   }
 }
 
 export async function POST() {
+  const startedAt = new Date().toISOString();
   try {
     await getZohoAccessToken();
 
@@ -141,8 +149,16 @@ export async function POST() {
       error: r.error || null,
     })));
 
+    await recordCronRun('invoices-auto-send', 'success', startedAt, {
+      drafts: drafts.length,
+      sent,
+      skipped,
+      failed,
+    });
     return NextResponse.json({ success: true, sent, skipped, failed, results });
   } catch (err) {
-    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+    const error = err instanceof Error ? err.message : String(err);
+    await recordCronRun('invoices-auto-send', 'failed', startedAt, {}, error);
+    return NextResponse.json({ success: false, error }, { status: 500 });
   }
 }
