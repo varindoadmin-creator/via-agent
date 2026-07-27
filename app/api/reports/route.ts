@@ -6,6 +6,11 @@ import {
 } from "@/lib/zoho/auth";
 import { fetchWithRetry } from "@/lib/zoho/retry";
 
+// Yearly commission reports fetch and aggregate many Zoho invoice details.
+// Vercel's default function duration can terminate the request and return an
+// HTML timeout page before this route has a chance to return JSON.
+export const maxDuration = 300;
+
 type AnyRecord = Record<string, unknown>;
 
 let purchaseRateCache: {
@@ -110,12 +115,13 @@ function getDateRange(period: string): { from: string; to: string } {
   }
 }
 
-async function fetchAllInvoices(from: string, to: string) {
+async function fetchAllInvoices(from: string, to: string, status?: string) {
   const allInvoices: AnyRecord[] = [];
   let page = 1;
   while (true) {
+    const statusParam = status ? `&status=${encodeURIComponent(status)}` : "";
     const data = await zohoGet(
-      `/invoices?date_start=${from}&date_end=${to}&per_page=200&page=${page}&sort_column=date&sort_order=A`,
+      `/invoices?date_start=${from}&date_end=${to}${statusParam}&per_page=200&page=${page}&sort_column=date&sort_order=A`,
     );
     const batch = (data.invoices || []) as AnyRecord[];
     allInvoices.push(...batch);
@@ -316,33 +322,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, rows, from, to });
     }
 
-    const allInvoices = await fetchAllInvoices(from, to);
+    // Salesperson commission only includes paid invoices, so do not download
+    // and inspect every unpaid invoice in annual periods.
+    const invoiceStatus = type === "commission" && paidOnly ? "paid" : undefined;
+    const allInvoices = await fetchAllInvoices(from, to, invoiceStatus);
 
     if (type === "team") {
       // Company-wide commission pool distributed across all employees: 0.5%
       // of total Revenue before PPN across ALL invoices (paid or not),
       // regardless of Salesperson assignment — unlike the per-salesperson
       // commission below, which only counts paid, assigned invoices.
-      const detailedInvoices = await fetchInvoiceDetailsForReport(allInvoices);
-      let revenue = 0;
+      // Zoho's aggregate report returns invoice sales exclusive of tax in one
+      // request. This avoids fetching hundreds of individual invoice details
+      // for annual periods. Zoho's invoice_sales value includes shipping.
+      const salesReport = await zohoGet(
+        `/reports/salesbysalesperson?from_date=${from}&to_date=${to}&per_page=200`,
+      );
+      const salesRows = (salesReport.sales || []) as AnyRecord[];
+      const revenue = salesRows.reduce(
+        (sum, row) => sum + parseMoney(row.invoice_sales ?? row.sales ?? 0),
+        0,
+      );
+
       let paidInvoiceCount = 0;
       let unpaidInvoiceCount = 0;
 
-      for (const { inv, detailInvoice } of detailedInvoices) {
-        const paid = isInvoicePaid(inv, detailInvoice);
+      for (const inv of allInvoices) {
+        const paid = isInvoicePaid(inv);
         if (paid) paidInvoiceCount += 1;
         else unpaidInvoiceCount += 1;
-
-        const lineItems = (detailInvoice.line_items || []) as AnyRecord[];
-        for (const li of lineItems) {
-          revenue += parseMoney(li.item_total ?? li.amount ?? 0);
-        }
-
-        // Shipping is part of invoice revenue before PPN but is not represented
-        // by an item line. Omitting it understated June 2026 by exactly Rp 50,000.
-        revenue += parseMoney(
-          detailInvoice.shipping_charge ?? inv.shipping_charge ?? 0,
-        );
       }
 
       const rate = 0.005;

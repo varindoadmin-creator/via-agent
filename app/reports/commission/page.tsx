@@ -71,6 +71,25 @@ const formatRp = (n: number) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID
 const formatPct = (n: number) => ((n || 0) * 100).toFixed(1) + '%';
 const formatQty = (n: number) => Number(n || 0).toLocaleString('id-ID');
 
+async function readApiJson(res: Response) {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    const looksLikeTimeout = res.status === 504 || /timeout|timed out/i.test(text);
+    throw new Error(
+      looksLikeTimeout
+        ? 'The commission report took too long to load. Please retry.'
+        : `The server returned an unexpected response (${res.status || 'unknown status'}).`,
+    );
+  }
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
 const PERIODS: { key: Period; label: string }[] = [
   { key: 'this_month', label: 'This Month' },
   { key: 'prev_month', label: 'Previous Month' },
@@ -174,7 +193,7 @@ export default function CommissionReportPage() {
     setError('');
     try {
       const res = await fetch(`/api/reports?type=commission&period=${period}&paid_only=true`);
-      const data = await res.json();
+      const data = await readApiJson(res);
       if (!data.success) throw new Error(data.error || 'Failed to load commission report');
       setRows(data.rows || []);
       setDateRange(data.from && data.to ? `${data.from} – ${data.to}` : '');
@@ -191,7 +210,7 @@ export default function CommissionReportPage() {
     setTeamError('');
     try {
       const res = await fetch(`/api/reports?type=team&period=${period}`);
-      const data = await res.json();
+      const data = await readApiJson(res);
       if (!data.success) throw new Error(data.error || 'Failed to load team commission');
       setTeam(data as TeamData);
     } catch (e) {
