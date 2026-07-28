@@ -373,7 +373,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   // this — this filter just keeps the sidebar honest about what's reachable.
   const visibleNav = role === 'admin'
     ? NAV.filter(entry =>
-        (entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'documents' || entry.section.id === 'sales')) ||
+        (entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'documents' || entry.section.id === 'sales' || entry.section.id === 'purchases')) ||
         (entry.type === 'standalone' && entry.item.id === 'guide')
       ).map(entry => {
         // Sales is only shown so Admin can reach Customers — Invoices and Tax

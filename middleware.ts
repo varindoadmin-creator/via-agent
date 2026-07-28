@@ -18,13 +18,14 @@ function isCronAuthorized(req: NextRequest): boolean {
 }
 
 // Path prefixes the 'admin' role may access — matches exactly what's visible
-// in today's sidebar (Approvals + Requests). Everything else is Director-only.
+// in the Admin sidebar. Everything else is Director-only.
 const ADMIN_ALLOWED_PREFIXES = [
   '/approvals/so', '/approvals/po', '/api/approvals',
   '/requests', '/api/requests',
   '/documents', '/api/documents',
   '/guide',
   '/customers', '/api/customers',
+  '/purchases', '/api/purchases',
 ];
 
 function isPublic(pathname: string): boolean {
