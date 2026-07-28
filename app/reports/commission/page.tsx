@@ -19,6 +19,9 @@ interface InvoiceLine {
   cost: number;
   gross_profit: number;
   gp_margin: number;
+  discount_percent: number;
+  discount_commission_rate: number;
+  discount_commission: number;
 }
 
 interface InvoiceDetail {
@@ -179,6 +182,69 @@ function printStatement(row: CommissionRow, dateRange: string) {
   w.focus();
 }
 
+function printDiscountStatement(row: CommissionRow, dateRange: string) {
+  const lineRows = row.invoices.flatMap(inv =>
+    inv.line_items.map(li => `
+      <tr>
+        <td>${esc(inv.date)}</td>
+        <td>${esc(inv.invoice_number)}</td>
+        <td>${esc(inv.customer_name)}</td>
+        <td>${esc(li.name)}</td>
+        <td>${esc(li.sku)}</td>
+        <td class="right">${formatQty(li.quantity)}</td>
+        <td class="right">${li.discount_percent.toFixed(2)}%</td>
+        <td class="right">${formatRp(li.revenue)}</td>
+        <td class="right">${formatPct(li.discount_commission_rate)}</td>
+        <td class="right">${formatRp(li.discount_commission)}</td>
+      </tr>
+    `)
+  ).join('');
+
+  const breakdownRows = ([
+    ['0', '0%', '5%'],
+    ['5', '5%', '3%'],
+    ['10', '10%', '2%'],
+    ['other', 'Other', '0%'],
+  ] as const).map(([key, discount, rate]) => {
+    const bucket = row.discount_breakdown?.[key];
+    return `<tr>
+      <td>${discount}</td>
+      <td class="right">${bucket?.line_count || 0}</td>
+      <td class="right">${formatRp(bucket?.revenue || 0)}</td>
+      <td class="right">${rate}</td>
+      <td class="right">${formatRp(bucket?.commission || 0)}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!doctype html><html><head><title>Discount Commission Statement - ${esc(row.name)}</title>
+    <style>
+      body{font-family:Arial,sans-serif;color:#111;margin:24px;font-size:11px}h1{font-size:20px;margin:0 0 4px}.muted{color:#666}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0}.card{border:1px solid #ddd;border-radius:8px;padding:10px}.label{font-size:10px;text-transform:uppercase;color:#666}.value{font-size:15px;font-weight:700;margin-top:4px}table{width:100%;border-collapse:collapse;margin-bottom:18px}th,td{border-bottom:1px solid #ddd;padding:7px;text-align:left;vertical-align:top}th{background:#f5f5f5;font-size:9px;text-transform:uppercase;color:#555}.right{text-align:right}.note{margin-top:18px;color:#555;font-size:11px}@media print{button{display:none}}
+    </style></head><body>
+      <button onclick="window.print()" style="float:right;padding:8px 12px">Print / Save as PDF</button>
+      <h1>Salesperson Discount Commission</h1>
+      <div class="muted">${esc(dateRange)} · All invoices · ${esc(row.name)}</div>
+      <div class="grid">
+        <div class="card"><div class="label">Eligible Revenue Before PPN</div><div class="value">${formatRp(
+          (row.discount_breakdown?.['0']?.revenue || 0) +
+          (row.discount_breakdown?.['5']?.revenue || 0) +
+          (row.discount_breakdown?.['10']?.revenue || 0)
+        )}</div></div>
+        <div class="card"><div class="label">Commission Payable</div><div class="value">${formatRp(row.discount_commission_amount)}</div></div>
+      </div>
+      <h2>Commission Summary</h2>
+      <table><thead><tr><th>Discount</th><th class="right">Lines</th><th class="right">Net Revenue</th><th class="right">Commission Rate</th><th class="right">Commission</th></tr></thead><tbody>${breakdownRows}</tbody></table>
+      <h2>Line Item Details</h2>
+      <table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Item</th><th>SKU</th><th class="right">Qty</th><th class="right">Discount</th><th class="right">Net Revenue</th><th class="right">Rate</th><th class="right">Commission</th></tr></thead><tbody>${lineRows}</tbody></table>
+      <div class="note">Commission is calculated per invoice line from net revenue before PPN: 0% discount = 5%, 5% discount = 3%, 10% discount = 2%; all other discount levels are not eligible.</div>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
 export default function CommissionReportPage() {
   const [period, setPeriod] = useState<Period>('this_month');
   const [rows, setRows] = useState<CommissionRow[]>([]);
@@ -189,6 +255,7 @@ export default function CommissionReportPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [selectedName, setSelectedName] = useState('');
+  const [selectedDiscountName, setSelectedDiscountName] = useState('');
 
   const [team, setTeam] = useState<TeamData | null>(null);
   const [teamLoading, setTeamLoading] = useState(false);
@@ -204,6 +271,7 @@ export default function CommissionReportPage() {
       setRows(data.rows || []);
       setDateRange(data.from && data.to ? `${data.from} – ${data.to}` : '');
       setSelectedName('');
+      setSelectedDiscountName('');
     } catch (e) {
       setError(String(e));
     } finally {
@@ -494,20 +562,86 @@ export default function CommissionReportPage() {
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>10% Discount Revenue<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Other Discount<br /><span style={{ color: 'var(--text-4)' }}>Not eligible</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission Payable</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
+              {loading && <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
               {!loading && filtered.map(row => (
-                <tr key={`discount-${row.name}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
-                  <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>{row.name}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.['0']?.revenue || 0)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.['5']?.revenue || 0)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.['10']?.revenue || 0)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-4)', fontSize: 12 }}>{formatRp(row.discount_breakdown?.other?.revenue || 0)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.discount_commission_amount || 0)}</td>
-                </tr>
+                <React.Fragment key={`discount-${row.name}`}>
+                  <tr
+                    style={{ borderBottom: '1px solid var(--border-muted)', cursor: 'pointer', background: selectedDiscountName === row.name ? 'var(--surface-2)' : undefined }}
+                    className="hover:bg-[var(--surface-2)] transition-colors"
+                    onClick={() => setSelectedDiscountName(prev => prev === row.name ? '' : row.name)}
+                  >
+                    <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>{row.name}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.['0']?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.['5']?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.['10']?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-4)', fontSize: 12 }}>{formatRp(row.discount_breakdown?.other?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.discount_commission_amount || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>
+                      <div className="flex justify-end gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedDiscountName(prev => prev === row.name ? '' : row.name); }} className="px-2 py-1 text-[10px] rounded border border-[var(--border)] bg-[var(--surface-1)] hover:bg-[var(--surface-3)] text-[var(--text-3)]">
+                          {selectedDiscountName === row.name ? 'Hide' : 'View'} Details
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); printDiscountStatement(row, dateRange); }} className="px-2 py-1 text-[10px] rounded border border-[var(--border)] bg-[var(--surface-1)] hover:bg-[var(--surface-3)] text-[var(--text-3)]">Print / PDF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  {selectedDiscountName === row.name && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 0, background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className="text-[var(--text)] font-semibold text-sm">Line Item Commission Details — {row.name}</div>
+                              <div className="text-[var(--text-4)] text-xs">Each item uses its own discount level and commission rate.</div>
+                            </div>
+                            <button onClick={() => printDiscountStatement(row, dateRange)} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--accent)] text-white hover:opacity-90">Print / Save PDF</button>
+                          </div>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ ...thStyle, cursor: 'default' }}>Invoice</th>
+                                  <th style={{ ...thStyle, cursor: 'default' }}>Customer</th>
+                                  <th style={{ ...thStyle, cursor: 'default' }}>Item</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Qty</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Discount</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Net Revenue</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Rate</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {row.invoices.flatMap(inv => inv.line_items.map((li, idx) => (
+                                  <tr key={`${inv.invoice_id}-discount-${idx}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                                    <td style={{ padding: '8px 12px', verticalAlign: 'top', minWidth: 125 }}>
+                                      <div className="text-[var(--accent-text)] text-xs font-medium">{inv.invoice_number}</div>
+                                      <div className="text-[var(--text-4)] text-[10px]">{inv.date}</div>
+                                    </td>
+                                    <td style={{ padding: '8px 12px', verticalAlign: 'top', color: 'var(--text-2)', fontSize: 11, minWidth: 160 }}>{inv.customer_name}</td>
+                                    <td style={{ padding: '8px 12px', verticalAlign: 'top', color: 'var(--text)', fontSize: 11, minWidth: 220 }}>
+                                      <div>{li.name || '-'}</div>
+                                      <div className="text-[var(--text-4)] text-[10px]">{li.sku || '-'}</div>
+                                    </td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, fontSize: 11 }}>{formatQty(li.quantity)}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, fontSize: 11 }}>{li.discount_percent.toFixed(2)}%</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, fontSize: 11 }}>{formatRp(li.revenue)}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, color: li.discount_commission_rate > 0 ? 'var(--success)' : 'var(--text-4)', fontSize: 11 }}>{formatPct(li.discount_commission_rate)}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, color: 'var(--accent)', fontSize: 11, fontWeight: 700 }}>{formatRp(li.discount_commission)}</td>
+                                  </tr>
+                                )))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
