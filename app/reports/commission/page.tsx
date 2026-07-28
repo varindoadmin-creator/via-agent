@@ -202,8 +202,8 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
 
   const breakdownRows = ([
     ['0', '0%', '5%'],
-    ['5', '5%', '3%'],
-    ['10', '10%', '2%'],
+    ['5', '1–5% (5% tier)', '3%'],
+    ['10', '>5–10% (10% tier)', '2%'],
     ['other', 'Other', '0%'],
   ] as const).map(([key, discount, rate]) => {
     const bucket = row.discount_breakdown?.[key];
@@ -235,7 +235,7 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
       <table><thead><tr><th>Discount</th><th class="right">Lines</th><th class="right">Net Revenue</th><th class="right">Commission Rate</th><th class="right">Commission</th></tr></thead><tbody>${breakdownRows}</tbody></table>
       <h2>Line Item Details</h2>
       <table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Item</th><th>SKU</th><th class="right">Qty</th><th class="right">Discount</th><th class="right">Net Revenue</th><th class="right">Rate</th><th class="right">Commission</th></tr></thead><tbody>${lineRows}</tbody></table>
-      <div class="note">Commission is calculated per invoice line from net revenue before PPN: 0% discount = 5%, 5% discount = 3%, 10% discount = 2%; all other discount levels are not eligible.</div>
+      <div class="note">Commission is calculated per invoice line from net revenue before PPN: 0% discount earns 5%; discounts above 0% through 5% are assigned to the 5% tier and earn 3%; discounts above 5% through 10% are assigned to the 10% tier and earn 2%. Other discount levels are not eligible.</div>
     </body></html>`;
 
   const w = window.open('', '_blank');
@@ -558,8 +558,8 @@ export default function CommissionReportPage() {
               <tr>
                 <th style={{ ...thStyle, cursor: 'default' }}>Salesperson</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>0% Discount Revenue<br /><span style={{ color: 'var(--text-4)' }}>5% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>5% Discount Revenue<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>10% Discount Revenue<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>1–5% Discount Revenue<br /><span style={{ color: 'var(--text-4)' }}>5% tier · 3% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>&gt;5–10% Discount Revenue<br /><span style={{ color: 'var(--text-4)' }}>10% tier · 2% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Other Discount<br /><span style={{ color: 'var(--text-4)' }}>Not eligible</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission Payable</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Action</th>

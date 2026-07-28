@@ -344,8 +344,10 @@ function getLineDiscountPercent(li: AnyRecord, invoice: AnyRecord): number {
 
 function getDiscountCommissionRate(discountPercent: number): number {
   if (Math.abs(discountPercent) < 0.01) return 0.05;
-  if (Math.abs(discountPercent - 5) < 0.01) return 0.03;
-  if (Math.abs(discountPercent - 10) < 0.01) return 0.02;
+  // Round item-level discounts into the agreed commission tiers:
+  // 1–4% joins the 5% tier, and 6–9% joins the 10% tier.
+  if (discountPercent > 0 && discountPercent <= 5) return 0.03;
+  if (discountPercent > 5 && discountPercent <= 10) return 0.02;
   return 0;
 }
 
@@ -622,8 +624,8 @@ export async function GET(request: NextRequest) {
           const discountCommission = revenue * discountCommissionRate;
           const discountKey =
             Math.abs(discountPercent) < 0.01 ? "0" :
-            Math.abs(discountPercent - 5) < 0.01 ? "5" :
-            Math.abs(discountPercent - 10) < 0.01 ? "10" : "other";
+            discountPercent > 0 && discountPercent <= 5 ? "5" :
+            discountPercent > 5 && discountPercent <= 10 ? "10" : "other";
 
           current.quantity += qty;
           current.amount += revenue;
@@ -729,7 +731,7 @@ export async function GET(request: NextRequest) {
           ? "Paid invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced."
           : "All invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
         discount_commission_basis:
-          "All assigned invoice lines: 0% discount earns 5% of net line revenue, 5% discount earns 3%, 10% discount earns 2%; other discounts earn 0%.",
+          "All assigned invoice lines: 0% discount earns 5% of net line revenue; discounts above 0% through 5% use the 5% discount tier and earn 3%; discounts above 5% through 10% use the 10% discount tier and earn 2%; other discounts earn 0%.",
         tiers: [
           { min_gp: 0, max_gp: 25_000_000, rate: 0.1 },
           { min_gp: 25_000_000, max_gp: 50_000_000, rate: 0.15 },
