@@ -47,7 +47,7 @@ export default function TaxInvoicesPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<Array<{
     filename: string; invoice_number: string | null; customer_name: string | null;
-    success: boolean; error?: string;
+    success: boolean; skipped?: boolean; error?: string;
   }> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -276,16 +276,19 @@ export default function TaxInvoicesPage() {
             <div className="px-4 py-3 border-b border-[var(--border)] flex items-center gap-3">
               <span className="text-[var(--text)] text-xs font-semibold">Upload Results</span>
               <span className="text-[var(--success)] text-xs">✓ {uploadResults.filter(r => r.success).length} attached</span>
-              {uploadResults.filter(r => !r.success).length > 0 && (
-                <span className="text-[var(--danger)] text-xs">✗ {uploadResults.filter(r => !r.success).length} failed</span>
+              {uploadResults.filter(r => r.skipped).length > 0 && (
+                <span className="text-[var(--warning)] text-xs">↷ {uploadResults.filter(r => r.skipped).length} skipped</span>
+              )}
+              {uploadResults.filter(r => !r.success && !r.skipped).length > 0 && (
+                <span className="text-[var(--danger)] text-xs">✗ {uploadResults.filter(r => !r.success && !r.skipped).length} failed</span>
               )}
               <button onClick={() => setUploadResults(null)} className="ml-auto text-[var(--text-4)] text-xs">✕</button>
             </div>
             <div className="divide-y divide-[var(--border-muted)]">
               {uploadResults.map((r, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className={`text-sm ${r.success ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
-                    {r.success ? '✓' : '✗'}
+                  <span className={`text-sm ${r.success ? 'text-[var(--success)]' : r.skipped ? 'text-[var(--warning)]' : 'text-[var(--danger)]'}`}>
+                    {r.success ? '✓' : r.skipped ? '↷' : '✗'}
                   </span>
                   <span className="text-[var(--text-3)] text-xs truncate max-w-[200px]" title={r.filename}>{r.filename}</span>
                   {r.invoice_number && (
@@ -295,7 +298,8 @@ export default function TaxInvoicesPage() {
                     <span className="text-[var(--text-3)] text-xs">{r.customer_name}</span>
                   )}
                   {r.success && <span className="text-[var(--success)] text-xs ml-auto">Attached to Zoho ✓</span>}
-                  {!r.success && <span className="text-[var(--danger)] text-xs ml-auto">{r.error}</span>}
+                  {r.skipped && <span className="text-[var(--warning)] text-xs ml-auto">Skipped — {r.error}</span>}
+                  {!r.success && !r.skipped && <span className="text-[var(--danger)] text-xs ml-auto">{r.error}</span>}
                 </div>
               ))}
             </div>

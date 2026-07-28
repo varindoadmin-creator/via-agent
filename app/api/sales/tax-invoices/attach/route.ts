@@ -57,8 +57,10 @@ export async function POST(request: NextRequest) {
       invoice_id: string | null;
       customer_name: string | null;
       success: boolean;
+      skipped?: boolean;
       error?: string;
     }> = [];
+    const attachedInvoiceIds = new Set<string>();
 
     for (const file of files) {
       const filename = file.name;
@@ -87,12 +89,26 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Step 3: Attach PDF to invoice
+        const invoiceId = String(invoice.invoice_id);
+        if (invoice.has_attachment || attachedInvoiceIds.has(invoiceId)) {
+          results.push({
+            filename,
+            invoice_number: invoiceNumber,
+            invoice_id: invoiceId,
+            customer_name: invoice.customer_name,
+            success: false,
+            skipped: true,
+            error: 'An attachment already exists in Zoho',
+          });
+          continue;
+        }
+
+        // Step 3: Attach PDF only when the invoice has no existing attachment
         const attachForm = new FormData();
         attachForm.append('attachment', new Blob([buffer], { type: 'application/pdf' }), filename);
 
         const attachRes = await fetchWithRetry(
-          `${base}/invoices/${invoice.invoice_id}/attachment?organization_id=${orgId}`,
+          `${base}/invoices/${invoiceId}/attachment?organization_id=${orgId}`,
           {
             method: 'POST',
             headers: { Authorization: `Zoho-oauthtoken ${token}` },
@@ -105,10 +121,11 @@ export async function POST(request: NextRequest) {
           throw new Error(attachData.message || 'Attachment failed');
         }
 
+        attachedInvoiceIds.add(invoiceId);
         results.push({
           filename,
           invoice_number: invoiceNumber,
-          invoice_id: invoice.invoice_id,
+          invoice_id: invoiceId,
           customer_name: invoice.customer_name,
           success: true,
         });
@@ -120,9 +137,10 @@ export async function POST(request: NextRequest) {
     }
 
     const succeeded = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
+    const skipped = results.filter(r => r.skipped).length;
+    const failed = results.filter(r => !r.success && !r.skipped).length;
 
-    return NextResponse.json({ success: true, succeeded, failed, results });
+    return NextResponse.json({ success: true, succeeded, skipped, failed, results });
 
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
