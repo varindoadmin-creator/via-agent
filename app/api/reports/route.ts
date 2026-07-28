@@ -319,12 +319,41 @@ function getCommissionTier(grossProfit: number) {
   return "Tier 1";
 }
 
+function getLineDiscountPercent(li: AnyRecord, invoice: AnyRecord): number {
+  const discounts = Array.isArray(li.discounts) ? li.discounts as AnyRecord[] : [];
+  const explicit = parseMoney(
+    discounts[0]?.discount_percent ??
+      li.discount_percentage ??
+      li.discount_percent ??
+      li.discount ??
+      0,
+  );
+  if (explicit > 0) return explicit;
+
+  const discountAmount = parseMoney(li.discount_amount ?? 0);
+  const netRevenue = parseMoney(li.item_total ?? li.amount ?? 0);
+  if (discountAmount > 0 && netRevenue + discountAmount > 0) {
+    return (discountAmount / (netRevenue + discountAmount)) * 100;
+  }
+
+  if (String(invoice.discount_type || "") !== "item_level") {
+    return parseMoney(invoice.discount ?? invoice.discount_percentage ?? 0);
+  }
+  return 0;
+}
+
+function getDiscountCommissionRate(discountPercent: number): number {
+  if (Math.abs(discountPercent) < 0.01) return 0.05;
+  if (Math.abs(discountPercent - 5) < 0.01) return 0.03;
+  if (Math.abs(discountPercent - 10) < 0.01) return 0.02;
+  return 0;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const type = searchParams.get("type") || "item";
   const period = searchParams.get("period") || "this_month";
-  const paidOnly =
-    searchParams.get("paid_only") === "true" || type === "commission";
+  const paidOnly = searchParams.get("paid_only") === "true";
   const includeDetails =
     searchParams.get("include_details") === "true" || type === "commission";
 
@@ -348,8 +377,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, rows, from, to });
     }
 
-    // Salesperson commission only includes paid invoices, so do not download
-    // and inspect every unpaid invoice in annual periods.
+    // A paid-only filter remains available for other callers, but the
+    // Commission page intentionally requests all invoices.
     const invoiceStatus = type === "commission" && paidOnly ? "paid" : undefined;
     const allInvoices = await fetchAllInvoices(from, to, invoiceStatus);
 
@@ -532,6 +561,8 @@ export async function GET(request: NextRequest) {
           invoice_ids: Set<string>;
           customer_names: Set<string>;
           missing_cost_lines: number;
+          discount_commission_amount: number;
+          discount_breakdown: Record<string, { revenue: number; commission: number; line_count: number }>;
           invoices: AnyRecord[];
         }
       >();
@@ -561,6 +592,13 @@ export async function GET(request: NextRequest) {
           invoice_ids: new Set<string>(),
           customer_names: new Set<string>(),
           missing_cost_lines: 0,
+          discount_commission_amount: 0,
+          discount_breakdown: {
+            "0": { revenue: 0, commission: 0, line_count: 0 },
+            "5": { revenue: 0, commission: 0, line_count: 0 },
+            "10": { revenue: 0, commission: 0, line_count: 0 },
+            other: { revenue: 0, commission: 0, line_count: 0 },
+          },
           invoices: [],
         };
 
@@ -579,11 +617,22 @@ export async function GET(request: NextRequest) {
           const gp = revenue - cost;
           const sku = String(li.sku || "");
           const itemName = String(li.name || li.item_name || "");
+          const discountPercent = getLineDiscountPercent(li, detailInvoice);
+          const discountCommissionRate = getDiscountCommissionRate(discountPercent);
+          const discountCommission = revenue * discountCommissionRate;
+          const discountKey =
+            Math.abs(discountPercent) < 0.01 ? "0" :
+            Math.abs(discountPercent - 5) < 0.01 ? "5" :
+            Math.abs(discountPercent - 10) < 0.01 ? "10" : "other";
 
           current.quantity += qty;
           current.amount += revenue;
           current.cost += cost;
           current.gross_profit += gp;
+          current.discount_commission_amount += discountCommission;
+          current.discount_breakdown[discountKey].revenue += revenue;
+          current.discount_breakdown[discountKey].commission += discountCommission;
+          current.discount_breakdown[discountKey].line_count += 1;
           if (purchaseRate <= 0 && revenue > 0) {
             current.missing_cost_lines += 1;
             invoiceMissingCostLines += 1;
@@ -604,6 +653,9 @@ export async function GET(request: NextRequest) {
             cost,
             gross_profit: gp,
             gp_margin: revenue > 0 ? gp / revenue : 0,
+            discount_percent: discountPercent,
+            discount_commission_rate: discountCommissionRate,
+            discount_commission: discountCommission,
           });
         }
 
@@ -649,6 +701,8 @@ export async function GET(request: NextRequest) {
           invoice_count: val.invoice_ids.size,
           customer_count: val.customer_names.size,
           missing_cost_lines: val.missing_cost_lines,
+          discount_commission_amount: val.discount_commission_amount,
+          discount_breakdown: val.discount_breakdown,
           commission_tier: getCommissionTier(val.gross_profit),
           commission_rate: commissionRate,
           commission_amount: val.gross_profit * commissionRate,
@@ -674,6 +728,8 @@ export async function GET(request: NextRequest) {
         basis: paidOnly
           ? "Paid invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced."
           : "All invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
+        discount_commission_basis:
+          "All assigned invoice lines: 0% discount earns 5% of net line revenue, 5% discount earns 3%, 10% discount earns 2%; other discounts earn 0%.",
         tiers: [
           { min_gp: 0, max_gp: 25_000_000, rate: 0.1 },
           { min_gp: 25_000_000, max_gp: 50_000_000, rate: 0.15 },
