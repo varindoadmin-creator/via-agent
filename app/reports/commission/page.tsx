@@ -192,7 +192,7 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
         <td>${esc(inv.customer_name)}</td>
         <td>${esc(li.name)}</td>
         <td>${esc(li.sku)}</td>
-        <td>${li.discount_commission_schema === 'low_margin' ? 'Low-margin item' : 'Standard'}</td>
+        <td>${li.discount_commission_schema === 'low_margin' ? 'Special Price' : 'Standard'}</td>
         <td class="right">${formatQty(li.quantity)}</td>
         <td class="right">${li.discount_percent.toFixed(2)}%</td>
         <td class="right">${formatRp(li.revenue)}</td>
@@ -206,8 +206,8 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
     ['standard_0', 'Standard', '0%', '5%'],
     ['standard_5', 'Standard', '1–5%', '3%'],
     ['standard_10', 'Standard', '>5–10%', '2%'],
-    ['low_margin_0', 'Low-margin prefixes / NEWEDGE', '0%', '3%'],
-    ['low_margin_5', 'Low-margin prefixes / NEWEDGE', '1–5%', '2%'],
+    ['low_margin_0', 'Special Price prefixes / NEWEDGE', '0%', '3%'],
+    ['low_margin_5', 'Special Price prefixes / NEWEDGE', '1–5%', '2%'],
     ['other', 'All items', 'Other', '0%'],
   ] as const).map(([key, schema, discount, rate]) => {
     const bucket = row.discount_breakdown?.[key];
@@ -242,7 +242,7 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
       <table><thead><tr><th>Schema</th><th>Discount</th><th class="right">Lines</th><th class="right">Net Revenue</th><th class="right">Commission Rate</th><th class="right">Commission</th></tr></thead><tbody>${breakdownRows}</tbody></table>
       <h2>Line Item Details</h2>
       <table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Item</th><th>SKU</th><th>Schema</th><th class="right">Qty</th><th class="right">Discount</th><th class="right">Net Revenue</th><th class="right">Rate</th><th class="right">Commission</th></tr></thead><tbody>${lineRows}</tbody></table>
-      <div class="note">Calculated per invoice line from net revenue before PPN. Standard items: 0% = 5%, 1–5% = 3%, &gt;5–10% = 2%. Low-margin prefixes ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP and NEWEDGE products: 0% = 3%, 1–5% = 2%, above 5% = 0%.</div>
+      <div class="note">Calculated per invoice line from net revenue before PPN. Standard items: 0% = 5%, 1–5% = 3%, &gt;5–10% = 2%. Special Price prefixes ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP and NEWEDGE products: 0% = 3%, 1–5% = 2%, above 5% = 0%.</div>
     </body></html>`;
 
   const w = window.open('', '_blank');
@@ -557,7 +557,7 @@ export default function CommissionReportPage() {
 
         <div className="flex items-center justify-between mt-8 mb-3">
           <h2 className="text-[var(--text)] font-semibold text-sm">Salesperson — Discount-Based Commission</h2>
-          <span className="text-[var(--text-4)] text-xs">Calculated per invoice line · special low-margin schema applied by product</span>
+          <span className="text-[var(--text-4)] text-xs">Calculated per invoice line · Special Price schema applied by product</span>
         </div>
         <div className="via-card overflow-x-auto mb-5">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -567,8 +567,8 @@ export default function CommissionReportPage() {
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 0% Discount<br /><span style={{ color: 'var(--text-4)' }}>5% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 1–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · &gt;5–10% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Low Margin · 0% Discount<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Low Margin · 1–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Special Price · 0% Discount<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Special Price · 1–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Other Discount<br /><span style={{ color: 'var(--text-4)' }}>Not eligible</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission Payable</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Action</th>
@@ -640,7 +640,7 @@ export default function CommissionReportPage() {
                                       <div className="text-[var(--text-4)] text-[10px]">{li.sku || '-'}</div>
                                     </td>
                                     <td style={{ padding: '8px 12px', verticalAlign: 'top', color: li.discount_commission_schema === 'low_margin' ? 'var(--warning)' : 'var(--text-3)', fontSize: 10 }}>
-                                      {li.discount_commission_schema === 'low_margin' ? 'Low margin' : 'Standard'}
+                                      {li.discount_commission_schema === 'low_margin' ? 'Special Price' : 'Standard'}
                                     </td>
                                     <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, fontSize: 11 }}>{formatQty(li.quantity)}</td>
                                     <td style={{ padding: '8px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, fontSize: 11 }}>{li.discount_percent.toFixed(2)}%</td>
@@ -663,7 +663,7 @@ export default function CommissionReportPage() {
         </div>
 
         <p className="text-[var(--text-4)] text-xs mt-3">
-          GP commission includes all invoices. Gross Profit = invoice line revenue before PPN − Item Purchase Rate × quantity. The GP rate applies to the full period GP per salesperson, not progressively. Discount-based commission is calculated separately per invoice line. Low-margin schema applies to prefixes ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP and product NEWEDGE.
+          GP commission includes all invoices. Gross Profit = invoice line revenue before PPN − Item Purchase Rate × quantity. The GP rate applies to the full period GP per salesperson, not progressively. Discount-based commission is calculated separately per invoice line. Special Price schema applies to prefixes ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP and product NEWEDGE.
         </p>
       </div>
     </div>

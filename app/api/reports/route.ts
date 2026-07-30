@@ -753,7 +753,7 @@ export async function GET(request: NextRequest) {
           ? "Paid invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced."
           : "All invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
         discount_commission_basis:
-          "Calculated per assigned invoice line. Standard items: 0% discount earns 5%, above 0% through 5% earns 3%, and above 5% through 10% earns 2%. ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP prefixes and NEWEDGE products: 0% discount earns 3%, above 0% through 5% earns 2%, and higher discounts earn 0%.",
+          "Calculated per assigned invoice line. Standard items: 0% discount earns 5%, above 0% through 5% earns 3%, and above 5% through 10% earns 2%. Special Price items with ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP prefixes and NEWEDGE products: 0% discount earns 3%, above 0% through 5% earns 2%, and higher discounts earn 0%.",
         tiers: [
           { min_gp: 0, max_gp: 25_000_000, rate: 0.1 },
           { min_gp: 25_000_000, max_gp: 50_000_000, rate: 0.15 },
