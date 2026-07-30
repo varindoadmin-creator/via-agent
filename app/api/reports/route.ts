@@ -731,6 +731,9 @@ export async function GET(request: NextRequest) {
           commission_rate: commissionRate,
           commission_amount: val.gross_profit * commissionRate,
           company_keeps: val.gross_profit - val.gross_profit * commissionRate,
+          monthly_gp_commission_rate: 0.2,
+          monthly_gp_commission_amount: val.gross_profit * 0.2,
+          monthly_gp_company_keeps: val.gross_profit * 0.8,
           invoices: includeDetails
             ? val.invoices.sort((a, b) =>
                 String(b.date).localeCompare(String(a.date)),

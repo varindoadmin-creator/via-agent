@@ -58,6 +58,9 @@ interface CommissionRow {
   commission_rate: number;
   commission_amount: number;
   company_keeps: number;
+  monthly_gp_commission_rate: number;
+  monthly_gp_commission_amount: number;
+  monthly_gp_company_keeps: number;
   discount_commission_amount: number;
   discount_breakdown: Record<'standard_0' | 'standard_5' | 'standard_10' | 'low_margin_0' | 'low_margin_5' | 'other', {
     revenue: number;
@@ -551,6 +554,52 @@ export default function CommissionReportPage() {
                 )}
               </React.Fragment>
               ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between mt-8 mb-3">
+          <h2 className="text-[var(--text)] font-semibold text-sm">Salesperson — Monthly GP Commission</h2>
+          <span className="text-[var(--text-4)] text-xs">20% of GP · all invoices included</span>
+        </div>
+        <div className="via-card overflow-hidden mb-5">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ ...thStyle, cursor: 'default' }}>Salesperson</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Revenue Before PPN</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Monthly GP</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Rate</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission Payable</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Company Keeps</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
+              {!loading && filtered.map(row => (
+                <tr key={`monthly-gp-${row.name}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                  <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>
+                    {row.name}
+                    <div style={{ color: 'var(--text-4)', fontSize: 10 }}>{row.invoice_count} invoices · all statuses</div>
+                  </td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontSize: 12 }}>{formatRp(row.amount)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: row.gross_profit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.gross_profit)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontSize: 12 }}>{formatPct(row.monthly_gp_commission_rate)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.monthly_gp_commission_amount)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-3)', fontSize: 12 }}>{formatRp(row.monthly_gp_company_keeps)}</td>
+                </tr>
+              ))}
+              {!loading && filtered.length > 0 && (
+                <tr style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 700 }}>Total</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700 }}>{formatRp(filtered.reduce((sum, row) => sum + row.amount, 0))}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, color: 'var(--success)', fontSize: 12, fontWeight: 700 }}>{formatRp(filtered.reduce((sum, row) => sum + row.gross_profit, 0))}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700 }}>{formatPct(0.2)}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(filtered.reduce((sum, row) => sum + row.monthly_gp_commission_amount, 0))}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700 }}>{formatRp(filtered.reduce((sum, row) => sum + row.monthly_gp_company_keeps, 0))}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
