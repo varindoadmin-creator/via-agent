@@ -342,13 +342,34 @@ function getLineDiscountPercent(li: AnyRecord, invoice: AnyRecord): number {
   return 0;
 }
 
-function getDiscountCommissionRate(discountPercent: number): number {
-  if (Math.abs(discountPercent) < 0.01) return 0.05;
-  // Round item-level discounts into the agreed commission tiers:
-  // 1–4% joins the 5% tier, and 6–9% joins the 10% tier.
-  if (discountPercent > 0 && discountPercent <= 5) return 0.03;
-  if (discountPercent > 5 && discountPercent <= 10) return 0.02;
-  return 0;
+const SPECIAL_DISCOUNT_PREFIXES = [
+  "ARTE", "ART", "CC", "CCM", "CCP", "CCX",
+  "ATS", "ATP", "ATW", "CATS", "CATP",
+];
+
+function usesLowMarginDiscountSchema(sku: string, itemName: string): boolean {
+  const normalizedSku = sku.trim().toUpperCase();
+  const normalizedName = itemName.trim().toUpperCase();
+  return SPECIAL_DISCOUNT_PREFIXES.some((prefix) =>
+    normalizedSku.startsWith(prefix),
+  ) || normalizedSku.includes("NEWEDGE") || normalizedName.includes("NEWEDGE");
+}
+
+function getDiscountCommissionBucket(
+  discountPercent: number,
+  lowMarginSchema: boolean,
+): { key: string; rate: number; schema: "standard" | "low_margin" } {
+  const schema = lowMarginSchema ? "low_margin" : "standard";
+  if (Math.abs(discountPercent) < 0.01) {
+    return { key: lowMarginSchema ? "low_margin_0" : "standard_0", rate: lowMarginSchema ? 0.03 : 0.05, schema };
+  }
+  if (discountPercent > 0 && discountPercent <= 5) {
+    return { key: lowMarginSchema ? "low_margin_5" : "standard_5", rate: lowMarginSchema ? 0.02 : 0.03, schema };
+  }
+  if (!lowMarginSchema && discountPercent > 5 && discountPercent <= 10) {
+    return { key: "standard_10", rate: 0.02, schema };
+  }
+  return { key: "other", rate: 0, schema };
 }
 
 export async function GET(request: NextRequest) {
@@ -596,9 +617,11 @@ export async function GET(request: NextRequest) {
           missing_cost_lines: 0,
           discount_commission_amount: 0,
           discount_breakdown: {
-            "0": { revenue: 0, commission: 0, line_count: 0 },
-            "5": { revenue: 0, commission: 0, line_count: 0 },
-            "10": { revenue: 0, commission: 0, line_count: 0 },
+            standard_0: { revenue: 0, commission: 0, line_count: 0 },
+            standard_5: { revenue: 0, commission: 0, line_count: 0 },
+            standard_10: { revenue: 0, commission: 0, line_count: 0 },
+            low_margin_0: { revenue: 0, commission: 0, line_count: 0 },
+            low_margin_5: { revenue: 0, commission: 0, line_count: 0 },
             other: { revenue: 0, commission: 0, line_count: 0 },
           },
           invoices: [],
@@ -620,21 +643,19 @@ export async function GET(request: NextRequest) {
           const sku = String(li.sku || "");
           const itemName = String(li.name || li.item_name || "");
           const discountPercent = getLineDiscountPercent(li, detailInvoice);
-          const discountCommissionRate = getDiscountCommissionRate(discountPercent);
+          const lowMarginSchema = usesLowMarginDiscountSchema(sku, itemName);
+          const discountBucket = getDiscountCommissionBucket(discountPercent, lowMarginSchema);
+          const discountCommissionRate = discountBucket.rate;
           const discountCommission = revenue * discountCommissionRate;
-          const discountKey =
-            Math.abs(discountPercent) < 0.01 ? "0" :
-            discountPercent > 0 && discountPercent <= 5 ? "5" :
-            discountPercent > 5 && discountPercent <= 10 ? "10" : "other";
 
           current.quantity += qty;
           current.amount += revenue;
           current.cost += cost;
           current.gross_profit += gp;
           current.discount_commission_amount += discountCommission;
-          current.discount_breakdown[discountKey].revenue += revenue;
-          current.discount_breakdown[discountKey].commission += discountCommission;
-          current.discount_breakdown[discountKey].line_count += 1;
+          current.discount_breakdown[discountBucket.key].revenue += revenue;
+          current.discount_breakdown[discountBucket.key].commission += discountCommission;
+          current.discount_breakdown[discountBucket.key].line_count += 1;
           if (purchaseRate <= 0 && revenue > 0) {
             current.missing_cost_lines += 1;
             invoiceMissingCostLines += 1;
@@ -656,6 +677,7 @@ export async function GET(request: NextRequest) {
             gross_profit: gp,
             gp_margin: revenue > 0 ? gp / revenue : 0,
             discount_percent: discountPercent,
+            discount_commission_schema: discountBucket.schema,
             discount_commission_rate: discountCommissionRate,
             discount_commission: discountCommission,
           });
@@ -731,7 +753,7 @@ export async function GET(request: NextRequest) {
           ? "Paid invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced."
           : "All invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
         discount_commission_basis:
-          "All assigned invoice lines: 0% discount earns 5% of net line revenue; discounts above 0% through 5% use the 5% discount tier and earn 3%; discounts above 5% through 10% use the 10% discount tier and earn 2%; other discounts earn 0%.",
+          "Calculated per assigned invoice line. Standard items: 0% discount earns 5%, above 0% through 5% earns 3%, and above 5% through 10% earns 2%. ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP prefixes and NEWEDGE products: 0% discount earns 3%, above 0% through 5% earns 2%, and higher discounts earn 0%.",
         tiers: [
           { min_gp: 0, max_gp: 25_000_000, rate: 0.1 },
           { min_gp: 25_000_000, max_gp: 50_000_000, rate: 0.15 },
