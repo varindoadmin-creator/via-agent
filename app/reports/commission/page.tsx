@@ -186,6 +186,58 @@ function printStatement(row: CommissionRow, dateRange: string) {
   w.focus();
 }
 
+function printMonthlyGpStatement(row: CommissionRow, dateRange: string) {
+  const invoiceRows = row.invoices.map(inv => `
+    <tr>
+      <td>${esc(inv.date)}</td>
+      <td>${esc(inv.invoice_number)}</td>
+      <td>${esc(inv.customer_name)}</td>
+      <td class="right">${formatRp(inv.revenue)}</td>
+      <td class="right">${formatRp(inv.cost)}</td>
+      <td class="right">${formatRp(inv.gross_profit)}</td>
+      <td class="right">${formatPct(0.2)}</td>
+      <td class="right">${formatRp(inv.gross_profit * 0.2)}</td>
+    </tr>
+    <tr>
+      <td colspan="8" class="nested">
+        <table>
+          <thead><tr><th>Item</th><th>SKU</th><th class="right">Qty</th><th class="right">Revenue</th><th class="right">Cost</th><th class="right">GP</th><th class="right">20% Commission</th></tr></thead>
+          <tbody>
+            ${inv.line_items.map(li => `
+              <tr>
+                <td>${esc(li.name)}</td><td>${esc(li.sku)}</td><td class="right">${formatQty(li.quantity)}</td><td class="right">${formatRp(li.revenue)}</td><td class="right">${formatRp(li.cost)}</td><td class="right">${formatRp(li.gross_profit)}</td><td class="right">${formatRp(li.gross_profit * 0.2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  `).join('');
+
+  const html = `<!doctype html><html><head><title>Monthly GP Commission - ${esc(row.name)}</title>
+    <style>
+      body{font-family:Arial,sans-serif;color:#111;margin:24px;font-size:12px}h1{font-size:20px;margin:0 0 4px}.muted{color:#666}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}.card{border:1px solid #ddd;border-radius:8px;padding:10px}.label{font-size:10px;text-transform:uppercase;color:#666}.value{font-size:15px;font-weight:700;margin-top:4px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:7px;text-align:left;vertical-align:top}th{background:#f5f5f5;font-size:10px;text-transform:uppercase;color:#555}.right{text-align:right}.nested{padding:0 0 12px 28px;background:#fafafa}.nested table{font-size:11px}.note{margin-top:18px;color:#555;font-size:11px}@media print{button{display:none}}
+    </style></head><body>
+      <button onclick="window.print()" style="float:right;padding:8px 12px">Print / Save as PDF</button>
+      <h1>Monthly GP Commission Statement</h1>
+      <div class="muted">${esc(dateRange)} · All invoices · ${esc(row.name)}</div>
+      <div class="grid">
+        <div class="card"><div class="label">Revenue before PPN</div><div class="value">${formatRp(row.amount)}</div></div>
+        <div class="card"><div class="label">Monthly GP</div><div class="value">${formatRp(row.gross_profit)}</div></div>
+        <div class="card"><div class="label">Commission Rate</div><div class="value">${formatPct(row.monthly_gp_commission_rate)}</div></div>
+        <div class="card"><div class="label">Commission Payable</div><div class="value">${formatRp(row.monthly_gp_commission_amount)}</div></div>
+      </div>
+      <table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th class="right">Revenue</th><th class="right">Cost</th><th class="right">GP</th><th class="right">Rate</th><th class="right">Commission</th></tr></thead><tbody>${invoiceRows}</tbody></table>
+      <div class="note">Calculation: 20% × gross profit. Gross profit = invoice line revenue before PPN − Item Purchase Rate × quantity. All invoices are included.</div>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
 function printDiscountStatement(row: CommissionRow, dateRange: string) {
   const lineRows = row.invoices.flatMap(inv =>
     inv.line_items.map(li => `
@@ -265,6 +317,7 @@ export default function CommissionReportPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [selectedName, setSelectedName] = useState('');
+  const [selectedMonthlyGpName, setSelectedMonthlyGpName] = useState('');
   const [selectedDiscountName, setSelectedDiscountName] = useState('');
 
   const [team, setTeam] = useState<TeamData | null>(null);
@@ -281,6 +334,7 @@ export default function CommissionReportPage() {
       setRows(data.rows || []);
       setDateRange(data.from && data.to ? `${data.from} – ${data.to}` : '');
       setSelectedName('');
+      setSelectedMonthlyGpName('');
       setSelectedDiscountName('');
     } catch (e) {
       setError(String(e));
@@ -572,23 +626,92 @@ export default function CommissionReportPage() {
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Rate</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission Payable</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Company Keeps</th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
+              {loading && <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
               {!loading && filtered.map(row => (
-                <tr key={`monthly-gp-${row.name}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
-                  <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>
-                    {row.name}
-                    <div style={{ color: 'var(--text-4)', fontSize: 10 }}>{row.invoice_count} invoices · all statuses</div>
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontSize: 12 }}>{formatRp(row.amount)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: row.gross_profit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.gross_profit)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontSize: 12 }}>{formatPct(row.monthly_gp_commission_rate)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.monthly_gp_commission_amount)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-3)', fontSize: 12 }}>{formatRp(row.monthly_gp_company_keeps)}</td>
-                </tr>
+                <React.Fragment key={`monthly-gp-${row.name}`}>
+                  <tr
+                    style={{ borderBottom: '1px solid var(--border-muted)', cursor: 'pointer', background: selectedMonthlyGpName === row.name ? 'var(--surface-2)' : undefined }}
+                    className="hover:bg-[var(--surface-2)] transition-colors"
+                    onClick={() => setSelectedMonthlyGpName(prev => prev === row.name ? '' : row.name)}
+                  >
+                    <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>
+                      {row.name}
+                      <div style={{ color: 'var(--text-4)', fontSize: 10 }}>{row.invoice_count} invoices · all statuses</div>
+                    </td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text)', fontSize: 12 }}>{formatRp(row.amount)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: row.gross_profit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.gross_profit)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-2)', fontSize: 12 }}>{formatPct(row.monthly_gp_commission_rate)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.monthly_gp_commission_amount)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-3)', fontSize: 12 }}>{formatRp(row.monthly_gp_company_keeps)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>
+                      <div className="flex justify-end gap-2">
+                        <button onClick={(event) => { event.stopPropagation(); setSelectedMonthlyGpName(prev => prev === row.name ? '' : row.name); }} className="px-2 py-1 text-[10px] rounded border border-[var(--border)] bg-[var(--surface-1)] hover:bg-[var(--surface-3)] text-[var(--text-3)]">
+                          {selectedMonthlyGpName === row.name ? 'Hide' : 'View'} Details
+                        </button>
+                        <button onClick={(event) => { event.stopPropagation(); printMonthlyGpStatement(row, dateRange); }} className="px-2 py-1 text-[10px] rounded border border-[var(--border)] bg-[var(--surface-1)] hover:bg-[var(--surface-3)] text-[var(--text-3)]">Print / PDF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  {selectedMonthlyGpName === row.name && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 0, background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className="text-[var(--text)] font-semibold text-sm">Monthly GP Details — {row.name}</div>
+                              <div className="text-[var(--text-4)] text-xs">20% of invoice and line-item GP · all invoices included.</div>
+                            </div>
+                            <button onClick={() => printMonthlyGpStatement(row, dateRange)} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--accent)] text-white hover:opacity-90">Print / Save PDF</button>
+                          </div>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ ...thStyle, cursor: 'default' }}>Invoice</th>
+                                  <th style={{ ...thStyle, cursor: 'default' }}>Customer</th>
+                                  <th style={{ ...thStyle, cursor: 'default' }}>Item Details</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Revenue</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Cost</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>GP</th>
+                                  <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>20% Commission</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {row.invoices.map(inv => (
+                                  <tr key={`${inv.invoice_id}-monthly-gp`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                                    <td style={{ padding: '10px 12px', verticalAlign: 'top', minWidth: 130 }}>
+                                      <div className="text-[var(--accent-text)] text-xs font-medium">{inv.invoice_number}</div>
+                                      <div className="text-[var(--text-4)] text-[10px]">{inv.date}</div>
+                                      <div className={`text-[10px] mt-1 ${inv.paid ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>{inv.paid ? 'Paid' : inv.status || 'Unpaid'}</div>
+                                    </td>
+                                    <td style={{ padding: '10px 12px', verticalAlign: 'top', color: 'var(--text-2)', fontSize: 12, minWidth: 170 }}>{inv.customer_name}</td>
+                                    <td style={{ padding: '10px 12px', verticalAlign: 'top', minWidth: 420 }}>
+                                      {inv.line_items.map((line, index) => (
+                                        <div key={`${inv.invoice_id}-monthly-line-${index}`} className="flex justify-between gap-3 py-1 text-[10px]">
+                                          <span className="text-[var(--text-3)]">{line.name || '-'} · {line.sku || '-'} · Qty {formatQty(line.quantity)}</span>
+                                          <span className="text-[var(--accent-text)] whitespace-nowrap" style={mono}>{formatRp(line.gross_profit)} GP → {formatRp(line.gross_profit * 0.2)}</span>
+                                        </div>
+                                      ))}
+                                    </td>
+                                    <td style={{ padding: '10px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, fontSize: 11 }}>{formatRp(inv.revenue)}</td>
+                                    <td style={{ padding: '10px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, color: 'var(--text-3)', fontSize: 11 }}>{formatRp(inv.cost)}</td>
+                                    <td style={{ padding: '10px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, color: inv.gross_profit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 11, fontWeight: 700 }}>{formatRp(inv.gross_profit)}</td>
+                                    <td style={{ padding: '10px 12px', textAlign: 'right', verticalAlign: 'top', ...mono, color: 'var(--accent)', fontSize: 11, fontWeight: 700 }}>{formatRp(inv.gross_profit * 0.2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
               {!loading && filtered.length > 0 && (
                 <tr style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
@@ -598,6 +721,7 @@ export default function CommissionReportPage() {
                   <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700 }}>{formatPct(0.2)}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(filtered.reduce((sum, row) => sum + row.monthly_gp_commission_amount, 0))}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', ...mono, fontSize: 12, fontWeight: 700 }}>{formatRp(filtered.reduce((sum, row) => sum + row.monthly_gp_company_keeps, 0))}</td>
+                  <td />
                 </tr>
               )}
             </tbody>
