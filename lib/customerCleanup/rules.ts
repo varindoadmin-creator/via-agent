@@ -22,9 +22,10 @@ const RETIRED_REGIONS = new Set(['SMG-HUB', 'SBY-HUB']);
 
 const PRICEBOOK_TO_TIER: Record<string, string> = {
   'Tier 1 - Bronze': 'Bronze',
-  'Tier 2 - Silver': 'Silver',
-  'Tier 3 - Gold': 'Gold',
-  'Tier 4 - Platinum': 'Platinum',
+  'Tier 2 - Bronze Plus': 'Bronze Plus',
+  'Tier 3 - Silver': 'Silver',
+  'Tier 4 - Gold': 'Gold',
+  'Tier 5 - Platinum': 'Platinum',
 };
 
 const LEGAL_SUFFIXES = ['PT', 'CV', 'UD', 'PD', 'FA', 'TBK', 'KOPERASI', 'YAYASAN'];
@@ -340,7 +341,7 @@ export function computeCustomerFix(contact: RawContact): CustomerFixResult {
     payload.payment_terms = TARGET_PAYMENT_TERMS;
   }
 
-  // Price List: intentionally left alone. Tier 1-4 (Bronze/Silver/Gold/Platinum) price books
+  // Price List: intentionally left alone. Tier 1-5 (Bronze/Bronze Plus/Silver/Gold/Platinum) price books
   // are legitimate, expected values — not something to clear.
 
   // ── Discount Tier must match Price List, when a Price List is set ───────────

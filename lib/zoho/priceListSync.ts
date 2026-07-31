@@ -2,7 +2,7 @@
 // Zoho doesn't auto-add newly created items to any pricebook (price list),
 // and there's no "add one item" API — updating a pricebook means resending
 // its ENTIRE pricebook_items array (full replace). So this scans all active
-// items, diffs each of the 4 tier pricebooks against that list, and for any
+// items, diffs each tier pricebook against that list, and for any
 // item missing from a tier, appends it — inferring discount% from other
 // items that share the same leading name-prefix (e.g. "ATP", "DXN") already
 // in that tier, which is 100% internally consistent across every existing
@@ -13,16 +13,9 @@
 // rows, never alter or drop one.
 
 import { zohoRequest } from './client';
+import { PRICE_LIST_TIERS, TIER_PRICEBOOK_MAP, type PriceListTier } from './pricebookConfig';
 
-export const PRICE_LIST_TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum'] as const;
-export type PriceListTier = (typeof PRICE_LIST_TIERS)[number];
-
-const TIER_PRICEBOOK_MAP: Record<PriceListTier, string> = {
-  Bronze: '8607767000000225630',
-  Silver: '8607767000000229114',
-  Gold: '8607767000000236082',
-  Platinum: '8607767000000232598',
-};
+export { PRICE_LIST_TIERS, type PriceListTier } from './pricebookConfig';
 
 interface ZohoItem {
   item_id: string;

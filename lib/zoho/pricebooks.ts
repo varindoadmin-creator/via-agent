@@ -1,4 +1,12 @@
 import { zohoRequest } from './client';
+import {
+  filterItemsByActiveIds,
+  getPricebookIdByTier,
+  PRICE_LIST_TIERS,
+  type PriceListTier,
+} from './pricebookConfig';
+
+export { getPricebookIdByTier, PRICE_LIST_TIERS, type PriceListTier } from './pricebookConfig';
 
 interface PricebookItem {
   item_id: string;
@@ -16,8 +24,14 @@ interface PricebookResponse {
   };
 }
 
+interface ZohoItemSummary {
+  item_id: string;
+  status?: string;
+}
+
 // Cache: pricebook_id → { raw items, fetchedAt }
 const pricebookCache = new Map<string, { items: PricebookItem[]; fetchedAt: number }>();
+let activeItemIdsCache: { ids: Set<string>; fetchedAt: number } | null = null;
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 async function fetchPricebookItems(pricebookId: string): Promise<PricebookItem[]> {
@@ -33,6 +47,29 @@ async function fetchPricebookItems(pricebookId: string): Promise<PricebookItem[]
   pricebookCache.set(pricebookId, { items, fetchedAt: Date.now() });
   console.log(`[Pricebook] Loaded ${items.length} items for pricebook ${pricebookId}`);
   return items;
+}
+
+async function fetchActiveItemIds(): Promise<Set<string>> {
+  if (activeItemIdsCache && Date.now() - activeItemIdsCache.fetchedAt < CACHE_TTL) {
+    return activeItemIdsCache.ids;
+  }
+
+  const ids = new Set<string>();
+  let page = 1;
+  while (true) {
+    const response = await zohoRequest<{
+      items?: ZohoItemSummary[];
+      page_context?: { has_more_page?: boolean };
+    }>('/items', { queryParams: { status: 'active', per_page: 200, page } });
+    for (const item of response.items || []) {
+      if (item.item_id && (!item.status || item.status === 'active')) ids.add(item.item_id);
+    }
+    if (!response.page_context?.has_more_page || page >= 30) break;
+    page++;
+  }
+
+  activeItemIdsCache = { ids, fetchedAt: Date.now() };
+  return ids;
 }
 
 export async function getPricebookRateMap(pricebookId: string): Promise<Map<string, number>> {
@@ -63,22 +100,6 @@ export async function getItemPricebookRate(
   return rateMap.get(itemId) ?? baseRate;
 }
 
-// Map cf_tier to pricebook ID
-const TIER_PRICEBOOK_MAP: Record<string, string> = {
-  'Bronze':      '8607767000000225630',
-  'Silver':      '8607767000000229114',
-  'Gold':        '8607767000000236082',
-  'Platinum':    '8607767000000232598',
-  'No Discount': '',
-};
-
-export function getPricebookIdByTier(tier: string): string {
-  return TIER_PRICEBOOK_MAP[tier] || '';
-}
-
-export const PRICE_LIST_TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum'] as const;
-export type PriceListTier = (typeof PRICE_LIST_TIERS)[number];
-
 export interface PriceListItem {
   item_id: string;
   name: string;
@@ -86,13 +107,23 @@ export interface PriceListItem {
   rate: number;
 }
 
+export function filterActivePricebookItems(
+  items: PricebookItem[],
+  activeItemIds: ReadonlySet<string>,
+): PricebookItem[] {
+  return filterItemsByActiveIds(items, activeItemIds);
+}
+
 /** Items in a tier's pricebook with a nonzero discount, sorted highest discount first. */
 export async function getPriceListForTier(tier: PriceListTier): Promise<PriceListItem[]> {
   const pricebookId = getPricebookIdByTier(tier);
   if (!pricebookId) return [];
 
-  const items = await fetchPricebookItems(pricebookId);
-  return items
+  const [items, activeItemIds] = await Promise.all([
+    fetchPricebookItems(pricebookId),
+    fetchActiveItemIds(),
+  ]);
+  return filterActivePricebookItems(items, activeItemIds)
     .map(item => ({
       item_id: item.item_id,
       name: item.name,

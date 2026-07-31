@@ -82,6 +82,7 @@ const TIER_TONES: Record<string, PillTone> = {
   'Platinum': 'purple',
   'Gold':     'warning',
   'Silver':   'neutral',
+  'Bronze Plus': 'serious',
   'Bronze':   'serious',
 };
 
@@ -92,7 +93,7 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CF_TIER_OPTIONS = ['No Discount', 'Bronze', 'Silver', 'Gold', 'Platinum'];
+const CF_TIER_OPTIONS = ['No Discount', 'Bronze', 'Bronze Plus', 'Silver', 'Gold', 'Platinum'];
 const CF_TYPE_OPTIONS = ['End User', 'Sub-Dealer'];
 const CF_REGION_OPTIONS = ['HEAD OFFICE', 'BDG-HUB', 'MDN-HUB', 'SMG-HUB'];
 const PAYMENT_TERMS = [

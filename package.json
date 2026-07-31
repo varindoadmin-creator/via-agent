@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test:commission": "node --experimental-strip-types --test lib/commission/discount.test.ts"
+    "test:commission": "node --experimental-strip-types --test lib/commission/discount.test.ts",
+    "test:price-lists": "node --experimental-strip-types --test lib/zoho/pricebooks.test.ts"
   },
   "dependencies": {
     "@types/node": "^20.17.0",

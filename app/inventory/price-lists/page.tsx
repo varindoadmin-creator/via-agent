@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
-const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum'] as const;
+const TIERS = ['Bronze', 'Bronze Plus', 'Silver', 'Gold', 'Platinum'] as const;
 type Tier = (typeof TIERS)[number];
 
 interface PriceListItem {
@@ -58,6 +58,7 @@ export default function PriceListsPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">Price Lists</h1>
+            <p className="text-[var(--text-4)] text-xs mt-1">Active Zoho items only</p>
           </div>
           <button onClick={() => fetchTier(activeTier)} disabled={loading}
             className="px-3 py-1.5 text-xs bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text-3)] hover:text-[var(--text)] rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
