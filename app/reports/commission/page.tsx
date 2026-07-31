@@ -62,7 +62,7 @@ interface CommissionRow {
   monthly_gp_commission_amount: number;
   monthly_gp_company_keeps: number;
   discount_commission_amount: number;
-  discount_breakdown: Record<'standard_0' | 'standard_5' | 'standard_10' | 'low_margin_0' | 'low_margin_5' | 'other', {
+  discount_breakdown: Record<'standard_0' | 'standard_2' | 'standard_5' | 'standard_7' | 'standard_10' | 'low_margin_0' | 'low_margin_3' | 'low_margin_5' | 'other', {
     revenue: number;
     commission: number;
     line_count: number;
@@ -259,10 +259,13 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
 
   const breakdownRows = ([
     ['standard_0', 'Standard', '0%', '5%'],
-    ['standard_5', 'Standard', '1–5%', '3%'],
-    ['standard_10', 'Standard', '>5–10%', '2%'],
+    ['standard_2', 'Standard', '1–2%', '4%'],
+    ['standard_5', 'Standard', '3–5%', '3%'],
+    ['standard_7', 'Standard', '6–7%', '2%'],
+    ['standard_10', 'Standard', '8–10%', '1%'],
     ['low_margin_0', 'Special Price prefixes / NEWEDGE', '0%', '3%'],
-    ['low_margin_5', 'Special Price prefixes / NEWEDGE', '1–5%', '2%'],
+    ['low_margin_3', 'Special Price prefixes / NEWEDGE', '1–3%', '2%'],
+    ['low_margin_5', 'Special Price prefixes / NEWEDGE', '4–5%', '1%'],
     ['other', 'All items', 'Other', '0%'],
   ] as const).map(([key, schema, discount, rate]) => {
     const bucket = row.discount_breakdown?.[key];
@@ -286,9 +289,12 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
       <div class="grid">
         <div class="card"><div class="label">Eligible Revenue Before PPN</div><div class="value">${formatRp(
           (row.discount_breakdown?.standard_0?.revenue || 0) +
+          (row.discount_breakdown?.standard_2?.revenue || 0) +
           (row.discount_breakdown?.standard_5?.revenue || 0) +
+          (row.discount_breakdown?.standard_7?.revenue || 0) +
           (row.discount_breakdown?.standard_10?.revenue || 0) +
           (row.discount_breakdown?.low_margin_0?.revenue || 0) +
+          (row.discount_breakdown?.low_margin_3?.revenue || 0) +
           (row.discount_breakdown?.low_margin_5?.revenue || 0)
         )}</div></div>
         <div class="card"><div class="label">Commission Payable</div><div class="value">${formatRp(row.discount_commission_amount)}</div></div>
@@ -297,7 +303,7 @@ function printDiscountStatement(row: CommissionRow, dateRange: string) {
       <table><thead><tr><th>Schema</th><th>Discount</th><th class="right">Lines</th><th class="right">Net Revenue</th><th class="right">Commission Rate</th><th class="right">Commission</th></tr></thead><tbody>${breakdownRows}</tbody></table>
       <h2>Line Item Details</h2>
       <table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Item</th><th>SKU</th><th>Schema</th><th class="right">Qty</th><th class="right">Discount</th><th class="right">Net Revenue</th><th class="right">Rate</th><th class="right">Commission</th></tr></thead><tbody>${lineRows}</tbody></table>
-      <div class="note">Calculated per invoice line from net revenue before PPN. Standard items: 0% = 5%, 1–5% = 3%, &gt;5–10% = 2%. Special Price prefixes ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP and NEWEDGE products: 0% = 3%, 1–5% = 2%, above 5% = 0%.</div>
+      <div class="note">Calculated per invoice line from net revenue before PPN. Standard items: 0% = 5%, 1–2% = 4%, 3–5% = 3%, 6–7% = 2%, 8–10% = 1%, above 10% = 0%. Special Price prefixes ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP and NEWEDGE products: 0% = 3%, 1–3% = 2%, 4–5% = 1%, above 5% = 0%.</div>
     </body></html>`;
 
   const w = window.open('', '_blank');
@@ -738,18 +744,21 @@ export default function CommissionReportPage() {
               <tr>
                 <th style={{ ...thStyle, cursor: 'default' }}>Salesperson</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 0% Discount<br /><span style={{ color: 'var(--text-4)' }}>5% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 1–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · &gt;5–10% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 1–2% Discount<br /><span style={{ color: 'var(--text-4)' }}>4% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 3–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 6–7% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Standard · 8–10% Discount<br /><span style={{ color: 'var(--text-4)' }}>1% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Special Price · 0% Discount<br /><span style={{ color: 'var(--text-4)' }}>3% commission</span></th>
-                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Special Price · 1–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Special Price · 1–3% Discount<br /><span style={{ color: 'var(--text-4)' }}>2% commission</span></th>
+                <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Special Price · 4–5% Discount<br /><span style={{ color: 'var(--text-4)' }}>1% commission</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Other Discount<br /><span style={{ color: 'var(--text-4)' }}>Not eligible</span></th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Commission Payable</th>
                 <th style={{ ...thStyle, cursor: 'default', textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={9} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
+              {loading && <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={12} style={{ padding: 30, textAlign: 'center', color: 'var(--text-4)' }}>No salesperson invoice data for this period.</td></tr>}
               {!loading && filtered.map(row => (
                 <React.Fragment key={`discount-${row.name}`}>
                   <tr
@@ -759,9 +768,12 @@ export default function CommissionReportPage() {
                   >
                     <td style={{ padding: '9px 12px', color: 'var(--text)', fontSize: 12, fontWeight: 600 }}>{row.name}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.standard_0?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.standard_2?.revenue || 0)}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.standard_5?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.standard_7?.revenue || 0)}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.standard_10?.revenue || 0)}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.low_margin_0?.revenue || 0)}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.low_margin_3?.revenue || 0)}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, fontSize: 12 }}>{formatRp(row.discount_breakdown?.low_margin_5?.revenue || 0)}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--text-4)', fontSize: 12 }}>{formatRp(row.discount_breakdown?.other?.revenue || 0)}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', ...mono, color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>{formatRp(row.discount_commission_amount || 0)}</td>
@@ -776,7 +788,7 @@ export default function CommissionReportPage() {
                   </tr>
                   {selectedDiscountName === row.name && (
                     <tr>
-                      <td colSpan={9} style={{ padding: 0, background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
+                      <td colSpan={12} style={{ padding: 0, background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
                         <div className="p-4">
                           <div className="flex items-center justify-between mb-3">
                             <div>

@@ -5,6 +5,11 @@ import {
   getZohoOrgId,
 } from "@/lib/zoho/auth";
 import { fetchWithRetry, type RetryOptions } from "@/lib/zoho/retry";
+import {
+  getDiscountCommissionBucket,
+  usesLowMarginDiscountSchema,
+  type DiscountCommissionBucketKey,
+} from "@/lib/commission/discount";
 
 // Yearly commission reports fetch and aggregate many Zoho invoice details.
 // Vercel's default function duration can terminate the request and return an
@@ -342,36 +347,6 @@ function getLineDiscountPercent(li: AnyRecord, invoice: AnyRecord): number {
   return 0;
 }
 
-const SPECIAL_DISCOUNT_PREFIXES = [
-  "ARTE", "ART", "CC", "CCM", "CCP", "CCX",
-  "ATS", "ATP", "ATW", "CATS", "CATP",
-];
-
-function usesLowMarginDiscountSchema(sku: string, itemName: string): boolean {
-  const normalizedSku = sku.trim().toUpperCase();
-  const normalizedName = itemName.trim().toUpperCase();
-  return SPECIAL_DISCOUNT_PREFIXES.some((prefix) =>
-    normalizedSku.startsWith(prefix),
-  ) || normalizedSku.includes("NEWEDGE") || normalizedName.includes("NEWEDGE");
-}
-
-function getDiscountCommissionBucket(
-  discountPercent: number,
-  lowMarginSchema: boolean,
-): { key: string; rate: number; schema: "standard" | "low_margin" } {
-  const schema = lowMarginSchema ? "low_margin" : "standard";
-  if (Math.abs(discountPercent) < 0.01) {
-    return { key: lowMarginSchema ? "low_margin_0" : "standard_0", rate: lowMarginSchema ? 0.03 : 0.05, schema };
-  }
-  if (discountPercent > 0 && discountPercent <= 5) {
-    return { key: lowMarginSchema ? "low_margin_5" : "standard_5", rate: lowMarginSchema ? 0.02 : 0.03, schema };
-  }
-  if (!lowMarginSchema && discountPercent > 5 && discountPercent <= 10) {
-    return { key: "standard_10", rate: 0.02, schema };
-  }
-  return { key: "other", rate: 0, schema };
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const type = searchParams.get("type") || "item";
@@ -585,7 +560,7 @@ export async function GET(request: NextRequest) {
           customer_names: Set<string>;
           missing_cost_lines: number;
           discount_commission_amount: number;
-          discount_breakdown: Record<string, { revenue: number; commission: number; line_count: number }>;
+          discount_breakdown: Record<DiscountCommissionBucketKey, { revenue: number; commission: number; line_count: number }>;
           invoices: AnyRecord[];
         }
       >();
@@ -618,9 +593,12 @@ export async function GET(request: NextRequest) {
           discount_commission_amount: 0,
           discount_breakdown: {
             standard_0: { revenue: 0, commission: 0, line_count: 0 },
+            standard_2: { revenue: 0, commission: 0, line_count: 0 },
             standard_5: { revenue: 0, commission: 0, line_count: 0 },
+            standard_7: { revenue: 0, commission: 0, line_count: 0 },
             standard_10: { revenue: 0, commission: 0, line_count: 0 },
             low_margin_0: { revenue: 0, commission: 0, line_count: 0 },
+            low_margin_3: { revenue: 0, commission: 0, line_count: 0 },
             low_margin_5: { revenue: 0, commission: 0, line_count: 0 },
             other: { revenue: 0, commission: 0, line_count: 0 },
           },
@@ -756,7 +734,7 @@ export async function GET(request: NextRequest) {
           ? "Paid invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced."
           : "All invoices with assigned Salesperson only. Revenue before PPN minus Purchase Rate × quantity invoiced.",
         discount_commission_basis:
-          "Calculated per assigned invoice line. Standard items: 0% discount earns 5%, above 0% through 5% earns 3%, and above 5% through 10% earns 2%. Special Price items with ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP prefixes and NEWEDGE products: 0% discount earns 3%, above 0% through 5% earns 2%, and higher discounts earn 0%.",
+          "Calculated per assigned invoice line. Standard items: 0% earns 5%, 1–2% earns 4%, 3–5% earns 3%, 6–7% earns 2%, and 8–10% earns 1%. Special Price items with ARTE, ART, CC, CCM, CCP, CCX, ATS, ATP, ATW, CATS, CATP prefixes and NEWEDGE products: 0% earns 3%, 1–3% earns 2%, and 4–5% earns 1%. Higher discounts earn 0%.",
         tiers: [
           { min_gp: 0, max_gp: 25_000_000, rate: 0.1 },
           { min_gp: 25_000_000, max_gp: 50_000_000, rate: 0.15 },
