@@ -190,7 +190,10 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
 .via-badge-accent   { background: var(--purple);   color: var(--purple-text);   }
 
 /* ─── Board tables ────────────────────────────────────────────────────────── */
-.via-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.via-table {
+  width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px;
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+}
 .via-table th {
   height: 36px; text-align: left; padding: 7px 12px;
   background: var(--surface); color: var(--text);
@@ -200,9 +203,11 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
   border-right: 1px solid var(--border);
 }
 .via-table td {
-  height: 36px; padding: 7px 12px; color: var(--text-2); background: var(--surface);
+  height: 36px; padding: 7px 12px; color: var(--text-2); background: inherit;
   border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
 }
+.via-table tbody tr { background: var(--surface); }
+.via-table tfoot tr { background: var(--surface-2); }
 .via-table tr:hover td { background: #f5f6f8; }
 .via-table a { color: var(--accent); }
 .via-table a:hover { text-decoration: underline; }
@@ -211,6 +216,8 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
    Give those data grids the same board rhythm without affecting print windows. */
 main table:not(.message-content table) {
   border-color: var(--border);
+  background: var(--surface);
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 main table:not(.message-content table) > thead > tr > th {
   height: 36px;
@@ -226,10 +233,22 @@ main table:not(.message-content table) > thead > tr > th {
 }
 main table:not(.message-content table) > tbody > tr > td {
   min-height: 36px;
+  background-color: inherit;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
+main table:not(.message-content table) > tbody > tr { background-color: var(--surface); }
+main table:not(.message-content table) > tfoot > tr { background-color: var(--surface-2); }
 main table:not(.message-content table) > tbody > tr:hover > td { background-color: #f5f6f8; }
+
+/* Table typography is intentionally uniform. Older pages used inline
+   JetBrains Mono on totals and identifiers; forcing Figtree here keeps every
+   board row and footer visually consistent while status components retain
+   their own color and weight. */
+main table:not(.message-content table) th,
+main table:not(.message-content table) td {
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
 
 /* ─── Chat ────────────────────────────────────────────────────────────────── */
 .message-content pre {
@@ -294,8 +313,9 @@ main table:not(.message-content table) > tbody > tr:hover > td { background-colo
 
 /* Shared Tailwind-built tables: normalize header and row typography even when
    the page does not yet use via-table. Inline colors remain intentionally intact. */
-main table > thead th { font-family: 'Figtree', sans-serif; }
-main table > tbody td { font-family: 'Figtree', sans-serif; }
+main table > thead th,
+main table > tbody td,
+main table > tfoot td { font-family: 'Figtree', sans-serif; }
 
 /* ─── Responsive table container ──────────────────────────────────────────── */
 .via-table-wrap {
