@@ -144,6 +144,80 @@ function CustomerGrowthAlerts() {
   );
 }
 
+type RiskCustomer = {
+  customer_id: string; customer_name: string; score: number; level: 'critical' | 'high' | 'watch' | 'low';
+  factors: Array<{ key: string; label: string; points: number; detail: string }>;
+  overdue_invoice_count: number; issued_invoice_count: number; average_payment_delay_days: number | null;
+  payment_delay_basis: 'paid_invoice_dates' | 'open_overdue_estimate' | 'unavailable';
+  outstanding_balance: number; credit_limit: number | null; creditUtilization: number | null;
+  growthPercent: number | null; disputed_or_cancelled_count: number;
+};
+
+const RISK_TONES: Record<RiskCustomer['level'], PillTone> = { critical: 'serious', high: 'warning', watch: 'info', low: 'good' };
+
+function CustomerRiskScoring() {
+  const [customers, setCustomers] = useState<RiskCustomer[] | null>(null);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [filter, setFilter] = useState<'flagged' | RiskCustomer['level'] | 'all'>('flagged');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function load() {
+    setLoading(true); setError('');
+    try {
+      const response = await fetch('/api/customers/risk-scores', { cache: 'no-store' });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) throw new Error(`Risk analysis returned ${response.status} instead of JSON. Please retry.`);
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Risk analysis failed');
+      setCustomers(data.customers || []); setSummary(data.summary || {});
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setLoading(false); }
+  }
+
+  if (!customers) return (
+    <div className="via-card px-4 py-4 mb-5 flex items-center justify-between gap-4">
+      <div><div className="text-sm font-semibold text-[var(--text)]">Customer Risk Scoring</div><div className="text-xs text-[var(--text-3)] mt-1">Explainable advisory flags only. VIA will not block orders or change customer credit settings.</div></div>
+      <button onClick={load} disabled={loading} className="via-btn via-btn-primary !text-xs whitespace-nowrap">{loading ? 'Analyzing customer history…' : 'Run Risk Analysis'}</button>
+      {error && <span className="text-xs text-[var(--danger)]">{error}</span>}
+    </div>
+  );
+
+  const visible = customers.filter(customer => filter === 'all' || (filter === 'flagged' ? customer.level !== 'low' : customer.level === filter));
+  return (
+    <div className="via-card mb-5 overflow-hidden">
+      <div className="px-4 py-4 flex items-start justify-between gap-4 border-b border-[var(--border)]">
+        <div><div className="text-sm font-semibold text-[var(--text)]">Customer Risk Scoring</div><div className="text-xs text-[var(--text-3)] mt-1">Advisory indicator only · missing credit limits or payment dates do not add risk points.</div></div>
+        <button onClick={load} disabled={loading} className="via-btn via-btn-secondary !min-h-[28px] !px-3 !text-xs">{loading ? '…' : '↻ Refresh'}</button>
+      </div>
+      <div className="px-4 py-3 flex items-center gap-2 border-b border-[var(--border-muted)]">
+        {(['flagged', 'critical', 'high', 'watch', 'low', 'all'] as const).map(level => (
+          <button key={level} onClick={() => setFilter(level)} className={`px-2.5 py-1 text-xs rounded-md border ${filter === level ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-3)]'}`}>
+            {level === 'flagged' ? `Flagged ${(summary.critical || 0) + (summary.high || 0) + (summary.watch || 0)}` : level === 'all' ? `All ${customers.length}` : `${level[0].toUpperCase() + level.slice(1)} ${summary[level] || 0}`}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="via-table w-full">
+          <thead><tr><th>Customer</th><th>Risk</th><th>Why flagged</th><th>Receivables</th><th>Payment behavior</th><th>Sales trend</th></tr></thead>
+          <tbody>{visible.slice(0, 100).map(customer => (
+            <tr key={customer.customer_id}>
+              <td><div className="font-semibold text-[var(--text)]">{customer.customer_name}</div><div className="text-[11px] text-[var(--text-4)]">{customer.issued_invoice_count} invoices reviewed</div></td>
+              <td><div className="flex items-center gap-2"><span className="text-lg font-semibold" style={mono}>{customer.score}</span><StatusPill tone={RISK_TONES[customer.level]} size="cell">{customer.level}</StatusPill></div></td>
+              <td><div className="flex flex-wrap gap-1">{customer.factors.length ? customer.factors.map(factor => <span key={factor.key} title={factor.detail} className="px-2 py-0.5 rounded bg-[var(--surface-2)] text-[11px] text-[var(--text-2)]">{factor.label} +{factor.points}</span>) : <span className="text-xs text-[var(--success)]">No material flags</span>}</div></td>
+              <td><div className="font-semibold text-[var(--text)]" style={mono}>{formatRp(customer.outstanding_balance)}</div><div className="text-[11px] text-[var(--text-3)]">{customer.credit_limit ? `${Math.round((customer.creditUtilization || 0) * 100)}% of ${formatRp(customer.credit_limit)}` : 'Credit limit not configured'}</div></td>
+              <td><div className="text-xs text-[var(--text-2)]">{customer.overdue_invoice_count} overdue</div><div className="text-[11px] text-[var(--text-3)]">{customer.average_payment_delay_days == null ? 'Delay unavailable' : `${customer.average_payment_delay_days} days avg ${customer.payment_delay_basis === 'open_overdue_estimate' ? '(open-invoice estimate)' : ''}`}</div></td>
+              <td><div className="text-xs text-[var(--text-2)]">{customer.growthPercent == null ? 'No prior-period baseline' : `${customer.growthPercent >= 0 ? '+' : ''}${Math.round(customer.growthPercent)}% vs prior 90d`}</div><div className="text-[11px] text-[var(--text-3)]">{customer.disputed_or_cancelled_count} disputed/void/cancelled</div></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {visible.length === 0 && <div className="px-4 py-6 text-center text-xs text-[var(--text-3)]">No customers match this risk filter.</div>}
+      {visible.length > 100 && <div className="px-4 py-2 text-xs text-[var(--text-3)] border-t border-[var(--border)]">Showing the 100 highest scores in this filter.</div>}
+    </div>
+  );
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CF_TIER_OPTIONS = ['No Discount', 'Bronze', 'Bronze Plus', 'Silver', 'Gold', 'Platinum'];
@@ -1008,6 +1082,8 @@ export default function CustomersPage() {
         <CustomerTrendsChart />
 
         <CustomerGrowthAlerts />
+
+        <CustomerRiskScoring />
 
         {/* Tier / Hub breakdown */}
         <div className="grid grid-cols-2 gap-3 mb-5">
