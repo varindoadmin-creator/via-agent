@@ -185,7 +185,7 @@ function NavContent({
 
   const btnBase: React.CSSProperties = {
     width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-    border: 'none', borderRadius: 6, transition: 'all 0.1s',
+    border: 'none', borderRadius: 4, transition: 'all 0.1s',
     position: 'relative', background: 'transparent',
     fontFamily: 'Figtree, sans-serif', cursor: 'pointer',
   };
@@ -215,7 +215,7 @@ function NavContent({
                 onMouseEnter={e => { if (!active && !soon) { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text)'; } }}
                 onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = soon ? 'var(--sidebar-section)' : 'var(--sidebar-text)'; } }}
               >
-                <Icon size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
+                <Icon size={17} strokeWidth={1.8} style={{ flexShrink: 0 }} />
                 {!collapsed && <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
               </button>
             </div>
@@ -562,7 +562,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg)' }}>
       <aside data-build={_BUILD} style={{
-        width: collapsed ? 52 : 210,
+        width: collapsed ? 56 : 232,
         flexShrink: 0, display: 'flex', flexDirection: 'column',
         background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)',
         transition: 'width 0.25s ease', overflow: 'hidden',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ItemDuplicatesModal from '@/components/ItemDuplicatesModal';
+import InventoryExceptionAlerts from '@/components/InventoryExceptionAlerts';
 
 const BRANDS = ['All Brands', 'AICA', 'CARTA', 'ECO', 'EDL', 'LAMITAK', 'TACO'];
 const LOCATIONS = ['HEAD OFFICE', 'HUB-BDG', 'HUB-MDN'] as const;
@@ -370,6 +371,8 @@ export default function InventoryPage() {
         {showDuplicatesModal && (
           <ItemDuplicatesModal onClose={() => setShowDuplicatesModal(false)} />
         )}
+
+        <InventoryExceptionAlerts />
 
         {/* Filters */}
         <div className="flex items-center gap-3 mb-6 flex-wrap">

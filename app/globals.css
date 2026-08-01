@@ -3,40 +3,40 @@
 @tailwind utilities;
 @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ─── VIA — Zoho Books–style Light Theme ──────────────────────────────────── */
+/* ─── VIA — monday-inspired operations workspace ──────────────────────────── */
 
 :root {
   /* Backgrounds */
-  --bg:           #f7f8fa;
+  --bg:           #ffffff;
   --bg-page:      #ffffff;
   --surface:      #ffffff;
-  --surface-2:    #f9fafb;
-  --surface-3:    #f3f4f6;
+  --surface-2:    #f5f6f8;
+  --surface-3:    #e6e9ef;
 
   /* Borders */
-  --border:       #e5e7eb;
-  --border-muted: #eef0f2;
+  --border:       #d0d4e4;
+  --border-muted: #e6e9ef;
 
   /* Text */
-  --text:         #111827;
-  --text-2:       #374151;
-  --text-3:       #6b7280;
-  --text-4:       #9ca3af;
+  --text:         #323338;
+  --text-2:       #323338;
+  --text-3:       #676879;
+  --text-4:       #9699a6;
 
   /* Aliases used by some pages */
   --panel:        var(--surface);
   --muted:        var(--text-3);
 
-  /* Accent / Brand — violet (links, focus, interactive, primary CTAs) */
-  --accent:       #4a3aa7;
-  --accent-hover: #3a2d85;
-  --accent-light: #f1eefa;
-  --accent-text:  #4a3aa7;
-  --accent-border:#cfc6ef;
+  /* monday blue: primary actions, focus, selected controls and links */
+  --accent:       #0073ea;
+  --accent-hover: #0060b9;
+  --accent-light: #e5f4ff;
+  --accent-text:  #0073ea;
+  --accent-border:#80c7f8;
 
   /* Primary action — same violet brand color as accent (monday.com-style: one brand color, not a separate near-black) */
-  --primary:      #4a3aa7;
-  --primary-hover:#3a2d85;
+  --primary:      #0073ea;
+  --primary-hover:#0060b9;
   --primary-text: #ffffff;
 
   /* Status tones — monday.com's actual board-status palette (Done/Working on
@@ -83,13 +83,13 @@
   --cat-violet:   #a25ddc;
   --cat-red:      #e2445c;
 
-  /* Sidebar — white with violet active state */
-  --sidebar-bg:     #ffffff;
+  /* Workspace navigation */
+  --sidebar-bg:     #f6f7fb;
   --sidebar-border: #e5e7eb;
   --sidebar-text:   #4b5563;
-  --sidebar-hover:  #f3f4f6;
-  --sidebar-active-bg: #4a3aa7;
-  --sidebar-active-text: #ffffff;
+  --sidebar-hover:  #e6e9ef;
+  --sidebar-active-bg: #cce5ff;
+  --sidebar-active-text: #323338;
   --sidebar-section:#9ca3af;
 }
 
@@ -99,8 +99,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -120,12 +120,12 @@ body {
 /* ─── Mono ────────────────────────────────────────────────────────────────── */
 code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
 
-/* ─── Page header (Zoho: bold black title + light subtitle) ─────────────────── */
+/* ─── Page header ─────────────────────────────────────────────────────────── */
 .via-h1 {
   color: var(--text);
   font-weight: 700;
-  font-size: 22px;
-  letter-spacing: -0.01em;
+  font-size: 24px;
+  letter-spacing: -0.02em;
 }
 .via-subtitle { color: var(--text-3); font-size: 13px; }
 
@@ -134,17 +134,18 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(50, 51, 56, 0.04);
 }
 .via-card-hover:hover {
   border-color: #d1d5db;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
-/* ─── Buttons (Zoho: solid black primary, white/bordered secondary) ─────────── */
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
 .via-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 7px 14px; border-radius: 6px;
-  font-size: 13px; font-weight: 500;
+  min-height: 32px; padding: 6px 14px; border-radius: 4px;
+  font-size: 14px; font-weight: 400;
   font-family: inherit; cursor: pointer;
   border: 1px solid transparent;
   transition: background-color 0.12s, border-color 0.12s, color 0.12s;
@@ -188,21 +189,51 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
 .via-badge-muted    { background: var(--neutral);  color: var(--neutral-text);  }
 .via-badge-accent   { background: var(--purple);   color: var(--purple-text);   }
 
-/* ─── Tables (Zoho: white bg, uppercase gray headers, subtle row borders) ───── */
-.via-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+/* ─── Board tables ────────────────────────────────────────────────────────── */
+.via-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
 .via-table th {
-  text-align: left; padding: 9px 12px;
-  background: var(--surface-2); color: var(--text-3);
-  font-weight: 600; font-size: 11px;
-  text-transform: uppercase; letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border);
-  border-top: 1px solid var(--border);
+  height: 36px; text-align: left; padding: 7px 12px;
+  background: var(--surface); color: var(--text);
+  font-weight: 400; font-size: 14px;
+  text-transform: none; letter-spacing: 0;
+  border-bottom: 1px solid var(--border); border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
-.via-table td { padding: 9px 12px; border-bottom: 1px solid var(--border-muted); color: var(--text-2); }
-.via-table tr:last-child td { border-bottom: 1px solid var(--border); }
-.via-table tr:hover td { background: var(--surface-2); }
+.via-table th:first-child { border-left: 5px solid var(--cat-blue); }
+.via-table td {
+  height: 36px; padding: 7px 12px; color: var(--text-2); background: var(--surface);
+  border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+.via-table td:first-child { border-left: 5px solid var(--cat-blue); }
+.via-table tr:hover td { background: #f5f6f8; }
 .via-table a { color: var(--accent); }
 .via-table a:hover { text-decoration: underline; }
+
+/* A large part of VIA predates via-table and uses inline table declarations.
+   Give those data grids the same board rhythm without affecting print windows. */
+main table:not(.message-content table) {
+  border-color: var(--border);
+}
+main table:not(.message-content table) > thead > tr > th {
+  height: 36px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+main table:not(.message-content table) > tbody > tr > td {
+  min-height: 36px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+main table:not(.message-content table) > thead > tr > th:first-child,
+main table:not(.message-content table) > tbody > tr > td:first-child { border-left: 5px solid var(--cat-blue); }
+main table:not(.message-content table) > tbody > tr:hover > td { background-color: #f5f6f8; }
 
 /* ─── Chat ────────────────────────────────────────────────────────────────── */
 .message-content pre {
@@ -248,8 +279,8 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
 /* ─── Inputs (Zoho: white bg, thin gray border, label above field) ──────────── */
 .via-input {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; padding: 7px 11px;
-  font-size: 13px; color: var(--text);
+  min-height: 32px; border-radius: 4px; padding: 6px 11px;
+  font-size: 14px; color: var(--text);
   outline: none; transition: border-color 0.15s, box-shadow 0.15s;
   font-family: inherit;
 }
@@ -262,8 +293,13 @@ code, .mono, pre { font-family: 'JetBrains Mono', monospace; }
   padding: 20px 16px 80px;
 }
 @media (min-width: 640px) {
-  .via-page { padding: 24px 24px 80px; }
+  .via-page { padding: 24px 32px 80px; }
 }
+
+/* Shared Tailwind-built tables: normalize header and row typography even when
+   the page does not yet use via-table. Inline colors remain intentionally intact. */
+main table > thead th { font-family: 'Figtree', sans-serif; }
+main table > tbody td { font-family: 'Figtree', sans-serif; }
 
 /* ─── Responsive table container ──────────────────────────────────────────── */
 .via-table-wrap {
