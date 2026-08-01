@@ -22,6 +22,115 @@ const formatRp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
 type PurchaseGapSO = { salesorder_id: string; salesorder_number: string; customer_name: string; total: number; confirmed_at: string; sub_status_formatted: string };
 
+type AutomationHealthJob = {
+  name: string; label: string; schedule: string;
+  status: 'healthy' | 'pending' | 'missing' | 'failed';
+  lastSuccessAt: string | null; nextExpectedAt: string;
+};
+type DraftReadinessIssue = {
+  product_code: string; item_name: string; required_quantity: number; available_quantity: number;
+  shortage_quantity: number; assigned_location: string;
+  other_locations: Array<{ location: string; available_quantity: number }>;
+  suggested_transfers: Array<{ from_location: string; quantity: number }>;
+};
+type DraftReadinessInvoice = { invoice_id: string; invoice_number: string; customer_name: string; issues: DraftReadinessIssue[] };
+
+function formatJakarta(value: string | null) {
+  if (!value) return 'Never';
+  return new Date(value).toLocaleString('en-GB', {
+    timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function AutomationHealthPanel() {
+  const [data, setData] = useState<{ healthy: boolean; jobs: AutomationHealthJob[]; alerts: Array<{ severity: string; message: string }>; draftReadiness: DraftReadinessInvoice[] } | null>(null);
+  const [error, setError] = useState('');
+
+  async function load() {
+    setError('');
+    try {
+      const res = await fetch('/api/dashboard/automation-health', { cache: 'no-store' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Health check failed');
+      setData(json);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, marginBottom: 20 }}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-[var(--text)] font-semibold text-sm">Automation Health</h2>
+          <div className="text-[var(--muted)] text-xs mt-1">Daily schedules use Asia/Jakarta time · 30-minute grace period</div>
+        </div>
+        <button onClick={load} className="px-3 py-1.5 text-xs rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>↻</button>
+      </div>
+
+      {error && <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
+      {data?.alerts.map((alert, index) => (
+        <div key={index} className="rounded-lg p-3 text-xs mb-2" style={{ background: alert.severity === 'critical' ? 'var(--danger-bg)' : 'var(--warning-bg)', border: `1px solid ${alert.severity === 'critical' ? 'var(--danger-border)' : 'var(--warning-border)'}`, color: alert.severity === 'critical' ? 'var(--danger)' : 'var(--warning)' }}>
+          ⚠ {alert.message}
+        </div>
+      ))}
+      {data?.healthy && <div className="rounded-lg p-3 text-xs mb-3" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>✓ All scheduled tasks are healthy.</div>}
+
+      {data && data.draftReadiness.length > 0 && (
+        <div className="mb-4 space-y-3">
+          <div className="text-xs font-semibold" style={{ color: 'var(--warning)' }}>Draft invoices needing stock action</div>
+          {data.draftReadiness.map(invoice => (
+            <div key={invoice.invoice_id} className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--warning-border)' }}>
+              <div className="px-3 py-2 text-xs" style={{ background: 'var(--warning-bg)', color: 'var(--text)' }}>
+                <strong>{invoice.invoice_number}</strong> — {invoice.customer_name}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead><tr style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                    <th className="text-left p-2">Product</th><th className="text-left p-2">Assigned location</th><th className="text-right p-2">Required</th><th className="text-right p-2">Available</th><th className="text-left p-2">Other stock</th><th className="text-left p-2">Suggested transfer</th>
+                  </tr></thead>
+                  <tbody>{invoice.issues.map((issue, index) => (
+                    <tr key={`${issue.product_code}-${index}`} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                      <td className="p-2"><div style={{ color: 'var(--text)', fontWeight: 600 }}>{issue.product_code}</div><div style={{ color: 'var(--muted)' }}>{issue.item_name}</div></td>
+                      <td className="p-2" style={{ color: 'var(--text-2)' }}>{issue.assigned_location}</td>
+                      <td className="p-2 text-right" style={{ color: 'var(--text-2)' }}>{issue.required_quantity}</td>
+                      <td className="p-2 text-right" style={{ color: 'var(--danger)', fontWeight: 600 }}>{issue.available_quantity}</td>
+                      <td className="p-2" style={{ color: 'var(--text-2)' }}>{issue.other_locations.length ? issue.other_locations.map(loc => `${loc.location}: ${loc.available_quantity}`).join(', ') : 'None'}</td>
+                      <td className="p-2" style={{ color: issue.suggested_transfers.length ? 'var(--success)' : 'var(--danger)' }}>
+                        {issue.suggested_transfers.length ? issue.suggested_transfers.map(move => `${move.quantity} from ${move.from_location}`).join(', ') : `Purchase/receive ${issue.shortage_quantity}`}
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead><tr style={{ color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+              <th className="text-left py-2">Task</th><th className="text-left py-2">Status</th><th className="text-left py-2">Last successful run</th><th className="text-left py-2">Next expected run</th>
+            </tr></thead>
+            <tbody>{data.jobs.map(job => (
+              <tr key={job.name} style={{ borderBottom: '1px solid var(--border-muted)' }}>
+                <td className="py-2.5"><div style={{ color: 'var(--text)' }}>{job.label}</div><div style={{ color: 'var(--muted)' }}>Daily {job.schedule}</div></td>
+                <td className="py-2.5"><span style={{ color: job.status === 'healthy' ? 'var(--success)' : job.status === 'pending' ? 'var(--muted)' : 'var(--danger)', fontWeight: 600 }}>{job.status.toUpperCase()}</span></td>
+                <td className="py-2.5" style={{ color: 'var(--text-2)' }}>{formatJakarta(job.lastSuccessAt)}</td>
+                <td className="py-2.5" style={{ color: 'var(--text-2)' }}>{formatJakarta(job.nextExpectedAt)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PurchaseGapAlert() {
   const [gaps, setGaps] = useState<PurchaseGapSO[] | null>(null);
 
@@ -349,6 +458,7 @@ export default function DashboardPage() {
 
         <PurchaseGapAlert />
         <ShipmentAgingAlert />
+        <AutomationHealthPanel />
         <DailyBriefPanel />
       </div>
     </div>

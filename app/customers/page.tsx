@@ -91,6 +91,58 @@ function TierBadge({ tier }: { tier: string }) {
   return <StatusPill tone={TIER_TONES[tier] || 'neutral'} size="cell">{tier}</StatusPill>;
 }
 
+type GrowthAlertCustomer = {
+  customer_id: string; customer_name: string; last_order_date: string; days_since_last_order: number;
+  normal_cycle_days: number; revenue_12m: number; recent_revenue_90d: number; previous_revenue_90d: number;
+  decline_percent: number; reasons: string[]; recommended_products: Array<{ code: string; name: string }>;
+  follow_up_message: string;
+};
+
+function CustomerGrowthAlerts() {
+  const [groups, setGroups] = useState<Array<{ salesperson: string; customers: GrowthAlertCustomer[] }> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function load() {
+    setLoading(true); setError('');
+    try {
+      const res = await fetch('/api/customers/growth-alerts', { cache: 'no-store' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Analysis failed');
+      setGroups(data.groups || []);
+    } catch (err) { setError(String(err)); }
+    finally { setLoading(false); }
+  }
+
+  if (!groups) return (
+    <div className="via-card px-4 py-4 mb-5 flex items-center justify-between">
+      <div><div className="text-sm font-semibold text-[var(--text)]">Customer Inactivity & Growth Alerts</div><div className="text-xs text-[var(--text-3)] mt-1">Find valuable customers who are declining or overdue for their normal reorder cycle.</div></div>
+      <button onClick={load} disabled={loading} className="px-4 py-2 text-xs bg-[var(--accent)] text-white rounded-lg disabled:opacity-50">{loading ? 'Analyzing 12 months…' : 'Run Growth Analysis'}</button>
+      {error && <span className="text-xs text-[var(--danger)]">{error}</span>}
+    </div>
+  );
+
+  return (
+    <div className="via-card px-4 py-4 mb-5">
+      <div className="flex items-center justify-between mb-3"><div><div className="text-sm font-semibold text-[var(--text)]">Customer Inactivity & Growth Alerts</div><div className="text-xs text-[var(--text-3)] mt-1">Approval-ready follow-ups grouped by salesperson. Messages are never sent automatically.</div></div><button onClick={load} disabled={loading} className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border)]">{loading ? '…' : '↻'}</button></div>
+      {groups.length === 0 && <div className="text-xs text-[var(--success)] py-3">✓ No valuable customers currently meet the decline or reorder-risk criteria.</div>}
+      <div className="space-y-4">{groups.map(group => (
+        <div key={group.salesperson} className="rounded-lg overflow-hidden border border-[var(--border)]">
+          <div className="px-3 py-2 bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)]">{group.salesperson} · {group.customers.length} follow-up{group.customers.length === 1 ? '' : 's'}</div>
+          <div className="divide-y divide-[var(--border-muted)]">{group.customers.map(customer => (
+            <div key={customer.customer_id} className="p-3 grid grid-cols-[1.2fr_1fr_1.5fr_auto] gap-4 items-start">
+              <div><div className="text-xs font-semibold text-[var(--text)]">{customer.customer_name}</div><div className="text-[11px] text-[var(--text-3)] mt-1">Last order {customer.last_order_date} · {customer.days_since_last_order} days ago · normal cycle {customer.normal_cycle_days || '—'} days</div><div className="text-[11px] text-[var(--warning)] mt-1">{customer.reasons.join(' · ')}</div></div>
+              <div className="text-[11px]"><div className="text-[var(--text-3)]">12-month value</div><div className="font-semibold text-[var(--text)]" style={mono}>{formatRp(customer.revenue_12m)}</div><div className="text-[var(--text-3)] mt-1">90-day decline: {customer.decline_percent}%</div></div>
+              <div><div className="text-[11px] text-[var(--text-3)] mb-1">Recommended products</div><div className="text-[11px] text-[var(--text-2)]">{customer.recommended_products.length ? customer.recommended_products.map(product => `${product.code} — ${product.name}`).join(', ') : 'No line-item history available'}</div></div>
+              <CopyWAButton message={customer.follow_up_message} label="Approve & Copy" />
+            </div>
+          ))}</div>
+        </div>
+      ))}</div>
+    </div>
+  );
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const CF_TIER_OPTIONS = ['No Discount', 'Bronze', 'Bronze Plus', 'Silver', 'Gold', 'Platinum'];
@@ -913,6 +965,8 @@ export default function CustomersPage() {
 
         {/* Trend chart */}
         <CustomerTrendsChart />
+
+        <CustomerGrowthAlerts />
 
         {/* Tier / Hub breakdown */}
         <div className="grid grid-cols-2 gap-3 mb-5">

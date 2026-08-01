@@ -5,7 +5,7 @@ import { recordCronRun } from '@/lib/cron/runLog';
 
 export const maxDuration = 300;
 
-// Triggered daily at 09:00 Asia/Jakarta by an external cron-job.org scheduled
+// Triggered daily at 09:10 Asia/Jakarta by an external cron-job.org scheduled
 // job (see middleware.ts for the x-cron-secret auth bypass — Hostinger's
 // Node.js Web App hosting has no cron support of its own). Also callable
 // manually via the "Mark Ready Drafts as Sent" Daily Brief action button.
@@ -26,6 +26,18 @@ interface AutoSendLogRow {
   reason: string | null;
   error: string | null;
 }
+
+type StockLocation = { location_id: string; location_name: string; available_quantity: number };
+type ReadinessIssue = {
+  product_code: string;
+  item_name: string;
+  required_quantity: number;
+  available_quantity: number;
+  shortage_quantity: number;
+  assigned_location: string;
+  other_locations: Array<{ location: string; available_quantity: number }>;
+  suggested_transfers: Array<{ from_location: string; quantity: number }>;
+};
 
 async function logAutoSendResults(rows: AutoSendLogRow[]) {
   if (!rows.length) return;
@@ -81,7 +93,7 @@ export async function POST() {
     const draftData = await zohoGet('/invoices?status=draft&per_page=200');
     const drafts = draftData.invoices || [];
 
-    const results: Array<{ invoice_id: string; invoice_number: string; customer_name: string; success: boolean; skipped?: boolean; reason?: string; error?: string }> = [];
+    const results: Array<{ invoice_id: string; invoice_number: string; customer_name: string; success: boolean; skipped?: boolean; reason?: string; error?: string; readiness_issues?: ReadinessIssue[] }> = [];
 
     for (const inv of drafts) {
       const invoiceId = String(inv.invoice_id);
@@ -92,28 +104,67 @@ export async function POST() {
         const lineItems = detail.invoice?.line_items || [];
 
         // Check per-location stock for each item
-        const itemIds = [...new Set(lineItems.map((li: Record<string, unknown>) => String(li.item_id || '')).filter(Boolean))];
-        const itemLocMap = new Map<string, number>();
+        const itemIds = [...new Set<string>(lineItems.map((li: Record<string, unknown>) => String(li.item_id || '')).filter(Boolean))];
+        const itemLocations = new Map<string, StockLocation[]>();
 
-        await Promise.all(itemIds.map(async (itemId: string) => {
+        await Promise.all(itemIds.map(async (itemId) => {
           try {
             const itemDetail = await zohoGet('/items/' + itemId);
-            for (const loc of itemDetail.item?.locations || []) {
-              itemLocMap.set(itemId + '_' + String(loc.location_id), Number(loc.location_stock_on_hand) || 0);
-            }
+            const locations = (itemDetail.item?.locations || []).map((loc: Record<string, unknown>) => ({
+              location_id: String(loc.location_id || ''),
+              location_name: String(loc.location_name || loc.name || 'Unknown location'),
+              available_quantity: Number(loc.location_stock_on_hand) || 0,
+            }));
+            itemLocations.set(itemId, locations);
           } catch { /* skip */ }
         }));
 
-        // Check all items are ready
-        const allReady = lineItems.every((li: Record<string, unknown>) => {
+        const readinessIssues: ReadinessIssue[] = lineItems.flatMap((li: Record<string, unknown>) => {
           const qty = Number(li.quantity) || 0;
-          const key = String(li.item_id) + '_' + String(li.location_id);
-          const stock = itemLocMap.get(key) ?? Number(li.stock_on_hand) ?? 0;
-          return stock >= qty;
+          const itemId = String(li.item_id || '');
+          const locationId = String(li.location_id || '');
+          const locations = itemLocations.get(itemId) || [];
+          const assigned = locations.find(loc => loc.location_id === locationId);
+          const available = assigned?.available_quantity ?? Number(li.stock_on_hand) ?? 0;
+          const shortage = Math.max(0, qty - available);
+          if (shortage === 0) return [];
+
+          const alternatives = locations
+            .filter(loc => loc.location_id !== locationId && loc.available_quantity > 0)
+            .sort((a, b) => b.available_quantity - a.available_quantity);
+          let remaining = shortage;
+          const suggestedTransfers: ReadinessIssue['suggested_transfers'] = [];
+          for (const loc of alternatives) {
+            if (remaining <= 0) break;
+            const transfer = Math.min(remaining, loc.available_quantity);
+            suggestedTransfers.push({ from_location: loc.location_name, quantity: transfer });
+            remaining -= transfer;
+          }
+
+          return [{
+            product_code: String(li.sku || li.item_code || 'Missing product code'),
+            item_name: String(li.name || 'Unknown item'),
+            required_quantity: qty,
+            available_quantity: available,
+            shortage_quantity: shortage,
+            assigned_location: String(li.location_name || assigned?.location_name || 'Unassigned location'),
+            other_locations: alternatives.map(loc => ({ location: loc.location_name, available_quantity: loc.available_quantity })),
+            suggested_transfers: suggestedTransfers,
+          }];
         });
 
+        const allReady = lineItems.length > 0 && readinessIssues.length === 0;
+
         if (!allReady) {
-          results.push({ invoice_id: invoiceId, invoice_number: String(inv.invoice_number), customer_name: customerName, success: false, skipped: true, reason: 'Insufficient stock' });
+          results.push({
+            invoice_id: invoiceId,
+            invoice_number: String(inv.invoice_number),
+            customer_name: customerName,
+            success: false,
+            skipped: true,
+            reason: lineItems.length === 0 ? 'Invoice has no line items' : 'Insufficient stock',
+            readiness_issues: readinessIssues,
+          });
           continue;
         }
 
@@ -154,6 +205,14 @@ export async function POST() {
       sent,
       skipped,
       failed,
+      readiness_issues: results
+        .filter(r => r.skipped)
+        .map(r => ({
+          invoice_id: r.invoice_id,
+          invoice_number: r.invoice_number,
+          customer_name: r.customer_name,
+          issues: r.readiness_issues || [],
+        })),
     });
     return NextResponse.json({ success: true, sent, skipped, failed, results });
   } catch (err) {
