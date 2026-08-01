@@ -18,6 +18,8 @@ interface DraftSO {
   quantity: number;
 }
 
+type TableSummary = { count: number; total: number };
+
 interface ConfirmedNotReady {
   salesorder_id: string;
   salesorder_number: string;
@@ -163,9 +165,9 @@ function EmptyState({ icon, msg }: { icon: string; msg: string }) {
 
 // ─── Table -1: Pending Approval SOs ──────────────────────────────────────────
 
-function PendingApprovalSOTable() {
+function PendingApprovalSOTable({ onSummary }: { onSummary: (summary: TableSummary) => void }) {
   const [items, setItems] = useState<DraftSO[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -181,10 +183,12 @@ function PendingApprovalSOTable() {
       const res = await fetch('/api/shipments?mode=pending_approval');
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-      setItems(data.salesorders || []);
+      const rows = (data.salesorders || []) as DraftSO[];
+      setItems(rows);
+      onSummary({ count: rows.length, total: rows.reduce((sum, row) => sum + row.total, 0) });
     } catch(e) { setError(String(e)); }
     finally { setLoading(false); }
-  }, []);
+  }, [onSummary]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -342,9 +346,9 @@ function PendingApprovalSOTable() {
 
 // ─── Table -0.5: Approved SOs ────────────────────────────────────────────────
 
-function ApprovedSOTable() {
+function ApprovedSOTable({ onSummary }: { onSummary: (summary: TableSummary) => void }) {
   const [items, setItems] = useState<DraftSO[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -360,10 +364,12 @@ function ApprovedSOTable() {
       const res = await fetch('/api/shipments?mode=approved');
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-      setItems(data.salesorders || []);
+      const rows = (data.salesorders || []) as DraftSO[];
+      setItems(rows);
+      onSummary({ count: rows.length, total: rows.reduce((sum, row) => sum + row.total, 0) });
     } catch(e) { setError(String(e)); }
     finally { setLoading(false); }
-  }, []);
+  }, [onSummary]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -536,9 +542,9 @@ function ApprovedSOTable() {
 
 // ─── Table 0: Draft ─────────────────────────────────────────────
 
-function DraftSOTable() {
+function DraftSOTable({ onSummary }: { onSummary: (summary: TableSummary) => void }) {
   const [items, setItems] = useState<DraftSO[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -554,10 +560,12 @@ function DraftSOTable() {
       const res = await fetch('/api/shipments?mode=drafts');
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-      setItems(data.salesorders || []);
+      const rows = (data.salesorders || []) as DraftSO[];
+      setItems(rows);
+      onSummary({ count: rows.length, total: rows.reduce((sum, row) => sum + row.total, 0) });
     } catch(e) { setError(String(e)); }
     finally { setLoading(false); }
-  }, []);
+  }, [onSummary]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -1210,9 +1218,12 @@ function DeliveredTable({ items, loading, error, onConverted }: {
 export default function ShipmentsPage() {
   const [notReady, setNotReady] = useState<ConfirmedNotReady[]>([]);
   const [delivered, setDelivered] = useState<DeliveredNotInvoiced[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState('');
+  const [draftSummary, setDraftSummary] = useState<TableSummary | null>(null);
+  const [pendingSummary, setPendingSummary] = useState<TableSummary | null>(null);
+  const [approvedSummary, setApprovedSummary] = useState<TableSummary | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -1237,8 +1248,13 @@ export default function ShipmentsPage() {
     setDelivered(prev => prev.filter(i => !ids.includes(i.salesorder_id)));
   }
 
-  const readyToInvoice = delivered.filter(i => i.all_delivered).length;
-  const totalReadyValue = delivered.filter(i => i.all_delivered).reduce((s, i) => s + i.total, 0);
+  const summaryCards = [
+    { label: 'Draft', summary: draftSummary, color: 'var(--neutral)', note: 'awaiting submission' },
+    { label: 'Pending Approval', summary: pendingSummary, color: 'var(--warning)', note: 'awaiting approval' },
+    { label: 'Approved', summary: approvedSummary, color: 'var(--good)', note: 'awaiting confirmation' },
+    { label: 'Confirmed — Not Packaged', summary: { count: notReady.length, total: notReady.reduce((sum, row) => sum + row.total, 0) }, color: 'var(--serious)', note: 'pending packing' },
+    { label: 'Delivered — Not Invoiced', summary: { count: delivered.length, total: delivered.reduce((sum, row) => sum + row.total, 0) }, color: 'var(--info)', note: 'pending invoice' },
+  ];
 
   return (
     <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
@@ -1269,30 +1285,28 @@ export default function ShipmentsPage() {
         )}
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="via-card px-5 py-4">
-            <div className="text-[var(--text-3)] text-xs mb-1">Confirmed, Not Ready</div>
-            <div className="text-[var(--text)] text-2xl font-semibold" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-              {loading ? '…' : notReady.length}
-            </div>
-            <div className="text-[var(--text-4)] text-xs mt-1">orders pending packing</div>
-          </div>
-          <div className="via-card px-5 py-4">
-            <div className="text-[var(--text-3)] text-xs mb-1">Ready to Invoice</div>
-            <div className="text-2xl font-semibold" style={{ fontFamily: 'JetBrains Mono, monospace', color: readyToInvoice > 0 ? 'var(--warning)' : 'var(--text)' }}>
-              {loading ? '…' : readyToInvoice}
-            </div>
-            <div className="text-[var(--text-4)] text-xs mt-1">
-              {readyToInvoice > 0 ? formatRp(totalReadyValue) : 'all invoiced'}
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
+          {summaryCards.map(card => {
+            const cardLoading = !card.summary || (loading && (card.label.startsWith('Confirmed') || card.label.startsWith('Delivered')));
+            return (
+              <div key={card.label} className="via-card px-4 py-3" style={{ borderTop: `3px solid ${card.color}` }}>
+                <div className="text-[var(--text-3)] text-xs mb-1 truncate" title={card.label}>{card.label}</div>
+                <div className="text-[var(--text)] text-2xl font-semibold" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                  {cardLoading ? '…' : card.summary!.count}
+                </div>
+                <div className="text-[var(--text-4)] text-[11px] mt-1 truncate" title={cardLoading ? card.note : `${formatRp(card.summary!.total)} · ${card.note}`}>
+                  {cardLoading ? card.note : `${formatRp(card.summary!.total)} · ${card.note}`}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Tables */}
         <div className="space-y-6">
-          <DraftSOTable />
-          <PendingApprovalSOTable />
-          <ApprovedSOTable />
+          <DraftSOTable onSummary={setDraftSummary} />
+          <PendingApprovalSOTable onSummary={setPendingSummary} />
+          <ApprovedSOTable onSummary={setApprovedSummary} />
           <NotReadyTable items={notReady} loading={loading} error={error} />
           <DeliveredTable items={delivered} loading={loading} error={error} onConverted={handleConverted} />
         </div>
