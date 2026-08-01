@@ -79,11 +79,12 @@ function DaysBadge({ days, suffix }: { days: number; suffix: string }) {
 }
 
 const TIER_TONES: Record<string, PillTone> = {
+  'No Discount': 'info',
+  'Bronze': 'serious',
+  'Bronze Plus': 'good',
+  'Silver': 'neutral',
+  'Gold': 'warning',
   'Platinum': 'purple',
-  'Gold':     'warning',
-  'Silver':   'neutral',
-  'Bronze Plus': 'serious',
-  'Bronze':   'serious',
 };
 
 function TierBadge({ tier }: { tier: string }) {
@@ -523,6 +524,7 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
 }) {
+  const PAGE_SIZE = 50;
   type SortKey =
     | 'contact_name' | 'contact' | 'cf_region' | 'cf_tier'
     | 'so_count_90d' | 'total_90d' | 'last_so_date'
@@ -546,6 +548,7 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
 
   const [sortKey, setSortKey] = useState<SortKey | null>(showActivity ? 'total_90d' : null);
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+  const [page, setPage] = useState(1);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
@@ -592,6 +595,15 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
     }
     return result;
   }, [customers, search, sortKey, sortDir]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pagedCustomers = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [customers, search, sortKey, sortDir]);
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
 
   const selectedInTable = useMemo(
     () => customers.filter(c => selectedIds.has(c.contact_id)),
@@ -649,10 +661,10 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
               <tr>
                 <th style={{ ...thStyle, width: 36 }}>
                   <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                    checked={filtered.length > 0 && filtered.every(c => selectedIds.has(c.contact_id))}
+                    checked={pagedCustomers.length > 0 && pagedCustomers.every(c => selectedIds.has(c.contact_id))}
                     onChange={() => {
-                      const allSel = filtered.every(c => selectedIds.has(c.contact_id));
-                      filtered.forEach(c => {
+                      const allSel = pagedCustomers.every(c => selectedIds.has(c.contact_id));
+                      pagedCustomers.forEach(c => {
                         const has = selectedIds.has(c.contact_id);
                         if (allSel && has) onToggleSelect(c.contact_id);
                         else if (!allSel && !has) onToggleSelect(c.contact_id);
@@ -678,7 +690,7 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => (
+              {pagedCustomers.map(c => (
                 <tr key={c.contact_id}
                   className={`transition-colors ${selectedIds.has(c.contact_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}
                   style={{ borderBottom: '1px solid var(--border-muted)' }}>
@@ -759,6 +771,35 @@ function CustomerTable({ title, groupColor, customers, loading, search, showActi
               </tfoot>
             )}
           </table>
+        </div>
+      )}
+
+      {!loading && filtered.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-4 px-5 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
+          <div className="text-xs text-[var(--text-3)]">
+            Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage(current => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="via-btn via-btn-secondary !min-h-[28px] !px-3 !text-xs disabled:opacity-40"
+            >
+              ← Previous
+            </button>
+            <span className="min-w-24 text-center text-xs text-[var(--text-3)]">
+              Page {page} of {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(current => Math.min(pageCount, current + 1))}
+              disabled={page === pageCount}
+              className="via-btn via-btn-secondary !min-h-[28px] !px-3 !text-xs disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
         </div>
       )}
     </div>
