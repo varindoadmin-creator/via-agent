@@ -15,7 +15,8 @@
     "test:customer-risk": "node --experimental-strip-types --test lib/customers/riskScoring.test.ts",
     "test:data-quality": "node --experimental-strip-types scripts/test-data-quality.ts",
     "test:customer-duplicate-ignore": "node --experimental-strip-types --test lib/customerDuplicates/ignoreStore.test.ts",
-    "test:customer-duplicate-merge": "node --experimental-strip-types --test lib/customerDuplicates/mergeRequest.test.ts"
+    "test:customer-duplicate-merge": "node --experimental-strip-types --test lib/customerDuplicates/mergeRequest.test.ts",
+    "test:customer-duplicate-detection": "node --experimental-strip-types --test lib/customerCleanup/duplicates.test.ts"
   },
   "dependencies": {
     "@types/node": "^20.17.0",

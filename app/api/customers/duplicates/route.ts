@@ -45,7 +45,7 @@ async function fetchAllCustomerIds(): Promise<string[]> {
   let page = 1;
   let hasMore = true;
   while (hasMore) {
-    const res = await zohoGet(`/contacts?contact_type=customer&per_page=200&page=${page}`);
+    const res = await zohoGet(`/contacts?contact_type=customer&status=active&per_page=200&page=${page}`);
     const batch = (res.contacts || []) as Array<{ contact_id: string }>;
     ids.push(...batch.map((c) => c.contact_id));
     hasMore = Boolean(res.page_context?.has_more_page);

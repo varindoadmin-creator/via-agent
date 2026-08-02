@@ -82,6 +82,10 @@ function pushMap(map: Map<string, string[]>, key: string, id: string) {
 }
 
 export function findDuplicateGroups(contacts: DuplicateCandidate[]): DuplicateGroup[] {
+  // Zoho Books merges by retaining the master and marking absorbed contacts
+  // inactive. Inactive contacts are historical records, not actionable
+  // duplicates, so they must never reappear after a successful merge.
+  const activeContacts = contacts.filter(contact => !contact.status || contact.status.toLowerCase() === 'active');
   const dsu = new DisjointSet();
 
   const npwpMap = new Map<string, string[]>();
@@ -89,7 +93,7 @@ export function findDuplicateGroups(contacts: DuplicateCandidate[]): DuplicateGr
   const emailMap = new Map<string, string[]>();
   const nameMap = new Map<string, string[]>();
 
-  for (const c of contacts) {
+  for (const c of activeContacts) {
     dsu.find(c.contact_id);
 
     const npwpKey = normalizeNpwpKey(c.npwp);
@@ -128,7 +132,7 @@ export function findDuplicateGroups(contacts: DuplicateCandidate[]): DuplicateGr
   addReasons(nameMap, 'Same name');
 
   const membersByRoot = new Map<string, DuplicateCandidate[]>();
-  for (const c of contacts) {
+  for (const c of activeContacts) {
     const root = dsu.find(c.contact_id);
     const list = membersByRoot.get(root);
     if (list) list.push(c);
