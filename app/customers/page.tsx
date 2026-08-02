@@ -919,7 +919,7 @@ export default function CustomersPage() {
       const region = c.cf_region?.trim();
       if (region) counts[region] = (counts[region] || 0) + 1;
     }
-    const known = ['HEAD OFFICE', 'BDG-HUB', 'MDN-HUB'];
+    const known = ['HEAD OFFICE', 'BDG-HUB', 'MDN-HUB', 'SMG-HUB'];
     const rows = known.map(hub => ({ label: hub, value: counts[hub] || 0 }));
     const otherCount = allCustomers.length - rows.reduce((s, r) => s + r.value, 0);
     if (otherCount > 0) rows.push({ label: 'Other / Unassigned', value: otherCount });
