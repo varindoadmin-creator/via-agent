@@ -13,7 +13,8 @@
     "test:price-lists": "node --experimental-strip-types --test lib/zoho/pricebooks.test.ts",
     "test:inventory-exceptions": "node --experimental-strip-types --test lib/inventory/exceptionAnalysis.test.ts",
     "test:customer-risk": "node --experimental-strip-types --test lib/customers/riskScoring.test.ts",
-    "test:data-quality": "node --experimental-strip-types scripts/test-data-quality.ts"
+    "test:data-quality": "node --experimental-strip-types scripts/test-data-quality.ts",
+    "test:customer-duplicate-ignore": "node --experimental-strip-types --test lib/customerDuplicates/ignoreStore.test.ts"
   },
   "dependencies": {
     "@types/node": "^20.17.0",
