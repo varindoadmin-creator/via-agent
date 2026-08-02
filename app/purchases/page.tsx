@@ -46,6 +46,22 @@ interface PO {
   matched_so_numbers: string[];
 }
 
+interface PurchaseRecommendation {
+  item_id: string; sku: string; name: string; unit: string;
+  vendor_name: string; purchase_rate: number; stock_on_hand: number;
+  open_sales_order_qty: number; incoming_po_qty: number; sold_90_days: number;
+  lead_time_days: number; safety_stock_qty: number; demand_during_lead_time: number;
+  projected_available_qty: number; recommended_qty: number; estimated_cost: number;
+  coverage_status: 'uncovered_so' | 'replenishment' | 'covered';
+  sales_orders: string[]; purchase_orders: string[];
+}
+
+interface SupplierProposal {
+  vendor_id: string; vendor_name: string; item_count: number;
+  recommended_qty: number; estimated_cost: number; sales_orders: string[];
+  items: PurchaseRecommendation[];
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
@@ -373,6 +389,75 @@ function POTable({
         </div>
       )}
       </div>
+    </div>
+  );
+}
+
+// ─── Purchasing recommendations ──────────────────────────────────────────────
+
+function PurchasingRecommendations() {
+  const [proposals, setProposals] = useState<SupplierProposal[]>([]);
+  const [summary, setSummary] = useState({ suppliers: 0, items_to_purchase: 0, sales_orders_without_coverage: 0, recommended_qty: 0, estimated_cost: 0 });
+  const [methodology, setMethodology] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const response = await fetch('/api/purchases/recommendations');
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Unable to calculate recommendations');
+      setProposals(data.proposals || []);
+      setSummary(data.summary || {});
+      setMethodology(data.methodology || '');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  function printProposal(proposal: SupplierProposal) {
+    const popup = window.open('', '_blank', 'width=1000,height=800');
+    if (!popup) { setError('Allow pop-ups to print the purchase proposal.'); return; }
+    const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+    const rows = proposal.items.map((item) => `<tr><td>${escape(item.sku || item.name)}</td><td>${escape(item.name)}</td><td class="n">${item.open_sales_order_qty}</td><td class="n">${item.stock_on_hand}</td><td class="n">${item.incoming_po_qty}</td><td class="n">${item.lead_time_days}</td><td class="n"><b>${item.recommended_qty}</b> ${escape(item.unit)}</td><td class="n">${formatRp(item.estimated_cost)}</td><td>${escape(item.sales_orders.join(', ') || 'Stock replenishment')}</td></tr>`).join('');
+    popup.document.write(`<!doctype html><html><head><title>Purchase Proposal - ${escape(proposal.vendor_name)}</title><style>body{font:12px Arial,sans-serif;color:#222;margin:32px}h1{font-size:20px;margin:0 0 4px}.meta{color:#666;margin-bottom:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#f2f3f5;font-size:10px;text-transform:uppercase}.n{text-align:right;white-space:nowrap}.total{margin-top:16px;text-align:right;font-size:14px}.note{margin-top:22px;padding:10px;border:1px solid #ccc;color:#555}.approval{display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:70px}.line{border-top:1px solid #333;padding-top:6px}@media print{body{margin:14mm}}</style></head><body><h1>Purchase Recommendation — For Approval</h1><div class="meta">Supplier: <b>${escape(proposal.vendor_name)}</b><br>Generated: ${new Date().toLocaleString('id-ID')} · Advisory proposal only</div><table><thead><tr><th>SKU</th><th>Item</th><th>Open SO</th><th>Stock</th><th>Incoming PO</th><th>Lead days</th><th>Recommended</th><th>Est. cost</th><th>Covers</th></tr></thead><tbody>${rows}</tbody></table><div class="total"><b>${proposal.item_count} items · ${proposal.recommended_qty.toLocaleString('id-ID')} units · ${formatRp(proposal.estimated_cost)}</b></div><div class="note">${escape(methodology)}</div><div class="approval"><div class="line">Prepared by / Date</div><div class="line">Director approval / Date</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    popup.document.close();
+  }
+
+  const th: React.CSSProperties = { padding: '8px 10px', color: 'var(--text-3)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '1px solid var(--border)' };
+  return (
+    <div className="via-card mb-6 overflow-hidden">
+      <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border)]">
+        <div><h2 className="font-bold text-base text-[var(--text)]">Purchasing Recommendations</h2><p className="text-[var(--text-3)] text-xs mt-0.5">Lead-time demand, open Sales Orders, stock on hand, and incoming POs — recommendations only</p></div>
+        <button onClick={load} disabled={loading} className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg text-[var(--text-3)] disabled:opacity-50">{loading ? 'Calculating…' : 'Recalculate'}</button>
+      </div>
+      <div className="grid grid-cols-5 gap-px bg-[var(--border)] border-b border-[var(--border)]">
+        {[
+          ['Suppliers', summary.suppliers], ['Items', summary.items_to_purchase], ['Uncovered SOs', summary.sales_orders_without_coverage],
+          ['Recommended Qty', summary.recommended_qty.toLocaleString('id-ID')], ['Estimated Cost', formatRp(summary.estimated_cost)],
+        ].map(([label, value]) => <div key={String(label)} className="bg-[var(--surface)] px-4 py-3"><div className="text-[var(--text-4)] text-xs">{label}</div><div className="text-[var(--text)] font-semibold mt-1" style={mono}>{value}</div></div>)}
+      </div>
+      {error && <div className="m-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">{error}</div>}
+      {!loading && !error && proposals.length === 0 && <div className="px-5 py-8 text-center text-[var(--success)] text-sm">✓ Stock and incoming POs cover current demand and replenishment requirements.</div>}
+      <div>
+        {proposals.map((proposal) => {
+          const key = proposal.vendor_id || proposal.vendor_name;
+          const open = expanded.has(key);
+          return <div key={key} className="border-b border-[var(--border)] last:border-0">
+            <div className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-2)] cursor-pointer" onClick={() => setExpanded((old) => { const next = new Set(old); next.has(key) ? next.delete(key) : next.add(key); return next; })}>
+              <span className="text-[var(--text-4)]">{open ? '▾' : '▸'}</span>
+              <div className="flex-1"><div className="text-[var(--text)] text-sm font-semibold">{proposal.vendor_name}</div><div className="text-[var(--text-4)] text-xs mt-0.5">{proposal.item_count} items · covers {proposal.sales_orders.length} Sales Orders</div></div>
+              <div className="text-right"><div className="text-[var(--text)] text-sm font-semibold" style={mono}>{proposal.recommended_qty.toLocaleString('id-ID')} units</div><div className="text-[var(--text-3)] text-xs" style={mono}>{formatRp(proposal.estimated_cost)}</div></div>
+              <button onClick={(event) => { event.stopPropagation(); printProposal(proposal); }} className="ml-3 px-3 py-1.5 text-xs bg-[var(--accent)] text-white rounded-lg">Print for Approval</button>
+            </div>
+            {open && <div className="overflow-x-auto bg-[var(--surface-2)]"><table className="w-full text-xs"><thead><tr>{['Item', 'Open SO', 'Stock', 'Incoming PO', '90D Sales', 'Lead Time', 'Recommended', 'Coverage'].map((label, index) => <th key={label} style={{ ...th, textAlign: index > 0 && index < 7 ? 'right' : 'left' }}>{label}</th>)}</tr></thead><tbody>{proposal.items.map((item) => <tr key={item.item_id} className="border-b border-[var(--border-muted)] last:border-0"><td className="px-3 py-2"><div className="text-[var(--text)] font-medium">{item.sku || item.name}</div><div className="text-[var(--text-4)]">{item.name}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.open_sales_order_qty}</td><td className="px-3 py-2 text-right" style={mono}>{item.stock_on_hand}</td><td className="px-3 py-2 text-right" style={mono}>{item.incoming_po_qty}<div className="text-[var(--text-4)]">{item.purchase_orders.join(', ')}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.sold_90_days}</td><td className="px-3 py-2 text-right" style={mono}>{item.lead_time_days}d</td><td className="px-3 py-2 text-right text-[var(--accent-text)] font-semibold" style={mono}>{item.recommended_qty} {item.unit}<div className="text-[var(--text-4)]">{formatRp(item.estimated_cost)}</div></td><td className="px-3 py-2"><span className={`via-badge border text-xs ${item.coverage_status === 'uncovered_so' ? 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]' : 'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]'}`}>{item.coverage_status === 'uncovered_so' ? 'SO not covered' : 'Replenishment'}</span><div className="text-[var(--text-4)] mt-1">{item.sales_orders.join(', ')}</div></td></tr>)}</tbody></table></div>}
+          </div>;
+        })}
+      </div>
+      {methodology && <div className="px-5 py-3 bg-[var(--surface-2)] text-[var(--text-4)] text-xs border-t border-[var(--border)]">{methodology}</div>}
     </div>
   );
 }
@@ -1072,6 +1157,9 @@ export default function PurchasesPage() {
 
         {/* Create PO — brand-batched Draft PO generation, covers unmet Confirmed SO demand */}
         <CreatePOPanel onCreated={fetchAll} />
+
+        {/* Advisory supplier-grouped proposals. Printing does not write to Zoho. */}
+        <PurchasingRecommendations />
 
         {/* Table 1 — Draft POs (real Zoho draft status — not yet submitted for approval, no checks) */}
         <div className="mb-6">
