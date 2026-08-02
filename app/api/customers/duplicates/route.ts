@@ -5,6 +5,7 @@ import { getCustomFieldValue, RawContact } from '@/lib/customerCleanup/rules';
 import { findDuplicateGroups, DuplicateCandidate } from '@/lib/customerCleanup/duplicates';
 import { duplicateGroupFingerprint, getIgnoredDuplicateFingerprints, ignoreDuplicateGroup } from '@/lib/customerDuplicates/ignoreStore';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '@/lib/auth';
+import { buildZohoContactMergePath } from '@/lib/customerDuplicates/mergeRequest';
 
 async function zohoGet(path: string) {
   const token = await getZohoAccessToken();
@@ -142,7 +143,10 @@ export async function POST(req: NextRequest) {
       const keep = group.customers.find(customer => customer.contact_id === keepId);
       if (!keep) return NextResponse.json({ success: false, error: 'Choose which customer Zoho should keep.' }, { status: 400 });
       if (body.confirmation !== `MERGE ${keepId}`) return NextResponse.json({ success: false, error: 'Merge confirmation did not match.' }, { status: 400 });
-      await zohoPost(`/contacts/${keepId}/merge`);
+      // Zoho's merge endpoint uses the selected master contact in the path and
+      // requires every record to be absorbed in the contact_ids query value.
+      // Omitting contact_ids returns "Invalid value passed for contact_ids".
+      await zohoPost(buildZohoContactMergePath(keepId, requestedIds));
       return NextResponse.json({ success: true, action: 'merged', kept_contact_id: keepId, kept_customer_name: keep.company_name || keep.contact_name });
     }
 
