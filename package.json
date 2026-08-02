@@ -12,7 +12,8 @@
     "test:commission": "node --experimental-strip-types --test lib/commission/discount.test.ts",
     "test:price-lists": "node --experimental-strip-types --test lib/zoho/pricebooks.test.ts",
     "test:inventory-exceptions": "node --experimental-strip-types --test lib/inventory/exceptionAnalysis.test.ts",
-    "test:customer-risk": "node --experimental-strip-types --test lib/customers/riskScoring.test.ts"
+    "test:customer-risk": "node --experimental-strip-types --test lib/customers/riskScoring.test.ts",
+    "test:data-quality": "node --experimental-strip-types scripts/test-data-quality.ts"
   },
   "dependencies": {
     "@types/node": "^20.17.0",
