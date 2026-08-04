@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, BookOpen, Landmark, Truck, Sparkles,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -124,7 +124,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
     },
     hidden: true,
   },
-  { type: 'standalone', item: { id: 'guide', href: '/guide', icon: BookOpen, label: 'Guide' } },
 ];
 
 const COMING_SOON = ['/orders', '/prices', '/reports'];
