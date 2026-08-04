@@ -48,18 +48,25 @@ interface PO {
 
 interface PurchaseRecommendation {
   item_id: string; sku: string; name: string; unit: string;
-  vendor_name: string; purchase_rate: number; stock_on_hand: number;
-  open_sales_order_qty: number; incoming_po_qty: number; sold_90_days: number;
-  lead_time_days: number; safety_stock_qty: number; demand_during_lead_time: number;
-  projected_available_qty: number; recommended_qty: number; estimated_cost: number;
+  category: string; warehouse: string; vendor_name: string; purchase_rate: number;
+  stock_on_hand: number; committed_stock: number; available_stock: number;
+  open_sales_order_qty: number; incoming_po_qty: number; history_bucket_days: number;
+  sold_recent_days: number; sold_middle_days: number; sold_older_days: number;
+  lead_time_days: number; safety_stock_qty: number; forecast_demand: number;
+  projected_available_qty: number; recommended_qty: number; estimated_unit_cost: number; estimated_cost: number;
+  recommended_order_date: string; expected_stockout_date: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  urgency: 'recommended_now' | 'recommended_soon' | 'no_action' | 'insufficient_data' | 'data_error';
+  explanation: string; assumptions: string[];
   coverage_status: 'uncovered_so' | 'replenishment' | 'covered';
-  sales_orders: string[]; purchase_orders: string[];
+  sales_orders: string[]; purchase_orders: string[]; mirpo_orders: string[];
 }
 
-interface SupplierProposal {
-  vendor_id: string; vendor_name: string; item_count: number;
-  recommended_qty: number; estimated_cost: number; sales_orders: string[];
-  items: PurchaseRecommendation[];
+interface MirpoPortfolioSummary {
+  target_qty: number; recommended_qty: number; sell_through_horizon_days: number;
+  projected_30d_sales: number; projected_30d_sell_through_pct: number;
+  safely_absorbable_qty: number; excess_risk_qty: number; ready_to_order: boolean;
+  decision: 'ready' | 'review' | 'insufficient_data'; explanation: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -396,67 +403,110 @@ function POTable({
 // ─── Purchasing recommendations ──────────────────────────────────────────────
 
 function PurchasingRecommendations() {
-  const [proposals, setProposals] = useState<SupplierProposal[]>([]);
-  const [summary, setSummary] = useState({ suppliers: 0, items_to_purchase: 0, sales_orders_without_coverage: 0, recommended_qty: 0, estimated_cost: 0 });
+  const [recommendations, setRecommendations] = useState<PurchaseRecommendation[]>([]);
+  const [summary, setSummary] = useState({ suppliers: 0, items_to_purchase: 0, recommended_now: 0, recommended_soon: 0, no_action: 0, insufficient_data: 0, estimated_cost: 0 });
+  const [portfolio, setPortfolio] = useState<MirpoPortfolioSummary | null>(null);
   const [methodology, setMethodology] = useState('');
+  const [generatedAt, setGeneratedAt] = useState('');
+  const [syncStatus, setSyncStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [draftMessage, setDraftMessage] = useState('');
+  const [filters, setFilters] = useState({ search: '', vendor: '', urgency: '', category: '', confidence: '', warehouse: '' });
+  const [sort, setSort] = useState<'urgency' | 'quantity' | 'cost' | 'stockout'>('urgency');
+  const [config, setConfig] = useState({ lead_time_days: 30, safety_days: 14, history_days: 90, include_open_so: true, ignore_abnormal: true, minimum_confidence: 'low', currency: 'IDR', include_tax: false, tax_rate_percent: 0, warehouse: 'all' });
+  const [adjustments, setAdjustments] = useState<Record<string, { quantity?: number; vendor_name?: string; required_date?: string }>>({});
+  const [exclusions, setExclusions] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (refresh = false) => {
     setLoading(true); setError('');
     try {
-      const response = await fetch('/api/purchases/recommendations');
+      const query = new URLSearchParams({
+        lead_time_days: String(config.lead_time_days), safety_days: String(config.safety_days), history_days: String(config.history_days),
+        include_open_so: String(config.include_open_so), ignore_abnormal: String(config.ignore_abnormal), minimum_confidence: config.minimum_confidence,
+        currency: config.currency, include_tax: String(config.include_tax), tax_rate_percent: String(config.tax_rate_percent), warehouse: config.warehouse,
+        ...(refresh ? { refresh: 'true' } : {}),
+      });
+      const response = await fetch(`/api/purchases/recommendations?${query}`);
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Unable to calculate recommendations');
-      setProposals(data.proposals || []);
+      setRecommendations(data.recommendations || []);
       setSummary(data.summary || {});
+      setPortfolio(data.portfolio || null);
       setMethodology(data.methodology || '');
+      setGeneratedAt(data.generated_at || ''); setSyncStatus(data.sync_status || 'current');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
+  }, [config]);
+
+  useEffect(() => { load(false); }, [load]);
+  useEffect(() => {
+    fetch('/api/purchases/recommendations/drafts').then(r => r.json()).then(data => {
+      if (data.success && data.draft) { setAdjustments(data.draft.adjustments || {}); setExclusions(data.draft.exclusions || {}); setDraftMessage('Restored manual changes from the latest local draft.'); }
+    }).catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const effective = useCallback((item: PurchaseRecommendation) => ({
+    quantity: adjustments[item.item_id]?.quantity ?? item.recommended_qty,
+    vendor_name: adjustments[item.item_id]?.vendor_name || item.vendor_name,
+    required_date: adjustments[item.item_id]?.required_date || item.recommended_order_date,
+    excluded: Object.prototype.hasOwnProperty.call(exclusions, item.item_id),
+  }), [adjustments, exclusions]);
 
-  function printProposal(proposal: SupplierProposal) {
-    const popup = window.open('', '_blank', 'width=1000,height=800');
-    if (!popup) { setError('Allow pop-ups to print the purchase proposal.'); return; }
-    const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
-    const rows = proposal.items.map((item) => `<tr><td>${escape(item.sku || item.name)}</td><td>${escape(item.name)}</td><td class="n">${item.open_sales_order_qty}</td><td class="n">${item.stock_on_hand}</td><td class="n">${item.incoming_po_qty}</td><td class="n">${item.lead_time_days}</td><td class="n"><b>${item.recommended_qty}</b> ${escape(item.unit)}</td><td class="n">${formatRp(item.estimated_cost)}</td><td>${escape(item.sales_orders.join(', ') || 'Stock replenishment')}</td></tr>`).join('');
-    popup.document.write(`<!doctype html><html><head><title>Purchase Proposal - ${escape(proposal.vendor_name)}</title><style>body{font:12px Arial,sans-serif;color:#222;margin:32px}h1{font-size:20px;margin:0 0 4px}.meta{color:#666;margin-bottom:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#f2f3f5;font-size:10px;text-transform:uppercase}.n{text-align:right;white-space:nowrap}.total{margin-top:16px;text-align:right;font-size:14px}.note{margin-top:22px;padding:10px;border:1px solid #ccc;color:#555}.approval{display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:70px}.line{border-top:1px solid #333;padding-top:6px}@media print{body{margin:14mm}}</style></head><body><h1>Purchase Recommendation — For Approval</h1><div class="meta">Supplier: <b>${escape(proposal.vendor_name)}</b><br>Generated: ${new Date().toLocaleString('id-ID')} · Advisory proposal only</div><table><thead><tr><th>SKU</th><th>Item</th><th>Open SO</th><th>Stock</th><th>Incoming PO</th><th>Lead days</th><th>Recommended</th><th>Est. cost</th><th>Covers</th></tr></thead><tbody>${rows}</tbody></table><div class="total"><b>${proposal.item_count} items · ${proposal.recommended_qty.toLocaleString('id-ID')} units · ${formatRp(proposal.estimated_cost)}</b></div><div class="note">${escape(methodology)}</div><div class="approval"><div class="line">Prepared by / Date</div><div class="line">Director approval / Date</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
-    popup.document.close();
+  const filtered = useMemo(() => {
+    const rank = { recommended_now: 0, recommended_soon: 1, insufficient_data: 2, no_action: 3, data_error: 4 };
+    return recommendations.filter(item => {
+      const e = effective(item); const q = filters.search.toLowerCase();
+      return (!q || `${item.sku} ${item.name}`.toLowerCase().includes(q)) && (!filters.vendor || e.vendor_name === filters.vendor) &&
+        (!filters.urgency || item.urgency === filters.urgency) && (!filters.category || item.category === filters.category) &&
+        (!filters.confidence || item.confidence === filters.confidence) && (!filters.warehouse || item.warehouse === filters.warehouse);
+    }).sort((a, b) => sort === 'quantity' ? effective(b).quantity - effective(a).quantity : sort === 'cost' ? effective(b).quantity * b.estimated_unit_cost - effective(a).quantity * a.estimated_unit_cost : sort === 'stockout' ? (a.expected_stockout_date || '9999').localeCompare(b.expected_stockout_date || '9999') : rank[a.urgency] - rank[b.urgency]);
+  }, [recommendations, effective, filters, sort]);
+
+  const total = recommendations.reduce((sum, item) => { const e = effective(item); return sum + (e.excluded ? 0 : e.quantity * item.estimated_unit_cost); }, 0);
+  const options = (key: 'vendor_name' | 'category' | 'warehouse') => Array.from(new Set(recommendations.map(item => key === 'vendor_name' ? effective(item).vendor_name : item[key]).filter(Boolean))).sort();
+
+  async function createLocalDraft() {
+    const active = recommendations.filter(item => !effective(item).excluded && effective(item).quantity > 0);
+    if (!active.length) { setError('No included recommendation has a positive quantity.'); return; }
+    const draftQty = active.reduce((sum, item) => sum + effective(item).quantity, 0);
+    if (draftQty !== 600) { setError(`A MIRPO must total exactly 600 sheets. The edited draft currently totals ${draftQty}.`); return; }
+    if (!window.confirm(`Create a local Recommended Next MIRPO draft for ${active.length} items (${formatRp(total)})? This will not create or modify a Zoho Purchase Order.`)) return;
+    setDraftMessage(''); setError('');
+    const response = await fetch('/api/purchases/recommendations/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      generated_at: generatedAt, configuration: config, adjustments, exclusions,
+      source_snapshot: { generated_at: generatedAt, sync_status: syncStatus, methodology },
+      items: recommendations.map(item => { const e = effective(item); return { item_id: item.item_id, sku: item.sku, name: item.name, quantity: e.quantity, vendor_name: e.vendor_name, required_date: e.required_date, estimated_unit_cost: item.estimated_unit_cost, excluded: e.excluded, exclusion_reason: exclusions[item.item_id] || '' }; }),
+    }) });
+    const data = await response.json();
+    if (!data.success) { setError(data.error || 'Unable to create local draft'); return; }
+    setDraftMessage(`Local draft ${data.draft.id} saved. No Zoho data was changed.`);
   }
 
-  const th: React.CSSProperties = { padding: '8px 10px', color: 'var(--text-3)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '1px solid var(--border)' };
+  const urgencyLabel = { recommended_now: 'Recommended now', recommended_soon: 'Recommended soon', no_action: 'No action', insufficient_data: 'Insufficient data', data_error: 'Data error' };
+  const urgencyClass = { recommended_now: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]', recommended_soon: 'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]', no_action: 'bg-[var(--success-bg)] text-[var(--success)] border-[var(--success-border)]', insufficient_data: 'bg-[var(--surface-3)] text-[var(--text-3)] border-[var(--border)]', data_error: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]' };
   return (
     <div className="via-card mb-6 overflow-hidden">
       <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border)]">
-        <div><h2 className="font-bold text-base text-[var(--text)]">Purchasing Recommendations</h2><p className="text-[var(--text-3)] text-xs mt-0.5">Lead-time demand, open Sales Orders, stock on hand, and incoming POs — recommendations only</p></div>
-        <button onClick={load} disabled={loading} className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg text-[var(--text-3)] disabled:opacity-50">{loading ? 'Calculating…' : 'Recalculate'}</button>
+        <div><h2 className="font-bold text-base text-[var(--text)]">Recommended Next MIRPO — LAMITAK HPL</h2><p className="text-[var(--text-3)] text-xs mt-0.5">600-sheet monthly portfolio · target: sell through within 30 days · local draft and Director approval only</p><div className="text-[var(--text-4)] text-xs mt-1">Sync: <span className={syncStatus === 'current' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>{syncStatus || 'waiting'}</span>{generatedAt && ` · ${new Date(generatedAt).toLocaleString('id-ID')}`}</div></div>
+        <div className="flex gap-2"><button onClick={() => load(true)} disabled={loading} className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg text-[var(--text-3)] disabled:opacity-50">{loading ? 'Refreshing Zoho…' : 'Refresh Zoho'}</button><button onClick={createLocalDraft} disabled={loading} className="px-3 py-1.5 text-xs bg-[var(--accent)] text-white rounded-lg disabled:opacity-50">Create Draft MIRPO</button></div>
       </div>
-      <div className="grid grid-cols-5 gap-px bg-[var(--border)] border-b border-[var(--border)]">
-        {[
-          ['Suppliers', summary.suppliers], ['Items', summary.items_to_purchase], ['Uncovered SOs', summary.sales_orders_without_coverage],
-          ['Recommended Qty', summary.recommended_qty.toLocaleString('id-ID')], ['Estimated Cost', formatRp(summary.estimated_cost)],
-        ].map(([label, value]) => <div key={String(label)} className="bg-[var(--surface)] px-4 py-3"><div className="text-[var(--text-4)] text-xs">{label}</div><div className="text-[var(--text)] font-semibold mt-1" style={mono}>{value}</div></div>)}
+      {portfolio && <div className={`mx-5 mt-4 rounded-lg border p-3 text-xs ${portfolio.ready_to_order ? 'bg-[var(--success-bg)] border-[var(--success-border)] text-[var(--success)]' : 'bg-[var(--warning-bg)] border-[var(--warning-border)] text-[var(--warning)]'}`}><div className="font-semibold">{portfolio.ready_to_order ? 'Ready: 30-day demand supports this MIRPO' : 'Review before ordering: dead-stock risk detected'}</div><div className="mt-1">{portfolio.explanation}</div></div>}
+      <div className="grid grid-cols-6 gap-px bg-[var(--border)] border-y border-[var(--border)] mt-4">
+        {[['MIRPO target', `${portfolio?.target_qty || 600} sheets`], ['Proposed', `${portfolio?.recommended_qty || 0} sheets`], ['30D sell-through', `${portfolio?.projected_30d_sell_through_pct || 0}%`], ['30D supported', `${portfolio?.safely_absorbable_qty || 0} sheets`], ['Risk balance', `${portfolio?.excess_risk_qty || 0} sheets`], ['Draft value', formatRp(total)]].map(([label, value]) => <div key={String(label)} className="bg-[var(--surface)] px-4 py-3"><div className="text-[var(--text-4)] text-xs">{label}</div><div className="text-[var(--text)] font-semibold mt-1" style={mono}>{value}</div></div>)}
       </div>
+      <div className="px-5 py-3 border-b border-[var(--border)] grid grid-cols-6 gap-2 bg-[var(--surface-2)]">
+        <input className="via-input text-xs px-2 py-1.5" placeholder="Search item…" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} />
+        {[['vendor', 'All vendors', options('vendor_name')], ['category', 'All categories', options('category')], ['warehouse', 'All warehouses', options('warehouse')]].map(([key, label, values]) => <select key={String(key)} className="via-input text-xs px-2 py-1.5" value={filters[key as 'vendor']} onChange={e => setFilters(f => ({ ...f, [key as string]: e.target.value }))}><option value="">{String(label)}</option>{(values as string[]).map(value => <option key={value}>{value}</option>)}</select>)}
+        <select className="via-input text-xs px-2 py-1.5" value={filters.urgency} onChange={e => setFilters(f => ({ ...f, urgency: e.target.value }))}><option value="">All urgency</option>{Object.entries(urgencyLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
+        <select className="via-input text-xs px-2 py-1.5" value={filters.confidence} onChange={e => setFilters(f => ({ ...f, confidence: e.target.value }))}><option value="">All confidence</option><option>high</option><option>medium</option><option>low</option></select>
+      </div>
+      <details className="px-5 py-3 border-b border-[var(--border)]"><summary className="text-xs text-[var(--accent-text)] cursor-pointer">Forecast configuration and fallback assumptions</summary><div className="grid grid-cols-6 gap-3 mt-3 text-xs"><label>Default lead days<input type="number" className="via-input mt-1 w-full p-1.5" value={config.lead_time_days} onChange={e => setConfig(c => ({ ...c, lead_time_days: Number(e.target.value) }))}/></label><label>Safety days<input type="number" className="via-input mt-1 w-full p-1.5" value={config.safety_days} onChange={e => setConfig(c => ({ ...c, safety_days: Number(e.target.value) }))}/></label><label>History days<select className="via-input mt-1 w-full p-1.5" value={config.history_days} onChange={e => setConfig(c => ({ ...c, history_days: Number(e.target.value) }))}><option value={60}>60</option><option value={90}>90</option><option value={180}>180</option></select></label><label>Minimum confidence<select className="via-input mt-1 w-full p-1.5" value={config.minimum_confidence} onChange={e => setConfig(c => ({ ...c, minimum_confidence: e.target.value }))}><option>low</option><option>medium</option><option>high</option></select></label><label>Warehouse scope<input className="via-input mt-1 w-full p-1.5" value={config.warehouse} onChange={e => setConfig(c => ({ ...c, warehouse: e.target.value || 'all' }))}/></label><label>Currency<input className="via-input mt-1 w-full p-1.5" value={config.currency} onChange={e => setConfig(c => ({ ...c, currency: e.target.value.toUpperCase() }))}/></label><label className="flex items-center gap-2"><input type="checkbox" checked={config.include_open_so} onChange={e => setConfig(c => ({ ...c, include_open_so: e.target.checked }))}/>Include open SOs</label><label className="flex items-center gap-2"><input type="checkbox" checked={config.ignore_abnormal} onChange={e => setConfig(c => ({ ...c, ignore_abnormal: e.target.checked }))}/>Ignore abnormal spikes</label><label className="flex items-center gap-2"><input type="checkbox" checked={config.include_tax} onChange={e => setConfig(c => ({ ...c, include_tax: e.target.checked }))}/>Include tax in estimate</label><label>Tax rate %<input type="number" min={0} max={100} step="0.1" disabled={!config.include_tax} className="via-input mt-1 w-full p-1.5 disabled:opacity-50" value={config.tax_rate_percent} onChange={e => setConfig(c => ({ ...c, tax_rate_percent: Number(e.target.value) }))}/></label><div className="col-span-2 text-[var(--text-4)]">Forecast: weighted average · Vendor rule: item vendor, then existing brand mapping · all fallback assumptions appear per item.</div></div></details>
       {error && <div className="m-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">{error}</div>}
-      {!loading && !error && proposals.length === 0 && <div className="px-5 py-8 text-center text-[var(--success)] text-sm">✓ Stock and incoming POs cover current demand and replenishment requirements.</div>}
-      <div>
-        {proposals.map((proposal) => {
-          const key = proposal.vendor_id || proposal.vendor_name;
-          const open = expanded.has(key);
-          return <div key={key} className="border-b border-[var(--border)] last:border-0">
-            <div className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-2)] cursor-pointer" onClick={() => setExpanded((old) => { const next = new Set(old); next.has(key) ? next.delete(key) : next.add(key); return next; })}>
-              <span className="text-[var(--text-4)]">{open ? '▾' : '▸'}</span>
-              <div className="flex-1"><div className="text-[var(--text)] text-sm font-semibold">{proposal.vendor_name}</div><div className="text-[var(--text-4)] text-xs mt-0.5">{proposal.item_count} items · covers {proposal.sales_orders.length} Sales Orders</div></div>
-              <div className="text-right"><div className="text-[var(--text)] text-sm font-semibold" style={mono}>{proposal.recommended_qty.toLocaleString('id-ID')} units</div><div className="text-[var(--text-3)] text-xs" style={mono}>{formatRp(proposal.estimated_cost)}</div></div>
-              <button onClick={(event) => { event.stopPropagation(); printProposal(proposal); }} className="ml-3 px-3 py-1.5 text-xs bg-[var(--accent)] text-white rounded-lg">Print for Approval</button>
-            </div>
-            {open && <div className="overflow-x-auto bg-[var(--surface-2)]"><table className="w-full text-xs"><thead><tr>{['Item', 'Open SO', 'Stock', 'Incoming PO', '90D Sales', 'Lead Time', 'Recommended', 'Coverage'].map((label, index) => <th key={label} style={{ ...th, textAlign: index > 0 && index < 7 ? 'right' : 'left' }}>{label}</th>)}</tr></thead><tbody>{proposal.items.map((item) => <tr key={item.item_id} className="border-b border-[var(--border-muted)] last:border-0"><td className="px-3 py-2"><div className="text-[var(--text)] font-medium">{item.sku || item.name}</div><div className="text-[var(--text-4)]">{item.name}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.open_sales_order_qty}</td><td className="px-3 py-2 text-right" style={mono}>{item.stock_on_hand}</td><td className="px-3 py-2 text-right" style={mono}>{item.incoming_po_qty}<div className="text-[var(--text-4)]">{item.purchase_orders.join(', ')}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.sold_90_days}</td><td className="px-3 py-2 text-right" style={mono}>{item.lead_time_days}d</td><td className="px-3 py-2 text-right text-[var(--accent-text)] font-semibold" style={mono}>{item.recommended_qty} {item.unit}<div className="text-[var(--text-4)]">{formatRp(item.estimated_cost)}</div></td><td className="px-3 py-2"><span className={`via-badge border text-xs ${item.coverage_status === 'uncovered_so' ? 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger-border)]' : 'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning-border)]'}`}>{item.coverage_status === 'uncovered_so' ? 'SO not covered' : 'Replenishment'}</span><div className="text-[var(--text-4)] mt-1">{item.sales_orders.join(', ')}</div></td></tr>)}</tbody></table></div>}
-          </div>;
-        })}
-      </div>
+      {draftMessage && <div className="mx-4 mt-4 p-3 bg-[var(--success-bg)] border border-[var(--success-border)] rounded-lg text-[var(--success)] text-xs">{draftMessage}</div>}
+      <div className="px-5 py-2 flex justify-end"><select className="via-input text-xs p-1.5" value={sort} onChange={e => setSort(e.target.value as typeof sort)}><option value="urgency">Sort: urgency</option><option value="quantity">Sort: quantity</option><option value="cost">Sort: value</option><option value="stockout">Sort: stockout date</option></select></div>
+      <div className="overflow-x-auto"><table className="w-full text-xs"><thead className="bg-[var(--surface-2)]"><tr>{['Item / explanation', 'Status', 'Available', 'Incoming', 'Forecast', 'Safety', 'Vendor', 'Qty / required date', 'Estimated value', 'Exclude'].map(label => <th key={label} className="px-3 py-2 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)] border-b border-[var(--border)]">{label}</th>)}</tr></thead><tbody>{filtered.map(item => { const e = effective(item); return <tr key={item.item_id} className={`border-b border-[var(--border-muted)] ${e.excluded ? 'opacity-50' : ''}`}><td className="px-3 py-2 min-w-[260px]"><div className="font-semibold text-[var(--text)]">{item.sku || item.name}</div><div className="text-[var(--text-4)]">{item.name} · {item.category} · {item.warehouse}</div><div className="text-[var(--text-3)] mt-1">{item.explanation}</div>{item.assumptions.length > 0 && <div className="text-[var(--warning)] mt-1">Assumptions: {item.assumptions.join('; ')}</div>}</td><td className="px-3 py-2"><span className={`via-badge border ${urgencyClass[item.urgency]}`}>{urgencyLabel[item.urgency]}</span><div className="text-[var(--text-4)] mt-1">{item.confidence} confidence</div><div className="text-[var(--text-4)]">Stockout: {item.expected_stockout_date || 'unknown'}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.available_stock}<div className="text-[var(--text-4)]">committed {item.committed_stock}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.incoming_po_qty}<div className="text-[var(--text-4)] max-w-[120px]">{item.purchase_orders.join(', ')}</div></td><td className="px-3 py-2 text-right" style={mono}>{item.forecast_demand}</td><td className="px-3 py-2 text-right" style={mono}>{item.safety_stock_qty}</td><td className="px-3 py-2"><input className="via-input p-1.5 w-44" value={e.vendor_name} onChange={ev => setAdjustments(a => ({ ...a, [item.item_id]: { ...a[item.item_id], vendor_name: ev.target.value } }))}/></td><td className="px-3 py-2"><input type="number" min={0} className="via-input p-1.5 w-20 text-right" value={e.quantity} onChange={ev => setAdjustments(a => ({ ...a, [item.item_id]: { ...a[item.item_id], quantity: Math.max(0, Number(ev.target.value)) } }))}/><input type="date" className="via-input p-1.5 mt-1 w-32" value={e.required_date} onChange={ev => setAdjustments(a => ({ ...a, [item.item_id]: { ...a[item.item_id], required_date: ev.target.value } }))}/></td><td className="px-3 py-2 text-right" style={mono}>{formatRp(e.quantity * item.estimated_unit_cost)}<div className="text-[var(--text-4)]">@ {formatRp(item.estimated_unit_cost)}</div></td><td className="px-3 py-2"><input type="checkbox" checked={e.excluded} onChange={ev => setExclusions(x => { const next = { ...x }; if (ev.target.checked) next[item.item_id] = next[item.item_id] || 'Excluded by user'; else delete next[item.item_id]; return next; })}/>{e.excluded && <input className="via-input p-1 mt-1 w-36" value={exclusions[item.item_id] || ''} placeholder="Reason" onChange={ev => setExclusions(x => ({ ...x, [item.item_id]: ev.target.value }))}/>}</td></tr>; })}</tbody></table></div>
+      {!loading && filtered.length === 0 && <div className="px-5 py-8 text-center text-[var(--text-3)]">No recommendations match the current filters.</div>}
       {methodology && <div className="px-5 py-3 bg-[var(--surface-2)] text-[var(--text-4)] text-xs border-t border-[var(--border)]">{methodology}</div>}
     </div>
   );
