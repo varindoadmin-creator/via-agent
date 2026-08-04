@@ -119,6 +119,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'purchases-report',  href: '/reports/purchases',  label: 'Purchases'  },
         { id: 'commission-report', href: '/reports/commission', label: 'Commission' },
         { id: 'business-analytics', href: '/reports/business-analytics', label: 'Business Analytics' },
+        { id: 'gross-profit', href: '/reports/gross-profit', label: 'Gross Profit' },
         { id: 'data-quality', href: '/reports/data-quality', label: 'Data Quality' },
       ],
     },

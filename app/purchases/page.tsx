@@ -403,7 +403,7 @@ function POTable({
 
 // ─── Purchasing recommendations ──────────────────────────────────────────────
 
-export function PurchasingRecommendations() {
+function PurchasingRecommendations() {
   const [recommendations, setRecommendations] = useState<PurchaseRecommendation[]>([]);
   const [summary, setSummary] = useState({ suppliers: 0, items_to_purchase: 0, recommended_now: 0, recommended_soon: 0, no_action: 0, insufficient_data: 0, estimated_cost: 0 });
   const [portfolio, setPortfolio] = useState<MirpoPortfolioSummary | null>(null);
@@ -1150,6 +1150,7 @@ function CreatePOPanel({ onCreated }: { onCreated: () => void }) {
 }
 
 export default function PurchasesPage() {
+  const [showMirpo, setShowMirpo] = useState(false);
   const [draftPOs, setDraftPOs] = useState<PO[]>([]);
   const [issuedPOs, setIssuedPOs] = useState<PO[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1177,7 +1178,25 @@ export default function PurchasesPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const mirpoView = new URLSearchParams(window.location.search).get('view') === 'mirpo';
+    setShowMirpo(mirpoView);
+    if (!mirpoView) fetchAll();
+  }, [fetchAll]);
+
+  if (showMirpo) {
+    return (
+      <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+          <div className="mb-5">
+            <h1 className="text-[var(--text)] font-semibold text-2xl tracking-tight">MIRPO</h1>
+            <p className="text-[var(--text-3)] text-sm mt-1">Monthly LAMITAK replenishment planning, retail-demand analysis, and Zoho Draft PO creation.</p>
+          </div>
+          <PurchasingRecommendations />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
