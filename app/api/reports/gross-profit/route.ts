@@ -79,12 +79,12 @@ function rateFor(line: Row, rates: Map<string, number>) {
   return rates.get(itemId) || rates.get(`sku:${sku}`) || rates.get(`name:${name}`) || 0;
 }
 
-type Aggregate = { name: string; revenue: number; cost: number; gross_profit: number; quantity: number; invoice_ids: Set<string>; missing_cost_lines: number };
-function add(map: Map<string, Aggregate>, name: string, invoiceId: string, revenue: number, cost: number, quantity: number, missingCost: boolean) {
+type Aggregate = { name: string; revenue: number; cost: number; gross_profit: number; quantity: number; invoices: Map<string, string>; missing_cost_lines: number };
+function add(map: Map<string, Aggregate>, name: string, invoiceId: string, invoiceNumber: string, revenue: number, cost: number, quantity: number, missingCost: boolean) {
   const key = name || 'Unassigned';
-  const row = map.get(key) || { name: key, revenue: 0, cost: 0, gross_profit: 0, quantity: 0, invoice_ids: new Set<string>(), missing_cost_lines: 0 };
+  const row = map.get(key) || { name: key, revenue: 0, cost: 0, gross_profit: 0, quantity: 0, invoices: new Map<string, string>(), missing_cost_lines: 0 };
   row.revenue += revenue; row.cost += cost; row.gross_profit += revenue - cost; row.quantity += quantity;
-  if (invoiceId) row.invoice_ids.add(invoiceId);
+  if (invoiceId) row.invoices.set(invoiceId, invoiceNumber || invoiceId);
   if (missingCost && revenue > 0) row.missing_cost_lines += 1;
   map.set(key, row);
 }
@@ -93,7 +93,9 @@ function serialize(map: Map<string, Aggregate>) {
   return [...map.values()].map(row => ({
     name: row.name, revenue: row.revenue, cost: row.cost, gross_profit: row.gross_profit,
     gp_margin: row.revenue > 0 ? row.gross_profit / row.revenue : 0,
-    quantity: row.quantity, invoice_count: row.invoice_ids.size, missing_cost_lines: row.missing_cost_lines,
+    quantity: row.quantity, invoice_count: row.invoices.size,
+    invoices: [...row.invoices.entries()].map(([invoice_id, invoice_number]) => ({ invoice_id, invoice_number })),
+    missing_cost_lines: row.missing_cost_lines,
   })).sort((a, b) => b.gross_profit - a.gross_profit);
 }
 
@@ -128,7 +130,7 @@ export async function GET(request: NextRequest) {
     const brands = new Map<string, Aggregate>(), hubs = new Map<string, Aggregate>(), customers = new Map<string, Aggregate>();
     let revenue = 0, cost = 0, quantity = 0, missingCostLines = 0;
     for (const invoice of details) {
-      const invoiceId = text(invoice.invoice_id), customer = text(invoice.customer_name) || 'Unknown Customer';
+      const invoiceId = text(invoice.invoice_id), invoiceNumber = text(invoice.invoice_number), customer = text(invoice.customer_name) || 'Unknown Customer';
       const invoiceHub = text(invoice.location_name) || 'Other / Unassigned';
       for (const line of (invoice.line_items || []) as Row[]) {
         const qty = Number(line.quantity) || 0;
@@ -138,9 +140,9 @@ export async function GET(request: NextRequest) {
         const missing = purchaseRate <= 0;
         const hub = text(line.location_name) || invoiceHub;
         revenue += lineRevenue; cost += lineCost; quantity += qty; if (missing && lineRevenue > 0) missingCostLines += 1;
-        add(brands, brandFor(line, itemBrands), invoiceId, lineRevenue, lineCost, qty, missing);
-        add(hubs, hub, invoiceId, lineRevenue, lineCost, qty, missing);
-        add(customers, customer, invoiceId, lineRevenue, lineCost, qty, missing);
+        add(brands, brandFor(line, itemBrands), invoiceId, invoiceNumber, lineRevenue, lineCost, qty, missing);
+        add(hubs, hub, invoiceId, invoiceNumber, lineRevenue, lineCost, qty, missing);
+        add(customers, customer, invoiceId, invoiceNumber, lineRevenue, lineCost, qty, missing);
       }
     }
     return NextResponse.json({
