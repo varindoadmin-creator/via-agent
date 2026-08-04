@@ -127,6 +127,26 @@ function salesFor(item: Row, bucket: Map<string, { sold: number; returns: number
   return { sold: 0, returns: 0 };
 }
 
+type RetailSignals = { customers: Set<string>; invoices: Set<string> };
+
+function buildRetailSignals(invoices: Row[]): Map<string, RetailSignals> {
+  const signals = new Map<string, RetailSignals>();
+  for (const invoice of invoices) {
+    const status = s(invoice.status).toLowerCase();
+    if (status === 'void' || status === 'draft') continue;
+    const customer = s(invoice.customer_id) || norm(invoice.customer_name);
+    const invoiceId = s(invoice.invoice_id) || s(invoice.invoice_number);
+    for (const line of (invoice.line_items || []) as Row[]) {
+      const key = itemKey(line); if (!key || n(line.quantity) <= 0) continue;
+      const entry = signals.get(key) || { customers: new Set<string>(), invoices: new Set<string>() };
+      if (customer) entry.customers.add(customer);
+      if (invoiceId) entry.invoices.add(invoiceId);
+      signals.set(key, entry);
+    }
+  }
+  return signals;
+}
+
 export async function GET(request: NextRequest) {
   const config = configFromRequest(request);
   const cacheKey = JSON.stringify(config);
@@ -136,18 +156,27 @@ export async function GET(request: NextRequest) {
 
   try {
     const bucketDays = Math.max(10, Math.round(config.sales_history_days / 3));
-    const [items, recent, middle, older, confirmedSOList, allPOList] = await Promise.all([
+    const historyFrom = dateBefore(config.sales_history_days);
+    const [items, recent, middle, older, confirmedSOList, allPOList, invoiceHeaders] = await Promise.all([
       fetchAll('/items', 'items', { filter_by: 'Status.Active' }),
       fetchSalesBucket(bucketDays, 0), fetchSalesBucket(bucketDays * 2, bucketDays), fetchSalesBucket(bucketDays * 3, bucketDays * 2),
       fetchAll('/salesorders', 'salesorders', { status: 'confirmed', sort_column: 'date', sort_order: 'D' }),
       fetchAll('/purchaseorders', 'purchaseorders', { sort_column: 'date', sort_order: 'D' }),
+      fetchAll('/invoices', 'invoices', { date_start: historyFrom, date_end: new Date().toISOString().slice(0, 10), sort_column: 'date', sort_order: 'D' }),
     ]);
     const inFlightStatuses = new Set(['draft', 'submitted', 'pending_approval', 'approved', 'open', 'partially_received']);
     const inFlightPOList = allPOList.filter((po) => inFlightStatuses.has(s(po.status).toLowerCase()));
-    const [salesOrders, purchaseOrders] = await Promise.all([
+    const [salesOrders, purchaseOrders, invoiceDetails] = await Promise.all([
       fetchDetails(confirmedSOList, 'salesorders', 'salesorder_id'),
       fetchDetails(inFlightPOList, 'purchaseorders', 'purchaseorder_id'),
+      mapConcurrent(invoiceHeaders.filter((invoice) => !['void', 'draft'].includes(s(invoice.status).toLowerCase())), 8, async (invoice) => {
+        try {
+          const response = await zohoRequest<Record<string, unknown>>(`/invoices/${s(invoice.invoice_id)}`);
+          return (response.invoice || invoice) as Row;
+        } catch { return invoice; }
+      }),
     ]);
+    const retailSignals = buildRetailSignals(invoiceDetails);
 
     const soDemand = new Map<string, { qty: number; cancelled: number; numbers: Set<string> }>();
     for (const so of salesOrders) {
@@ -192,6 +221,11 @@ export async function GET(request: NextRequest) {
       const leads = vendorLeadTimes.get(vendorId || norm(vendorName)) || [];
       const lead = leads.length ? Math.round(leads.reduce((sum, value) => sum + value, 0) / leads.length) : 0;
       const recentSales = salesFor(item, recent), middleSales = salesFor(item, middle), olderSales = salesFor(item, older);
+      const activeSalesPeriods = [recentSales.sold, middleSales.sold, olderSales.sold].filter((qty) => qty > 0).length;
+      const retail = retailSignals.get(key) || { customers: new Set<string>(), invoices: new Set<string>() };
+      const distinctCustomers = retail.customers.size;
+      const salesTransactions = retail.invoices.size;
+      const retailDemandScore = activeSalesPeriods * 100 + Math.min(10, distinctCustomers) * 25 + Math.min(20, salesTransactions) * 10;
       const input: PurchaseRecommendationInput = {
         item_id: s(item.item_id), sku: s(item.sku), name: s(item.name), unit: s(item.unit) || 'units',
         category: s(item.category_name || item.category || brand) || 'Uncategorized', warehouse: config.warehouse_scope === 'all' ? 'All locations' : config.warehouse_scope,
@@ -199,6 +233,8 @@ export async function GET(request: NextRequest) {
         stock_on_hand: n(item.stock_on_hand), committed_stock: n(item.committed_stock), available_stock: n(item.available_stock ?? item.stock_on_hand) - (item.available_stock == null ? n(item.committed_stock) : 0),
         open_sales_order_qty: demand.qty, incoming_po_qty: supply.qty, history_bucket_days: bucketDays,
         sold_recent_days: recentSales.sold, sold_middle_days: middleSales.sold, sold_older_days: olderSales.sold,
+        active_sales_periods: activeSalesPeriods, distinct_customer_count: distinctCustomers,
+        sales_transaction_count: salesTransactions, retail_demand_score: retailDemandScore,
         returns_qty: recentSales.returns + middleSales.returns + olderSales.returns, cancelled_qty: demand.cancelled,
         lead_time_days: lead, reorder_level: n(item.reorder_level),
         preferred_stock_level: customNumber(item, ['preferred_stock_level', 'preferred stock', 'target stock']),
@@ -228,7 +264,7 @@ export async function GET(request: NextRequest) {
         recommended_qty: portfolio.recommended_qty, estimated_cost: actionable.reduce((sum, row) => sum + row.estimated_cost, 0),
       },
       recommendations: visible, proposals, portfolio,
-      methodology: 'LAMITAK HPL only. VIA builds one 600-sheet MIRPO portfolio for a 30-day sell-through target. It first allocates sheets only where forecast 30-day sales plus open SO demand exceed available and incoming stock. Any remaining quantity required by the 600-sheet MIRPO policy is allocated to the fastest movers but explicitly marked as review-risk. Existing draft, submitted, approved, open POs and MIRPOs are deducted. Advisory local draft only.',
+      methodology: 'LAMITAK HPL only. VIA ignores legacy Zoho reorder levels and builds one 600-sheet MIRPO portfolio for a 30-day sell-through target. Eligible retail items must sell in at least 2 of 3 history periods or reach at least 3 customers, and must cost no more than Rp1,000,000 per sheet. Recurring periods, distinct customers, and invoice frequency drive priority. VIA first fills genuine 30-day net demand gaps; any remaining policy balance is allocated by retail-demand score and marked as review-risk. Existing stock and incoming POs/MIRPOs are deducted.',
     };
     cache.set(cacheKey, { expires: Date.now() + 15 * 60_000, payload }); lastValidPayload = payload;
     return NextResponse.json(payload);

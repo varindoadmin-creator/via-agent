@@ -13,6 +13,7 @@ const base: PurchaseRecommendationInput = {
   stock_on_hand: 20, committed_stock: 0, available_stock: 20,
   open_sales_order_qty: 30, incoming_po_qty: 5, history_bucket_days: 30,
   sold_recent_days: 30, sold_middle_days: 30, sold_older_days: 30, returns_qty: 0, cancelled_qty: 0,
+  active_sales_periods: 3, distinct_customer_count: 4, sales_transaction_count: 6, retail_demand_score: 335,
   lead_time_days: 30, reorder_level: 0, preferred_stock_level: 0, minimum_order_qty: 0, order_multiple: 0,
   sales_orders: ['SO-1'], purchase_orders: ['PO-1'], mirpo_orders: [], assumptions: [],
 };
@@ -23,6 +24,13 @@ test('normal reorder uses weighted demand, safety stock, stock, and incoming PO'
   assert.equal(result.safety_stock_qty, 14);
   assert.equal(result.recommended_qty, 49);
   assert.equal(result.estimated_cost, 4900);
+});
+
+test('legacy Zoho reorder level does not inflate the recommendation', () => {
+  const normal = buildPurchaseRecommendation(base);
+  const legacy = buildPurchaseRecommendation({ ...base, reorder_level: 500 });
+  assert.equal(legacy.recommended_qty, normal.recommended_qty);
+  assert.equal(legacy.safety_stock_qty, normal.safety_stock_qty);
 });
 
 test('zero and negative results never recommend below zero', () => {
@@ -100,6 +108,16 @@ test('LAMITAK MIRPO portfolio totals 600 sheets and exposes 30-day excess risk',
   assert.equal(portfolio.items.reduce((sum, item) => sum + item.recommended_qty, 0), 600);
   assert.equal(portfolio.ready_to_order, true);
   assert.equal(portfolio.excess_risk_qty, 0);
+});
+
+test('MIRPO excludes expensive and one-off project items in favour of recurring retail demand', () => {
+  const retail = buildPurchaseRecommendation({ ...base, item_id: 'retail', available_stock: 0 });
+  const expensive = buildPurchaseRecommendation({ ...base, item_id: 'expensive', purchase_rate: 1_000_001, available_stock: 0 });
+  const project = buildPurchaseRecommendation({ ...base, item_id: 'project', active_sales_periods: 1, distinct_customer_count: 1, sales_transaction_count: 1, retail_demand_score: 135, available_stock: 0 });
+  const portfolio = buildMirpoPortfolio([retail, expensive, project], 600, 30);
+  assert.equal(portfolio.items.find((item) => item.item_id === 'retail')?.recommended_qty, 600);
+  assert.equal(portfolio.items.find((item) => item.item_id === 'expensive')?.recommended_qty, 0);
+  assert.equal(portfolio.items.find((item) => item.item_id === 'project')?.recommended_qty, 0);
 });
 
 test('MIRPO local draft must preserve the 600-sheet brand policy', () => {

@@ -51,6 +51,10 @@ export type PurchaseRecommendationInput = {
   sold_recent_days: number;
   sold_middle_days: number;
   sold_older_days: number;
+  active_sales_periods: number;
+  distinct_customer_count: number;
+  sales_transaction_count: number;
+  retail_demand_score: number;
   returns_qty: number;
   cancelled_qty: number;
   lead_time_days: number;
@@ -159,7 +163,9 @@ export function buildPurchaseRecommendation(
   const incoming = Math.max(0, finite(input.incoming_po_qty));
   const replenishmentDays = leadTimeDays + Math.max(0, settings.safety_stock_days);
   const forecastDemand = dailyVelocity * leadTimeDays + openDemand;
-  const safetyStock = Math.max(dailyVelocity * settings.safety_stock_days, finite(input.reorder_level));
+  // Zoho reorder levels may predate reliable sales history. MIRPO replenishment
+  // therefore derives its safety stock only from observed demand.
+  const safetyStock = dailyVelocity * settings.safety_stock_days;
   const preferredBuffer = Math.max(0, finite(input.preferred_stock_level) - available - incoming);
   const rawSuggested = Math.max(0, forecastDemand + safetyStock - available - incoming, preferredBuffer);
   const recommended = roundOrderQuantity(rawSuggested, input.minimum_order_qty, input.order_multiple);
@@ -252,7 +258,12 @@ export function buildMirpoPortfolio(
 ): MirpoPortfolio {
   const target = Math.max(0, Math.round(finite(targetQty)));
   const horizon = Math.max(1, Math.round(finite(horizonDays)));
-  const candidates = rows.filter((row) => row.daily_velocity > 0 && row.urgency !== 'data_error');
+  const candidates = rows.filter((row) =>
+    row.daily_velocity > 0 &&
+    row.urgency !== 'data_error' &&
+    row.estimated_unit_cost <= 1_000_000 &&
+    (row.active_sales_periods >= 2 || row.distinct_customer_count >= 3),
+  );
   if (!target || candidates.length === 0) {
     return {
       target_qty: target, recommended_qty: 0, sell_through_horizon_days: horizon,
@@ -278,7 +289,7 @@ export function buildMirpoPortfolio(
   while (remaining > 0) {
     const next = candidates
       .filter((row) => (allocation.get(row.item_id) || 0) < (safeNeed.get(row.item_id) || 0))
-      .sort((a, b) => ((safeNeed.get(b.item_id) || 0) - (allocation.get(b.item_id) || 0)) - ((safeNeed.get(a.item_id) || 0) - (allocation.get(a.item_id) || 0)) || b.daily_velocity - a.daily_velocity)[0];
+      .sort((a, b) => b.retail_demand_score - a.retail_demand_score || ((safeNeed.get(b.item_id) || 0) - (allocation.get(b.item_id) || 0)) - ((safeNeed.get(a.item_id) || 0) - (allocation.get(a.item_id) || 0)) || b.daily_velocity - a.daily_velocity)[0];
     if (!next) break;
     allocation.set(next.item_id, (allocation.get(next.item_id) || 0) + 1);
     remaining--;
@@ -287,11 +298,11 @@ export function buildMirpoPortfolio(
 
   // Policy still requires a complete 600-sheet proposal. Spread the review-risk
   // balance by sales velocity, one sheet at a time, favouring under-allocated movers.
-  const totalVelocity = candidates.reduce((sum, row) => sum + row.daily_velocity, 0);
+  const totalRetailScore = candidates.reduce((sum, row) => sum + Math.max(1, row.retail_demand_score), 0);
   while (remaining > 0) {
     const next = [...candidates].sort((a, b) => {
-      const targetA = target * a.daily_velocity / totalVelocity;
-      const targetB = target * b.daily_velocity / totalVelocity;
+      const targetA = target * Math.max(1, a.retail_demand_score) / totalRetailScore;
+      const targetB = target * Math.max(1, b.retail_demand_score) / totalRetailScore;
       return (targetB - (allocation.get(b.item_id) || 0)) - (targetA - (allocation.get(a.item_id) || 0)) || b.daily_velocity - a.daily_velocity;
     })[0];
     allocation.set(next.item_id, (allocation.get(next.item_id) || 0) + 1);
@@ -313,8 +324,12 @@ export function buildMirpoPortfolio(
       estimated_cost: quantity * row.estimated_unit_cost,
       urgency: quantity > 0 ? row.urgency : 'no_action' as RecommendationUrgency,
       explanation: quantity > 0
-        ? `${quantity} sheets selected for the 600-sheet LAMITAK MIRPO; ${Math.min(quantity, safe)} are supported by the 30-day net demand gap${risk ? ` and ${risk} require review because they exceed that gap` : ''}.`
-        : `Not selected: existing and incoming stock rank ahead of this item's 30-day demand.`,
+        ? `${quantity} sheets selected for the 600-sheet LAMITAK MIRPO; sold in ${row.active_sales_periods}/3 periods across ${row.distinct_customer_count} customers and ${row.sales_transaction_count} invoices. ${Math.min(quantity, safe)} are supported by the 30-day net demand gap${risk ? ` and ${risk} require review because they exceed that gap` : ''}.`
+        : row.estimated_unit_cost > 1_000_000
+          ? `Not selected: purchase rate ${Math.round(row.estimated_unit_cost).toLocaleString('id-ID')} exceeds the Rp1,000,000 MIRPO retail ceiling.`
+          : row.active_sales_periods < 2 && row.distinct_customer_count < 3
+            ? `Not selected: demand is not recurring enough (${row.active_sales_periods}/3 periods, ${row.distinct_customer_count} customers).`
+            : `Not selected: existing and incoming stock rank ahead of this item's 30-day demand.`,
       calculation: { ...row.calculation, raw_suggested_qty: safe, rounded_suggested_qty: quantity },
     };
   });
