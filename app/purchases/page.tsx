@@ -410,6 +410,7 @@ function PurchasingRecommendations() {
   const [generatedAt, setGeneratedAt] = useState('');
   const [syncStatus, setSyncStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [creatingMirpo, setCreatingMirpo] = useState(false);
   const [error, setError] = useState('');
   const [draftMessage, setDraftMessage] = useState('');
   const [filters, setFilters] = useState({ search: '', vendor: '', urgency: '', category: '', confidence: '', warehouse: '' });
@@ -471,16 +472,29 @@ function PurchasingRecommendations() {
     if (!active.length) { setError('No included recommendation has a positive quantity.'); return; }
     const draftQty = active.reduce((sum, item) => sum + effective(item).quantity, 0);
     if (draftQty !== 600) { setError(`A MIRPO must total exactly 600 sheets. The edited draft currently totals ${draftQty}.`); return; }
-    if (!window.confirm(`Create a local Recommended Next MIRPO draft for ${active.length} items (${formatRp(total)})? This will not create or modify a Zoho Purchase Order.`)) return;
+    if (!window.confirm(`Create a real Draft Purchase Order in Zoho Books for ${active.length} LAMITAK items (${draftQty} sheets, ${formatRp(total)})? Vendor: TAK PRODUCTS AND SERVICES, PT. Reference: MIRPO. The PO will remain Draft and will not be submitted or approved.`)) return;
+    setCreatingMirpo(true);
     setDraftMessage(''); setError('');
-    const response = await fetch('/api/purchases/recommendations/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      generated_at: generatedAt, configuration: config, adjustments, exclusions,
-      source_snapshot: { generated_at: generatedAt, sync_status: syncStatus, methodology },
-      items: recommendations.map(item => { const e = effective(item); return { item_id: item.item_id, sku: item.sku, name: item.name, quantity: e.quantity, vendor_name: e.vendor_name, required_date: e.required_date, estimated_unit_cost: item.estimated_unit_cost, excluded: e.excluded, exclusion_reason: exclusions[item.item_id] || '' }; }),
-    }) });
-    const data = await response.json();
-    if (!data.success) { setError(data.error || 'Unable to create local draft'); return; }
-    setDraftMessage(`Local draft ${data.draft.id} saved. No Zoho data was changed.`);
+    try {
+      const response = await fetch('/api/purchases/recommendations/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        generated_at: generatedAt, configuration: config, adjustments, exclusions,
+        source_snapshot: { generated_at: generatedAt, sync_status: syncStatus, methodology },
+        items: recommendations.map(item => { const e = effective(item); return { item_id: item.item_id, sku: item.sku, name: item.name, quantity: e.quantity, vendor_name: e.vendor_name, required_date: e.required_date, estimated_unit_cost: item.estimated_unit_cost, purchase_rate: item.purchase_rate, excluded: e.excluded, exclusion_reason: exclusions[item.item_id] || '' }; }),
+      }) });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Unable to save the local MIRPO audit draft');
+      const zohoResponse = await fetch('/api/purchases/recommendations/drafts/create-zoho', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft_id: data.draft.id }),
+      });
+      const zohoData = await zohoResponse.json();
+      if (!zohoData.success) throw new Error(zohoData.error || 'Unable to create the Zoho Draft Purchase Order');
+      const po = zohoData.purchaseorder || zohoData;
+      setDraftMessage(`Zoho Draft PO ${po.purchaseorder_number || po.purchaseorder_id} created for TAK PRODUCTS AND SERVICES, PT with reference MIRPO. It has not been submitted or approved.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCreatingMirpo(false);
+    }
   }
 
   const urgencyLabel = { recommended_now: 'Recommended now', recommended_soon: 'Recommended soon', no_action: 'No action', insufficient_data: 'Insufficient data', data_error: 'Data error' };
@@ -488,8 +502,8 @@ function PurchasingRecommendations() {
   return (
     <div className="via-card mb-6 overflow-hidden">
       <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border)]">
-        <div><h2 className="font-bold text-base text-[var(--text)]">Recommended Next MIRPO — LAMITAK HPL</h2><p className="text-[var(--text-3)] text-xs mt-0.5">600-sheet monthly portfolio · target: sell through within 30 days · local draft and Director approval only</p><div className="text-[var(--text-4)] text-xs mt-1">Sync: <span className={syncStatus === 'current' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>{syncStatus || 'waiting'}</span>{generatedAt && ` · ${new Date(generatedAt).toLocaleString('id-ID')}`}</div></div>
-        <div className="flex gap-2"><button onClick={() => load(true)} disabled={loading} className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg text-[var(--text-3)] disabled:opacity-50">{loading ? 'Refreshing Zoho…' : 'Refresh Zoho'}</button><button onClick={createLocalDraft} disabled={loading} className="px-3 py-1.5 text-xs bg-[var(--accent)] text-white rounded-lg disabled:opacity-50">Create Draft MIRPO</button></div>
+        <div><h2 className="font-bold text-base text-[var(--text)]">Recommended Next MIRPO — LAMITAK HPL</h2><p className="text-[var(--text-3)] text-xs mt-0.5">600-sheet monthly portfolio · target: sell through within 30 days · creates a Zoho Draft PO after Director confirmation</p><div className="text-[var(--text-4)] text-xs mt-1">Sync: <span className={syncStatus === 'current' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}>{syncStatus || 'waiting'}</span>{generatedAt && ` · ${new Date(generatedAt).toLocaleString('id-ID')}`}</div></div>
+        <div className="flex gap-2"><button onClick={() => load(true)} disabled={loading || creatingMirpo} className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-lg text-[var(--text-3)] disabled:opacity-50">{loading ? 'Refreshing Zoho…' : 'Refresh Zoho'}</button><button onClick={createLocalDraft} disabled={loading || creatingMirpo} className="px-3 py-1.5 text-xs bg-[var(--accent)] text-white rounded-lg disabled:opacity-50">{creatingMirpo ? 'Creating Zoho Draft…' : 'Create Draft MIRPO in Zoho'}</button></div>
       </div>
       {portfolio && <div className={`mx-5 mt-4 rounded-lg border p-3 text-xs ${portfolio.ready_to_order ? 'bg-[var(--success-bg)] border-[var(--success-border)] text-[var(--success)]' : 'bg-[var(--warning-bg)] border-[var(--warning-border)] text-[var(--warning)]'}`}><div className="font-semibold">{portfolio.ready_to_order ? 'Ready: 30-day demand supports this MIRPO' : 'Review before ordering: dead-stock risk detected'}</div><div className="mt-1">{portfolio.explanation}</div></div>}
       <div className="grid grid-cols-6 gap-px bg-[var(--border)] border-y border-[var(--border)] mt-4">

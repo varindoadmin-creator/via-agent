@@ -5,6 +5,7 @@ import {
   type PurchaseRecommendationInput,
 } from './recommendations.ts';
 import { assertMirpoPolicyQuantity, canCreateMirpoDraft, validateDraftItems } from './draftValidation.ts';
+import { assertMirpoZohoLines, MIRPO_REFERENCE, MIRPO_TARGET_QTY, MIRPO_VENDOR_NAME } from './mirpoZohoContract.ts';
 
 const base: PurchaseRecommendationInput = {
   item_id: 'item-1', sku: 'SKU-1', name: 'Panel', unit: 'sht', category: 'LAMITAK', warehouse: 'All locations',
@@ -105,4 +106,12 @@ test('MIRPO local draft must preserve the 600-sheet brand policy', () => {
   const valid = validateDraftItems([{ item_id: '1', quantity: 600 }]);
   assert.doesNotThrow(() => assertMirpoPolicyQuantity(valid));
   assert.throws(() => assertMirpoPolicyQuantity(validateDraftItems([{ item_id: '1', quantity: 599 }])));
+});
+
+test('Zoho MIRPO creation contract fixes vendor, reference, and 600-sheet total', () => {
+  assert.equal(MIRPO_VENDOR_NAME, 'TAK PRODUCTS AND SERVICES, PT');
+  assert.equal(MIRPO_REFERENCE, 'MIRPO');
+  assert.equal(MIRPO_TARGET_QTY, 600);
+  assert.doesNotThrow(() => assertMirpoZohoLines([{ item_id: 'a', quantity: 400 }, { item_id: 'b', quantity: 200 }]));
+  assert.throws(() => assertMirpoZohoLines([{ item_id: 'a', quantity: 599 }]));
 });

@@ -6,6 +6,7 @@ export type DraftItem = {
   vendor_name: string;
   required_date: string;
   estimated_unit_cost: number;
+  purchase_rate?: number;
   excluded?: boolean;
   exclusion_reason?: string;
 };
@@ -25,6 +26,7 @@ export function validateDraftItems(value: unknown): DraftItem[] {
       item_id: String(item.item_id), sku: String(item.sku || ''), name: String(item.name || ''), quantity,
       vendor_name: String(item.vendor_name || ''), required_date: requiredDate,
       estimated_unit_cost: Math.max(0, Number(item.estimated_unit_cost) || 0),
+      purchase_rate: Math.max(0, Number(item.purchase_rate) || 0),
       excluded: Boolean(item.excluded), exclusion_reason: String(item.exclusion_reason || '').slice(0, 500),
     };
   });

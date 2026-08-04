@@ -8,6 +8,8 @@ export interface ZohoRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: Record<string, unknown>;
   queryParams?: Record<string, string | number | boolean>;
+  /** Set to 0 for non-idempotent writes where an automatic retry could duplicate data. */
+  retries?: number;
 }
 
 /**
@@ -17,7 +19,7 @@ export async function zohoRequest<T>(
   path: string,
   options: ZohoRequestOptions = {}
 ): Promise<T> {
-  const { method = 'GET', body, queryParams = {} } = options;
+  const { method = 'GET', body, queryParams = {}, retries } = options;
 
   const accessToken = await getZohoAccessToken();
   const orgId = getZohoOrgId();
@@ -45,7 +47,7 @@ export async function zohoRequest<T>(
     fetchOptions.body = JSON.stringify(body);
   }
 
-  const response = await fetchWithRetry(url.toString(), fetchOptions);
+  const response = await fetchWithRetry(url.toString(), fetchOptions, retries == null ? {} : { retries });
 
   if (!response.ok) {
     const errorText = await response.text();
