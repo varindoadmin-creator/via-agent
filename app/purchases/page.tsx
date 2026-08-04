@@ -403,7 +403,7 @@ function POTable({
 
 // ─── Purchasing recommendations ──────────────────────────────────────────────
 
-function PurchasingRecommendations() {
+export function PurchasingRecommendations() {
   const [recommendations, setRecommendations] = useState<PurchaseRecommendation[]>([]);
   const [summary, setSummary] = useState({ suppliers: 0, items_to_purchase: 0, recommended_now: 0, recommended_soon: 0, no_action: 0, insufficient_data: 0, estimated_cost: 0 });
   const [portfolio, setPortfolio] = useState<MirpoPortfolioSummary | null>(null);
@@ -1222,9 +1222,6 @@ export default function PurchasesPage() {
 
         {/* Create PO — brand-batched Draft PO generation, covers unmet Confirmed SO demand */}
         <CreatePOPanel onCreated={fetchAll} />
-
-        {/* Advisory supplier-grouped proposals. Printing does not write to Zoho. */}
-        <PurchasingRecommendations />
 
         {/* Table 1 — Draft POs (real Zoho draft status — not yet submitted for approval, no checks) */}
         <div className="mb-6">

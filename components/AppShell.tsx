@@ -67,6 +67,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
       id: 'purchases', label: 'Purchases', icon: Package,
       items: [
         { id: 'purchaseorders', href: '/purchases', label: 'Purchase Orders' },
+        { id: 'mirpo', href: '/purchases/mirpo', label: 'MIRPO' },
       ],
     },
     hidden: true,
