@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getZohoAccessToken, getZohoApiBaseUrl } from "@/lib/zoho/auth";
 import { fetchWithRetry } from "@/lib/zoho/retry";
 import { collectOpenInvoices, OpenInvoice } from "@/lib/reconciliation/openInvoices";
+import { compareInvoiceMatches } from "@/lib/reconciliation/matchRanking";
 
 const ORG_ID = () => process.env.ZOHO_ORGANIZATION_ID || "";
 
@@ -816,13 +817,7 @@ function matchTransactions(
       }
     }
 
-    matches.sort((a, b) => {
-      if (Math.abs(b.match_score - a.match_score) < 0.01) {
-        if (a.type === "multi" && b.type !== "multi") return -1;
-        if (b.type === "multi" && a.type !== "multi") return 1;
-      }
-      return b.match_score - a.match_score;
-    });
+    matches.sort(compareInvoiceMatches);
 
     const status =
       matches.length === 0
