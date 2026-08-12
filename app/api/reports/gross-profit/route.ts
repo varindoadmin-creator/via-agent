@@ -58,16 +58,21 @@ async function mapLimit<T, R>(items: T[], concurrency: number, worker: (item: T)
   return output;
 }
 
+function normalizeBrand(value: string) {
+  const brand = value.toUpperCase().trim();
+  return brand === 'TAC' ? 'TACO' : brand;
+}
+
 function brandFor(line: Row, brands: Map<string, string>) {
   const explicit = text(line.brand || line.cf_brand);
-  if (explicit) return explicit.toUpperCase();
+  if (explicit) return normalizeBrand(explicit);
   const itemId = text(line.item_id);
   const mapped = brands.get(itemId);
-  if (mapped) return mapped;
+  if (mapped) return normalizeBrand(mapped);
   const sku = text(line.sku).toUpperCase();
   const prefix = sku.split(/[-\s]/)[0];
   if (prefix.startsWith('LAM')) return 'LAMITAK';
-  return prefix || 'UNASSIGNED';
+  return normalizeBrand(prefix || 'UNASSIGNED');
 }
 
 function rateFor(line: Row, rates: Map<string, number>) {
@@ -116,7 +121,7 @@ export async function GET(request: NextRequest) {
       const rate = money(item.purchase_rate);
       const itemId = text(item.item_id), sku = text(item.sku).toUpperCase(), name = text(item.name);
       if (itemId) rates.set(itemId, rate); if (sku) rates.set(`sku:${sku}`, rate); if (name) rates.set(`name:${name}`, rate);
-      const brand = text(item.brand || item.cf_brand).toUpperCase();
+      const brand = normalizeBrand(text(item.brand || item.cf_brand));
       if (itemId && brand) itemBrands.set(itemId, brand);
     }
     const details = await mapLimit(invoices, 6, async invoice => {

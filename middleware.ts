@@ -5,7 +5,7 @@ const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/pin
 
 // Hit by external cron-job.org scheduled jobs (no browser session available),
 // so these bypass session auth via a shared secret header instead.
-const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/invoices-page/auto-send', '/api/inventory/price-lists/sync', '/api/salesperson-map/sync', '/api/salesorders/purchase-gap-check', '/api/shipments/aging-check', '/api/data-quality'];
+const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/customers/duplicates/scan', '/api/invoices-page/auto-send', '/api/inventory/price-lists/sync', '/api/salesperson-map/sync', '/api/salesorders/purchase-gap-check', '/api/shipments/aging-check', '/api/data-quality'];
 
 function isCronAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

@@ -17,7 +17,8 @@
     "test:customer-duplicate-ignore": "node --experimental-strip-types --test lib/customerDuplicates/ignoreStore.test.ts",
     "test:customer-duplicate-merge": "node --experimental-strip-types --test lib/customerDuplicates/mergeRequest.test.ts",
     "test:customer-duplicate-detection": "node --experimental-strip-types --test lib/customerCleanup/duplicates.test.ts",
-    "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts"
+    "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
+    "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/openInvoices.test.ts"
   },
   "dependencies": {
     "@types/node": "^20.17.0",

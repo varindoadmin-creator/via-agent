@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
 import { fetchWithRetry } from '@/lib/zoho/retry';
-import { getCustomFieldValue, RawContact } from '@/lib/customerCleanup/rules';
-import { findDuplicateGroups, DuplicateCandidate } from '@/lib/customerCleanup/duplicates';
-import { duplicateGroupFingerprint, getIgnoredDuplicateFingerprints, ignoreDuplicateGroup } from '@/lib/customerDuplicates/ignoreStore';
+import { duplicateGroupFingerprint, ignoreDuplicateGroup } from '@/lib/customerDuplicates/ignoreStore';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '@/lib/auth';
 import { buildZohoContactMergePath } from '@/lib/customerDuplicates/mergeRequest';
+import { scanCustomerDuplicates } from '@/lib/customerDuplicates/scan';
 
 async function zohoGet(path: string) {
   const token = await getZohoAccessToken();
@@ -40,74 +39,15 @@ async function zohoPost(path: string) {
   return body;
 }
 
-async function fetchAllCustomerIds(): Promise<string[]> {
-  const ids: string[] = [];
-  let page = 1;
-  let hasMore = true;
-  while (hasMore) {
-    const res = await zohoGet(`/contacts?contact_type=customer&status=active&per_page=200&page=${page}`);
-    const batch = (res.contacts || []) as Array<{ contact_id: string }>;
-    ids.push(...batch.map((c) => c.contact_id));
-    hasMore = Boolean(res.page_context?.has_more_page);
-    page++;
-    if (page > 20) break;
-  }
-  return ids;
-}
-
-async function fetchDetailBatch(ids: string[]): Promise<RawContact[]> {
-  const BATCH = 15;
-  const results: RawContact[] = [];
-  for (let i = 0; i < ids.length; i += BATCH) {
-    const slice = ids.slice(i, i + BATCH);
-    const details = await Promise.all(
-      slice.map(async (id) => {
-        try {
-          const r = await zohoGet(`/contacts/${id}`);
-          return (r.contact as RawContact & { email?: string; phone?: string; mobile?: string; status?: string }) || null;
-        } catch {
-          return null;
-        }
-      })
-    );
-    results.push(...(details.filter(Boolean) as RawContact[]));
-  }
-  return results;
-}
-
-async function scanDuplicates(includeIgnored = false) {
-    const ids = await fetchAllCustomerIds();
-    const details = await fetchDetailBatch(ids);
-
-    const candidates: DuplicateCandidate[] = details.map((c) => {
-      const raw = c as RawContact & { email?: string; phone?: string; mobile?: string; status?: string };
-      return {
-        contact_id: c.contact_id,
-        contact_name: c.contact_name || '',
-        company_name: c.company_name || '',
-        email: raw.email || '',
-        phone: raw.phone || '',
-        mobile: raw.mobile || '',
-        npwp: getCustomFieldValue(c, 'cf_npwp') || '',
-        status: raw.status || '',
-      };
-    });
-
-    const allGroups = findDuplicateGroups(candidates);
-    const ignored = await getIgnoredDuplicateFingerprints();
-    const groups = includeIgnored ? allGroups : allGroups.filter(group => !ignored.has(duplicateGroupFingerprint(group.customers.map(customer => customer.contact_id))));
-    return { ids, groups, ignoredCount: allGroups.length - groups.length };
-}
-
 // ─── GET /api/customers/duplicates — scan for likely duplicate customers ─────
 export async function GET() {
   try {
-    const { ids, groups, ignoredCount } = await scanDuplicates();
+    const { totalCustomers, groups, ignoredCount } = await scanCustomerDuplicates();
     const duplicateCustomerCount = groups.reduce((sum, g) => sum + g.customers.length, 0);
 
     return NextResponse.json({
       success: true,
-      total_customers: ids.length,
+      total_customers: totalCustomers,
       group_count: groups.length,
       duplicate_customer_count: duplicateCustomerCount,
       ignored_group_count: ignoredCount,
@@ -126,7 +66,7 @@ export async function POST(req: NextRequest) {
     if (requestedIds.length < 2) return NextResponse.json({ success: false, error: 'Select a duplicate group containing at least two customers.' }, { status: 400 });
 
     // Never trust IDs sent by the browser: confirm the exact group still exists in a fresh Zoho scan.
-    const { groups } = await scanDuplicates(true);
+    const { groups } = await scanCustomerDuplicates(true);
     const fingerprint = duplicateGroupFingerprint(requestedIds);
     const group = groups.find(candidate => duplicateGroupFingerprint(candidate.customers.map(customer => customer.contact_id)) === fingerprint);
     if (!group) return NextResponse.json({ success: false, error: 'This duplicate group changed or is no longer detected. Refresh and review it again.' }, { status: 409 });

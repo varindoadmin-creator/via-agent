@@ -16,8 +16,14 @@ the header `x-cron-secret: <CRON_SECRET>`.
 | 09:20 | `/api/salesperson-map/sync` | `{"mode":"incremental"}` |
 | 09:25 | `/api/shipments/aging-check` | `{}` |
 | 09:30 | `/api/data-quality` | `{}` |
+| 09:35 | `/api/customers/duplicates/scan` | `{}` |
 | 15:00 | `/api/salesorders/purchase-gap-check` | `{}` |
 
 The application records every completed or failed invocation in
 `public.cron_run_log`, including successful runs that find no work. Apply
 `supabase/cron_run_log.sql` before relying on these heartbeats.
+
+The duplicate-customer scan reads every active customer detail and can exceed
+cron-job.org's 30-second request limit as the customer list grows. Schedule
+that endpoint with Google Cloud Scheduler and an attempt deadline of at least
+10 minutes; the other lightweight jobs may remain on cron-job.org.

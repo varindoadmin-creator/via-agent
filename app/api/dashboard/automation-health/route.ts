@@ -12,6 +12,8 @@ const JOBS = [
   { name: 'inventory-price-list-sync', label: 'Synchronize Inventory Price Lists', hour: 9, minute: 15 },
   { name: 'salesperson-map-sync', label: 'Assign Salespersons', hour: 9, minute: 20 },
   { name: 'shipments-aging-check', label: 'Shipment Aging Check', hour: 9, minute: 25 },
+  { name: 'data-quality-monitor', label: 'Monitor Data Quality', hour: 9, minute: 30 },
+  { name: 'customers-duplicate-check', label: 'Check Duplicate Customers', hour: 9, minute: 35 },
   { name: 'salesorders-purchase-gap-check', label: 'Sales Order Purchase-Gap Check', hour: 15, minute: 0 },
 ] as const;
 

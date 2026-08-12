@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getZohoAccessToken, getZohoApiBaseUrl } from "@/lib/zoho/auth";
 import { fetchWithRetry } from "@/lib/zoho/retry";
+import { collectOpenInvoices, OpenInvoice } from "@/lib/reconciliation/openInvoices";
 
 const ORG_ID = () => process.env.ZOHO_ORGANIZATION_ID || "";
 
@@ -97,16 +98,7 @@ function amountMatchScore(bankAmount: number, invoiceAmount: number): number {
   return 0;
 }
 
-interface ZohoInvoice {
-  invoice_id: string;
-  invoice_number: string;
-  customer_name: string;
-  customer_id: string;
-  date: string;
-  due_date: string;
-  total: number;
-  balance: number;
-}
+type ZohoInvoice = OpenInvoice;
 
 // IDR has no meaningful sub-unit — invoices with a sub-Rupiah residual balance
 // (e.g. Rp 0.1 left over from prior payment rounding) are effectively paid and
@@ -676,30 +668,9 @@ function rowToTransaction(
 }
 
 async function fetchOpenInvoices(): Promise<ZohoInvoice[]> {
-  const [invRes, partialRes] = await Promise.all([
-    zohoGet("/invoices?status=unpaid&per_page=200"),
-    zohoGet("/invoices?status=partially_paid&per_page=200"),
-  ]);
-
-  const merged = new Map<string, ZohoInvoice>();
-  for (const i of [
-    ...(invRes.invoices || []),
-    ...(partialRes.invoices || []),
-  ] as Record<string, unknown>[]) {
-    const invoiceId = String(i.invoice_id);
-    merged.set(invoiceId, {
-      invoice_id: invoiceId,
-      invoice_number: String(i.invoice_number),
-      customer_name: String(i.customer_name),
-      customer_id: String(i.customer_id),
-      date: String(i.date),
-      due_date: String(i.due_date),
-      total: parseFloat(String(i.total)) || 0,
-      balance: parseFloat(String(i.balance)) || 0,
-    });
-  }
-
-  return Array.from(merged.values()).filter((i) => hasPositiveBalance(i));
+  return collectOpenInvoices((status, page) =>
+    zohoGet(`/invoices?status=${encodeURIComponent(status)}&per_page=200&page=${page}&sort_column=date&sort_order=D`),
+  );
 }
 
 function findMultiInvoiceCombinations(

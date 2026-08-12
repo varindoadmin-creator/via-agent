@@ -34,6 +34,8 @@ type DraftReadinessIssue = {
   suggested_transfers: Array<{ from_location: string; quantity: number }>;
 };
 type DraftReadinessInvoice = { invoice_id: string; invoice_number: string; customer_name: string; issues: DraftReadinessIssue[] };
+type DuplicateCustomer = { contact_id: string; contact_name: string; company_name: string; email: string; phone: string; mobile: string; npwp: string; status: string };
+type DuplicateGroup = { key: string; reasons: string[]; customers: DuplicateCustomer[] };
 
 function formatJakarta(value: string | null) {
   if (!value) return 'Never';
@@ -131,6 +133,101 @@ function AutomationHealthPanel() {
   );
 }
 
+function DuplicateCustomerReview() {
+  const [scan, setScan] = useState<{ scanned_at: string; total_customers: number; group_count: number; duplicate_customer_count: number; groups: DuplicateGroup[] } | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState('');
+
+  async function load() {
+    setError('');
+    try {
+      const response = await fetch('/api/customers/duplicates/scan', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Could not load the duplicate scan.');
+      setScan(result.scan);
+      setSelected(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function runNow() {
+    setRunning(true); setError('');
+    try {
+      const response = await fetch('/api/customers/duplicates/scan', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Duplicate scan failed.');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function ignoreSelected() {
+    if (!scan || selected.size === 0) return;
+    setRunning(true); setError('');
+    try {
+      for (const group of scan.groups.filter(candidate => selected.has(candidate.key))) {
+        const response = await fetch('/api/customers/duplicates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'ignore', contact_ids: group.customers.map(customer => customer.contact_id) }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'Could not ignore the selected group.');
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, marginBottom: 20 }}>
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <div>
+          <h2 className="text-[var(--text)] font-semibold text-sm">Duplicate Customer Review</h2>
+          <div className="text-[var(--muted)] text-xs mt-1">
+            {scan ? `${scan.group_count} possible group${scan.group_count === 1 ? '' : 's'} from ${scan.total_customers} active customers · scanned ${formatJakarta(scan.scanned_at)}` : 'Daily scan scheduled for 09:35 Jakarta time'}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={ignoreSelected} disabled={running || selected.size === 0} className="via-btn via-btn-secondary !text-xs disabled:opacity-40">Ignore selected{selected.size ? ` (${selected.size})` : ''}</button>
+          <button onClick={runNow} disabled={running} className="via-btn via-btn-secondary !text-xs disabled:opacity-40">{running ? 'Working…' : 'Run now'}</button>
+        </div>
+      </div>
+      {error && <div className="rounded-lg p-3 text-xs mb-3" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>{error}</div>}
+      {loading && <div className="text-xs py-3" style={{ color: 'var(--muted)' }}>Loading latest scan…</div>}
+      {!loading && !scan && !error && <div className="text-xs py-3" style={{ color: 'var(--muted)' }}>No completed scan yet. Use Run now, or wait for the scheduled scan.</div>}
+      {scan && scan.groups.length === 0 && <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>✓ No unreviewed duplicate customers in the latest scan.</div>}
+      {scan && scan.groups.length > 0 && (
+        <div className="space-y-2">
+          {scan.groups.map(group => (
+            <label key={group.key} className="flex items-start gap-3 rounded-lg p-3 cursor-pointer" style={{ border: '1px solid var(--border)', background: selected.has(group.key) ? 'var(--surface-2)' : 'transparent' }}>
+              <input type="checkbox" className="mt-0.5" checked={selected.has(group.key)} onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(group.key); else next.delete(group.key); return next; })} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium" style={{ color: 'var(--text)' }}>{group.customers.map(customer => customer.company_name || customer.contact_name || '(unnamed)').join(' ↔ ')}</span>
+                <span className="block text-[11px] mt-1" style={{ color: 'var(--muted)' }}>{group.reasons.join(' · ')}</span>
+              </span>
+            </label>
+          ))}
+          <div className="text-[11px]" style={{ color: 'var(--muted)' }}>Ignoring only hides a confirmed false positive from future checks. It does not change or delete Zoho customer data.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PurchaseGapAlert() {
   const [gaps, setGaps] = useState<PurchaseGapSO[] | null>(null);
 
@@ -174,16 +271,35 @@ function PurchaseGapAlert() {
   );
 }
 
-function CategorySection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
+function AutomatedTaskGroup<T>({
+  taskKey, label, days, expanded, toggle, getItems, renderItem,
+}: {
+  taskKey: string; label: string; days: DailyBriefDay[]; expanded: Set<string>; toggle: (key: string) => void;
+  getItems: (day: DailyBriefDay) => T[]; renderItem: (item: T) => React.ReactNode;
+}) {
+  const count = days.reduce((sum, day) => sum + getItems(day).length, 0);
   if (count === 0) return null;
+  const isOpen = expanded.has(taskKey);
   return (
-    <div>
-      <div className="px-3 pt-2.5 pb-1 text-[var(--text-4)] text-xs uppercase tracking-wider" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-        {label} ({count})
-      </div>
-      <div className="divide-y">
-        {children}
-      </div>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+      <button onClick={() => toggle(taskKey)} className="w-full flex items-center justify-between px-3 py-2" style={{ background: 'var(--surface-2)' }}>
+        <span className="text-[var(--text)] text-xs font-medium">{label}</span>
+        <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{count} action{count === 1 ? '' : 's'} {isOpen ? '▲' : '▼'}</span>
+      </button>
+      {isOpen && (
+        <div style={{ borderTop: '1px solid var(--border)' }}>
+          {days.map(day => {
+            const items = getItems(day);
+            if (items.length === 0) return null;
+            return (
+              <div key={`${taskKey}-${day.date}`}>
+                <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-4)', background: 'var(--surface-1)', borderBottom: '1px solid var(--border-muted)' }}>{day.label}</div>
+                <div className="divide-y">{items.map((item, index) => <div key={index}>{renderItem(item)}</div>)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -204,7 +320,7 @@ function DailyBriefPanel() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load');
       setDays(json.days || []);
-      setExpanded(prev => (prev.size ? prev : new Set((json.days || []).slice(0, 1).map((d: DailyBriefDay) => d.date))));
+      setExpanded(prev => (prev.size ? prev : new Set(['customer-repair'])));
     } catch (err) {
       setError(String(err));
     } finally {
@@ -230,10 +346,10 @@ function DailyBriefPanel() {
     }
   }
 
-  function toggle(date: string) {
+  function toggle(key: string) {
     setExpanded(prev => {
       const next = new Set(prev);
-      if (next.has(date)) next.delete(date); else next.add(date);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }
@@ -242,7 +358,8 @@ function DailyBriefPanel() {
     <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, marginBottom: 20 }}>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-[var(--text)] font-semibold text-sm">Daily Automated Tasks</h2>
+          <h2 className="text-[var(--text)] font-semibold text-sm">Automated Task Activity</h2>
+          <div className="text-[var(--muted)] text-xs mt-1">Grouped by task · activity from the last 14 days</div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={runSalespersonSync} disabled={syncing}
@@ -276,24 +393,7 @@ function DailyBriefPanel() {
 
       {!error && days && days.length > 0 && (
         <div className="space-y-2">
-          {days.map(day => {
-            const isOpen = expanded.has(day.date);
-            return (
-              <div key={day.date} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                <button
-                  onClick={() => toggle(day.date)}
-                  className="w-full flex items-center justify-between px-3 py-2"
-                  style={{ background: 'var(--surface-2)' }}
-                >
-                  <span className="text-[var(--text)] text-xs font-medium">{day.label}</span>
-                  <span className="text-[var(--muted)] text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                    {day.customers.length} {day.customers.length === 1 ? 'customer' : 'customers'} · {day.invoices.length} {day.invoices.length === 1 ? 'invoice' : 'invoices'} · {day.sentInvoices.length} sent · {day.priceListItems.length} priced · {day.salespersonAssignments.length} salesperson · {day.soApprovals.length} SO · {day.poApprovals.length} PO {isOpen ? '▲' : '▼'}
-                  </span>
-                </button>
-                {isOpen && (
-                  <div className="divide-y" style={{ borderTop: '1px solid var(--border)' }}>
-                    <CategorySection label="Customer Data Fixes" count={day.customers.length}>
-                      {day.customers.map(c => (
+          <AutomatedTaskGroup taskKey="customer-repair" label="Customer Data Repairs" days={days} expanded={expanded} toggle={toggle} getItems={day => day.customers} renderItem={c => (
                         <div key={c.contact_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{c.contact_name || '(unnamed)'}</div>
                           <div className="text-[var(--muted)] text-xs mt-1 space-y-0.5">
@@ -304,11 +404,8 @@ function DailyBriefPanel() {
                             ))}
                           </div>
                         </div>
-                      ))}
-                    </CategorySection>
-
-                    <CategorySection label="Shipments Converted to Invoice" count={day.invoices.length}>
-                      {day.invoices.map(inv => (
+          )} />
+          <AutomatedTaskGroup taskKey="shipment-invoice" label="Shipments Converted to Invoice" days={days} expanded={expanded} toggle={toggle} getItems={day => day.invoices} renderItem={inv => (
                         <div key={inv.salesorder_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{inv.customer_name || '(unnamed)'}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
@@ -316,33 +413,24 @@ function DailyBriefPanel() {
                             {inv.invoice_number && <> — <span style={{ color: 'var(--success)', fontFamily: 'JetBrains Mono, monospace' }}>{inv.invoice_number}</span></>}
                           </div>
                         </div>
-                      ))}
-                    </CategorySection>
-
-                    <CategorySection label="Invoices Marked as Sent" count={day.sentInvoices.length}>
-                      {day.sentInvoices.map(inv => (
+          )} />
+          <AutomatedTaskGroup taskKey="invoice-sent" label="Invoices Marked as Sent" days={days} expanded={expanded} toggle={toggle} getItems={day => day.sentInvoices} renderItem={inv => (
                         <div key={inv.invoice_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{inv.customer_name || '(unnamed)'}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
                             Invoice <span style={{ color: 'var(--success)', fontFamily: 'JetBrains Mono, monospace' }}>{inv.invoice_number}</span> marked as sent
                           </div>
                         </div>
-                      ))}
-                    </CategorySection>
-
-                    <CategorySection label="Price List Additions" count={day.priceListItems.length}>
-                      {day.priceListItems.map(item => (
+          )} />
+          <AutomatedTaskGroup taskKey="price-list" label="Price List Additions" days={days} expanded={expanded} toggle={toggle} getItems={day => day.priceListItems} renderItem={item => (
                         <div key={item.item_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{item.item_name}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
                             Added to Price Lists — <span style={{ color: 'var(--success)' }}>{item.tiers.join(', ')}</span>
                           </div>
                         </div>
-                      ))}
-                    </CategorySection>
-
-                    <CategorySection label="Salesperson Auto-Assigned" count={day.salespersonAssignments.length}>
-                      {day.salespersonAssignments.map(s => (
+          )} />
+          <AutomatedTaskGroup taskKey="salesperson" label="Salesperson Auto-Assignments" days={days} expanded={expanded} toggle={toggle} getItems={day => day.salespersonAssignments} renderItem={s => (
                         <div key={s.document_type + s.document_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{s.customer_name || '(unnamed)'}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
@@ -350,22 +438,16 @@ function DailyBriefPanel() {
                             <span style={{ color: 'var(--success)' }}>{s.salesperson_name}</span>
                           </div>
                         </div>
-                      ))}
-                    </CategorySection>
-
-                    <CategorySection label="Sales Orders Approved" count={day.soApprovals.length}>
-                      {day.soApprovals.map(a => (
+          )} />
+          <AutomatedTaskGroup taskKey="so-approval" label="Sales Orders Approved" days={days} expanded={expanded} toggle={toggle} getItems={day => day.soApprovals} renderItem={a => (
                         <div key={a.salesorder_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{a.customer_name || '(unnamed)'}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
                             <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{a.salesorder_number}</span> — {a.item_count} item{a.item_count === 1 ? '' : 's'}, {formatRp(a.total)} — approved by {a.approved_by}
                           </div>
                         </div>
-                      ))}
-                    </CategorySection>
-
-                    <CategorySection label="Purchase Orders Approved" count={day.poApprovals.length}>
-                      {day.poApprovals.map(a => (
+          )} />
+          <AutomatedTaskGroup taskKey="po-approval" label="Purchase Orders Approved" days={days} expanded={expanded} toggle={toggle} getItems={day => day.poApprovals} renderItem={a => (
                         <div key={a.purchaseorder_id} className="px-3 py-2">
                           <div className="text-[var(--text)] text-xs font-medium">{a.vendor_name || '(unnamed)'}</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
@@ -386,13 +468,7 @@ function DailyBriefPanel() {
                             <div className="text-[var(--muted)] text-xs mt-1">Fully matched to confirmed Sales Order demand.</div>
                           )}
                         </div>
-                      ))}
-                    </CategorySection>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          )} />
         </div>
       )}
     </div>
@@ -458,6 +534,7 @@ export default function DashboardPage() {
 
         <PurchaseGapAlert />
         <ShipmentAgingAlert />
+        <DuplicateCustomerReview />
         <AutomationHealthPanel />
         <DailyBriefPanel />
       </div>
