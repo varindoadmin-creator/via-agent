@@ -789,9 +789,18 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return items.filter(i =>
-      !q || i.salesorder_number.toLowerCase().includes(q) || i.customer_name.toLowerCase().includes(q)
-    );
+    return items
+      .filter(i =>
+        !q || i.salesorder_number.toLowerCase().includes(q) || i.customer_name.toLowerCase().includes(q)
+      )
+      // Oldest confirmed orders require attention first. Fall back to the SO
+      // date when Zoho does not return a confirmed date, matching the Aging
+      // badge displayed in the table.
+      .sort((a, b) => {
+        const aDate = Date.parse(a.confirmed_date || a.date || '') || Number.MAX_SAFE_INTEGER;
+        const bDate = Date.parse(b.confirmed_date || b.date || '') || Number.MAX_SAFE_INTEGER;
+        return aDate - bDate || a.salesorder_number.localeCompare(b.salesorder_number);
+      });
   }, [items, search]);
 
   return (
@@ -808,7 +817,7 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
               <th>SO Number</th>
               <th>Customer</th>
               <th>SO Date</th>
-              <th className="text-right">Aging</th>
+              <th className="text-right">Aging ↓</th>
               <th>Status</th>
               <th className="text-right">Qty</th>
               <th className="text-right">Packed</th>

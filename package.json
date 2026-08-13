@@ -17,6 +17,7 @@
     "test:customer-duplicate-ignore": "node --experimental-strip-types --test lib/customerDuplicates/ignoreStore.test.ts",
     "test:customer-duplicate-merge": "node --experimental-strip-types --test lib/customerDuplicates/mergeRequest.test.ts",
     "test:customer-duplicate-detection": "node --experimental-strip-types --test lib/customerCleanup/duplicates.test.ts",
+    "test:customer-cleanup": "node --experimental-strip-types --test lib/customerCleanup/rules.test.ts",
     "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
     "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts"
   },

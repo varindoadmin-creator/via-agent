@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
 import { fetchWithRetry } from '@/lib/zoho/retry';
 import { computeCustomerFix, RawContact } from '@/lib/customerCleanup/rules';
-import { getFixedContactIds, logCustomerFixed } from '@/lib/customerCleanup/supabaseLog';
+import { logCustomerFixed } from '@/lib/customerCleanup/supabaseLog';
 
 async function zohoGet(path: string) {
   const token = await getZohoAccessToken();
@@ -76,13 +76,12 @@ async function fetchDetailBatch(ids: string[]): Promise<RawContact[]> {
 
 export async function GET() {
   try {
-    const [allCustomers, fixedIds] = await Promise.all([
-      fetchAllCustomerIds(),
-      getFixedContactIds(),
-    ]);
-
-    const unfixed = allCustomers.filter((c) => !fixedIds.has(c.contact_id));
-    const details = await fetchDetailBatch(unfixed.map((c) => c.contact_id));
+    // Re-scan every customer. A contact that passed an earlier cleanup may
+    // need a rule introduced later (such as correcting ". PT" to ", PT").
+    // computeCustomerFix only returns current differences, so already-clean
+    // customers remain absent from the review list.
+    const allCustomers = await fetchAllCustomerIds();
+    const details = await fetchDetailBatch(allCustomers.map((c) => c.contact_id));
 
     const results = details
       .map((contact) => {
@@ -99,8 +98,8 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       total_customers: allCustomers.length,
-      already_fixed: fixedIds.size,
-      scanned: unfixed.length,
+      already_fixed: 0,
+      scanned: allCustomers.length,
       needs_attention: results.length,
       customers: results,
     });

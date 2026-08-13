@@ -145,11 +145,13 @@ export function formatBusinessName(raw: string): string {
     }
   }
 
-  // Already in "..., SUFFIX" form? Just fix casing/spacing, keep order.
-  const suffixAtEnd = name.match(/,\s*([A-Za-z.]+)\s*$/);
-  if (suffixAtEnd && LEGAL_SUFFIXES.includes(suffixAtEnd[1].toUpperCase().replace('.', ''))) {
-    const rest = normalizeSpaces(name.slice(0, name.lastIndexOf(',')));
-    const suf = suffixAtEnd[1].toUpperCase().replace('.', '');
+  // Legal suffix already at the end. Admins sometimes type a period where
+  // Varindo's naming convention requires a comma ("LOGAM MAS. PT"). Accept
+  // either separator and normalize it to "LOGAM MAS, PT".
+  const suffixAtEnd = name.match(/\s*([,.])\s*([A-Za-z.]+)\s*$/);
+  if (suffixAtEnd && LEGAL_SUFFIXES.includes(suffixAtEnd[2].toUpperCase().replaceAll('.', ''))) {
+    const rest = normalizeSpaces(name.slice(0, suffixAtEnd.index));
+    const suf = suffixAtEnd[2].toUpperCase().replaceAll('.', '');
     return `${rest.toUpperCase()}, ${suf}`;
   }
 
