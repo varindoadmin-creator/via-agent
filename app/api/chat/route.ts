@@ -115,7 +115,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>
       : null;
     const isCreateRevision = Boolean(
       pendingCreatePreview &&
-      /\b(?:revise|change|replace|make it|instead|correct|quantity|size|standard|jumbo|sheet|sht)\b/i.test(trimmedMessage)
+      /\b(?:revise|change|replace|make it|instead|correct|quantity|size|standard|jumbo|sheet|sht|revisi|ubah|ganti|koreksi|jumlah|ukuran|standar|lembar)\b/i.test(trimmedMessage)
     );
     const extractionMessage = isCreateRevision && pendingCreatePreview
       ? [

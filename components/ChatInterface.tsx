@@ -451,6 +451,8 @@ export default function ChatInterface() {
           isLoading={isLoading}
           disabled={!activeConversationId}
           pendingAction={pendingAction?.type || null}
+          voiceReplies={voiceReplies}
+          onToggleVoiceReplies={toggleVoiceReplies}
         />
       </div>
     </div>

@@ -24,7 +24,7 @@ test('keeps revision instructions as natural language', () => {
 test('supports Bahasa wake and approval phrases', () => {
   assert.equal(
     normalizeVoiceCommand('Halo VIA, buat Sales Order untuk Profitto'),
-    'buat Sales Order untuk Profitto'
+    'Create Sales Order for Profitto'
   );
   assert.equal(normalizeVoiceCommand('OK, buat', 'create_so'), 'APPROVE CREATE SO');
 });
@@ -36,6 +36,17 @@ test('accepts Varindo as an alternative wake name', () => {
   );
   assert.equal(
     normalizeVoiceCommand('Halo Varindo, buat Sales Order untuk Profitto'),
-    'buat Sales Order untuk Profitto'
+    'Create Sales Order for Profitto'
+  );
+});
+
+test('normalizes a Bahasa Sales Order request for reliable intent detection', () => {
+  assert.equal(
+    normalizeVoiceCommand('Halo VIA, buat Sales Order untuk Profitto, DXO 5338D ukuran standar 10 lembar'),
+    'Create Sales Order for Profitto, DXO 5338D standard size 10 sheets'
+  );
+  assert.equal(
+    normalizeVoiceCommand('Hello Varindo, tolong buatkan SO untuk Profitto, DXO 5338D ukuran jumbo 5 lembar'),
+    'Create Sales Order for Profitto, DXO 5338D jumbo size 5 sheets'
   );
 });

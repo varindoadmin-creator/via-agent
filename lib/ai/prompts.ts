@@ -215,6 +215,10 @@ export const SYSTEM_PROMPT_ORDER_EXTRACTION = `You are an order extraction AI fo
 
 Extract structured order information from the given text and return ONLY a valid JSON object.
 
+The user may speak or type in English, Bahasa Indonesia, or a mixture of both.
+Understand Indonesian requests such as "buat Sales Order untuk", "cek stok",
+"cari customer", "ubah jumlah", and Indonesian quantity words such as "lembar".
+
 ## Rules
 1. Extract customer name, item codes, quantities, and any prices mentioned
 2. Normalize item codes: uppercase, remove extra spaces — but ALWAYS keep the full code including the letter prefix.

@@ -35,5 +35,14 @@ export function normalizeVoiceCommand(
     return 'APPROVE UPDATE SO';
   }
 
-  return withoutWakeWord;
+  // Normalize common Bahasa commands into the English phrasing used by the
+  // order-intent pipeline. Customer names and item descriptions stay intact.
+  return withoutWakeWord
+    .replace(/^\s*(?:tolong\s+)?buat(?:kan)?\s+(?:sebuah\s+)?(?:sales\s*order|so)\s+(?:untuk|buat)\s+/i, 'Create Sales Order for ')
+    .replace(/^\s*(?:tolong\s+)?buat(?:kan)?\s+(?:sebuah\s+)?(?:sales\s*order|so)\s+/i, 'Create Sales Order ')
+    .replace(/\b(?:lembar|sheet|sheets)\b/gi, 'sheets')
+    .replace(/\bukuran\s+standar\b/gi, 'standard size')
+    .replace(/\bukuran\s+jumbo\b/gi, 'jumbo size')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, Paperclip, X, Loader2, Image, FileText, Mic, MicOff } from 'lucide-react';
+import { Send, Paperclip, X, Loader2, Image, FileText, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { Attachment } from '@/types/chat';
 import { normalizeVoiceCommand, type VoicePendingAction } from '@/lib/ai/voiceCommands';
 
@@ -44,6 +44,8 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   pendingAction?: VoicePendingAction;
+  voiceReplies?: boolean;
+  onToggleVoiceReplies?: () => void;
 }
 
 const QUICK_COMMANDS = [
@@ -60,6 +62,8 @@ export default function ChatInput({
   disabled = false,
   placeholder = 'Type a message, paste an order, or upload a file...',
   pendingAction = null,
+  voiceReplies = false,
+  onToggleVoiceReplies,
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -73,6 +77,7 @@ export default function ChatInput({
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceBaseMessageRef = useRef('');
   const finalTranscriptRef = useRef('');
+  const latestTranscriptRef = useRef('');
   const voiceSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -170,12 +175,13 @@ export default function ChatInput({
     setVoiceError(null);
     voiceBaseMessageRef.current = message.trim();
     finalTranscriptRef.current = '';
+    latestTranscriptRef.current = '';
     voiceSubmittedRef.current = false;
 
     const recognition = new Recognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = 'en-ID';
+    recognition.lang = 'id-ID';
 
     recognition.onresult = (event) => {
       let interim = '';
@@ -186,6 +192,7 @@ export default function ChatInput({
       }
 
       const spoken = `${finalTranscriptRef.current}${interim}`.trim();
+      latestTranscriptRef.current = spoken;
       const prefix = voiceBaseMessageRef.current;
       setMessage([prefix, spoken].filter(Boolean).join(prefix && spoken ? ' ' : ''));
     };
@@ -203,7 +210,10 @@ export default function ChatInput({
     recognition.onend = () => {
       setIsListening(false);
       recognitionRef.current = null;
-      const command = normalizeVoiceCommand(finalTranscriptRef.current, pendingAction);
+      const command = normalizeVoiceCommand(
+        finalTranscriptRef.current.trim() || latestTranscriptRef.current,
+        pendingAction
+      );
       if (command && !voiceSubmittedRef.current) {
         voiceSubmittedRef.current = true;
         setMessage('');
@@ -359,6 +369,23 @@ export default function ChatInput({
         {isListening
           ? 'Listening… speak naturally, then pause; VIA will submit the transcript'
           : 'Press Enter to send • Shift+Enter for new line • Say “Hello VIA…” or “Hello Varindo…” after tapping the microphone'}
+      </div>
+      <div className="mt-2 flex justify-center">
+        <button
+          type="button"
+          onClick={onToggleVoiceReplies}
+          disabled={!onToggleVoiceReplies}
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            voiceReplies
+              ? 'border-[var(--accent-border)] bg-[var(--accent-light)] text-[var(--accent)]'
+              : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-3)]'
+          } disabled:opacity-40`}
+          aria-pressed={voiceReplies}
+          aria-label={`Voice replies ${voiceReplies ? 'on' : 'off'}. Click to turn ${voiceReplies ? 'off' : 'on'}.`}
+        >
+          {voiceReplies ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          Voice replies: {voiceReplies ? 'ON' : 'OFF'}
+        </button>
       </div>
     </div>
   );
