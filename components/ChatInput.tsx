@@ -48,14 +48,6 @@ interface ChatInputProps {
   onToggleVoiceReplies?: () => void;
 }
 
-const QUICK_COMMANDS = [
-  { label: 'Create SO', text: 'I want to create a sales order for ' },
-  { label: 'Check SO vs Stock', text: 'Check SO-' },
-  { label: 'Price Check', text: 'What is the price of ' },
-  { label: 'Find Customer', text: 'Find customer ' },
-  { label: 'Search Item', text: 'Search for item ' },
-];
-
 export default function ChatInput({
   onSend,
   isLoading,
@@ -159,11 +151,6 @@ export default function ChatInput({
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleQuickCommand = (text: string) => {
-    setMessage(text);
-    textareaRef.current?.focus();
-  };
-
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
   }, []);
@@ -243,20 +230,6 @@ export default function ChatInput({
 
   return (
     <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
-      {/* Quick commands */}
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {QUICK_COMMANDS.map((cmd) => (
-          <button
-            key={cmd.label}
-            onClick={() => handleQuickCommand(cmd.text)}
-            disabled={isLoading || disabled}
-            className="px-2.5 py-1 rounded-full text-xs bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-3)] hover:border-[var(--border)] hover:text-[var(--text-3)] transition-colors disabled:opacity-40"
-          >
-            {cmd.label}
-          </button>
-        ))}
-      </div>
-
       {/* Attachment previews */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
