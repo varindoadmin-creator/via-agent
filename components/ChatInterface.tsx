@@ -25,27 +25,7 @@ const WELCOME_MESSAGE: ChatMessageType = {
   id: 'welcome',
   role: 'assistant',
   type: 'text',
-  content: `## Welcome to VIA — Varindo Intelligence Agent
-
-I'm your internal AI assistant connected to Zoho Books. I can help you with:
-
-- **Order Processing** — Parse customer orders from text, images, or PDFs
-- **Customer Search** — Find customers in Zoho Books
-- **Item & Price Check** — Get official prices from Zoho
-- **Sales Order Preview** — Review before creating
-- **Create/Update SO** — With exact approval commands
-- **SO vs Stock/PO Check** — Analyze confirmed SO items
-- **Voice Commands** — Tap the microphone, speak an order, review the transcript, then send
-
-**Quick examples:**
-- "I want to create an SO for PT Profitto - DXO 5338D, 50 sht"
-- Voice: "Hello VIA" or "Hello Varindo, create a Sales Order for Profitto, DXO 5338D, 5 sheets"
-- "What is the price of WY 5217?"
-- "Check SO-00001 against stock and PO"
-- "Find customer Maju Bersama"
-
-> ⚠️ All Sales Order actions require exact approval commands.
-> Creating: \`APPROVE CREATE SO\` | Updating: \`APPROVE UPDATE SO\``,
+  content: 'Hello, sir. What can I do for you today?',
   timestamp: new Date(),
 };
 
@@ -62,14 +42,23 @@ export default function ChatInterface() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const voiceRepliesRef = useRef(false);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceAudioUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setVoiceReplies(window.localStorage.getItem('via-voice-replies') === 'true');
-    return () => window.speechSynthesis?.cancel();
+    const enabled = window.localStorage.getItem('via-voice-replies') === 'true';
+    voiceRepliesRef.current = enabled;
+    setVoiceReplies(enabled);
+    return () => {
+      window.speechSynthesis?.cancel();
+      voiceAudioRef.current?.pause();
+      if (voiceAudioUrlRef.current) URL.revokeObjectURL(voiceAudioUrlRef.current);
+    };
   }, []);
 
-  const speakReply = useCallback((content: string) => {
-    if (!voiceReplies || !('speechSynthesis' in window)) return;
+  const speakWithBrowserFallback = useCallback((content: string) => {
+    if (!('speechSynthesis' in window)) return;
     const spokenText = textForSpeech(content);
     if (!spokenText) return;
 
@@ -85,13 +74,58 @@ export default function ChatInterface() {
     utterance.pitch = 1.05;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
-  }, [voiceReplies]);
+  }, []);
+
+  const speakReply = useCallback(async (content: string) => {
+    if (!voiceRepliesRef.current) return;
+    const spokenText = textForSpeech(content);
+    if (!spokenText) return;
+
+    window.speechSynthesis?.cancel();
+    voiceAudioRef.current?.pause();
+    if (voiceAudioUrlRef.current) {
+      URL.revokeObjectURL(voiceAudioUrlRef.current);
+      voiceAudioUrlRef.current = null;
+    }
+
+    try {
+      const response = await fetch('/api/voice/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: spokenText }),
+      });
+      if (!response.ok) throw new Error('Natural voice unavailable');
+      const blob = await response.blob();
+      if (!voiceRepliesRef.current) return;
+
+      const url = URL.createObjectURL(blob);
+      voiceAudioUrlRef.current = url;
+      const audio = new Audio(url);
+      voiceAudioRef.current = audio;
+      const release = () => {
+        if (voiceAudioUrlRef.current === url) {
+          URL.revokeObjectURL(url);
+          voiceAudioUrlRef.current = null;
+          voiceAudioRef.current = null;
+        }
+      };
+      audio.addEventListener('ended', release, { once: true });
+      audio.addEventListener('error', release, { once: true });
+      await audio.play();
+    } catch {
+      if (voiceRepliesRef.current) speakWithBrowserFallback(spokenText);
+    }
+  }, [speakWithBrowserFallback]);
 
   const toggleVoiceReplies = useCallback(() => {
     setVoiceReplies((current) => {
       const next = !current;
+      voiceRepliesRef.current = next;
       window.localStorage.setItem('via-voice-replies', String(next));
-      if (!next) window.speechSynthesis?.cancel();
+      if (!next) {
+        window.speechSynthesis?.cancel();
+        voiceAudioRef.current?.pause();
+      }
       return next;
     });
   }, []);
@@ -365,7 +399,7 @@ export default function ChatInterface() {
               aria-pressed={voiceReplies}
             >
               {voiceReplies ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-              <span>{voiceReplies ? 'Voice on' : 'Voice off'}</span>
+              <span>{voiceReplies ? 'Natural voice on' : 'Voice off'}</span>
             </button>
 
             {/* Debug toggle */}

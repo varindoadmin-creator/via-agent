@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { aiCompletion } from '@/lib/ai/provider';
 import { extractOrder } from '@/lib/ai/orderExtraction';
 import { SYSTEM_PROMPT_MAIN } from '@/lib/ai/prompts';
+import { getGreetingReply } from '@/lib/ai/greetings';
 import {
   searchCustomers,
   scoreCustomerMatch,
@@ -42,6 +43,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>
     }
 
     const trimmedMessage = (message || '').trim();
+
+    const greetingReply = getGreetingReply(trimmedMessage);
+    if (greetingReply && !attachments?.length) {
+      return NextResponse.json({
+        message: greetingReply,
+        type: 'text',
+        metadata: { intent: 'general_question', warnings: [] },
+      });
+    }
 
     // ─── Check for Approval Commands ─────────────────────────────────────────
 

@@ -381,12 +381,17 @@ export default function ChatInput({
               : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-3)]'
           } disabled:opacity-40`}
           aria-pressed={voiceReplies}
-          aria-label={`Voice replies ${voiceReplies ? 'on' : 'off'}. Click to turn ${voiceReplies ? 'off' : 'on'}.`}
+          aria-label={`Natural voice replies ${voiceReplies ? 'on' : 'off'}. Click to turn ${voiceReplies ? 'off' : 'on'}.`}
         >
           {voiceReplies ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-          Voice replies: {voiceReplies ? 'ON' : 'OFF'}
+          Natural voice replies: {voiceReplies ? 'ON' : 'OFF'}
         </button>
       </div>
+      {voiceReplies && (
+        <div className="mt-1 text-center text-[10px] text-[var(--text-4)]">
+          AI-generated voice · Bahasa and English pronunciation
+        </div>
+      )}
     </div>
   );
 }

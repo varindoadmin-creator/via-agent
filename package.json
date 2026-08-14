@@ -21,6 +21,8 @@
     "test:google-ads": "node --experimental-strip-types --test lib/googleAds/report.test.ts",
     "test:voice-commands": "node --experimental-strip-types --test lib/ai/voiceCommands.test.ts",
     "test:speech": "node --experimental-strip-types --test lib/ai/speech.test.ts",
+    "test:openai-speech": "node --experimental-strip-types --test lib/ai/openaiSpeech.test.ts",
+    "test:greetings": "node --experimental-strip-types --test lib/ai/greetings.test.ts",
     "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
     "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts"
   },
