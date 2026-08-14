@@ -1,3 +1,5 @@
+import { normalizeSpokenItemCodes } from './phoneticMatching.ts';
+
 export type VoicePendingAction = 'create_so' | 'update_so' | null;
 
 /**
@@ -37,12 +39,12 @@ export function normalizeVoiceCommand(
 
   // Normalize common Bahasa commands into the English phrasing used by the
   // order-intent pipeline. Customer names and item descriptions stay intact.
-  return withoutWakeWord
+  return normalizeSpokenItemCodes(withoutWakeWord
     .replace(/^\s*(?:tolong\s+)?buat(?:kan)?\s+(?:sebuah\s+)?(?:sales\s*order|so)\s+(?:untuk|buat)\s+/i, 'Create Sales Order for ')
     .replace(/^\s*(?:tolong\s+)?buat(?:kan)?\s+(?:sebuah\s+)?(?:sales\s*order|so)\s+/i, 'Create Sales Order ')
     .replace(/\b(?:lembar|sheet|sheets)\b/gi, 'sheets')
     .replace(/\bukuran\s+standar\b/gi, 'standard size')
     .replace(/\bukuran\s+jumbo\b/gi, 'jumbo size')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim());
 }

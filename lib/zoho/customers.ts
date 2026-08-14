@@ -2,6 +2,7 @@
 
 import { ZohoContact, ZohoContactListResponse } from '@/types/zoho';
 import { zohoRequest, isMockMode } from './client';
+import { fuzzyNameSimilarity } from '@/lib/ai/phoneticMatching';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -218,5 +219,8 @@ export function scoreCustomerMatch(customerName: string, query: string): number 
   // Boost if the name starts with the query
   const boost = nameUpper.startsWith(queryUpper) ? 0.1 : 0;
 
-  return Math.min(1, wordScore + boost);
+  const fuzzyScore = fuzzyNameSimilarity(customerName, query);
+  // Fuzzy matches are intentionally capped below exact/substring matches so
+  // a speech prediction is visible for confirmation, never silently certain.
+  return Math.max(Math.min(1, wordScore + boost), Math.min(0.84, fuzzyScore * 0.9));
 }
