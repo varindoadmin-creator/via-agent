@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { normalizeVoiceCommand } from './voiceCommands.ts';
+
+test('removes the VIA wake phrase from a spoken order', () => {
+  assert.equal(
+    normalizeVoiceCommand('Hello VIA. Create SO for Profitto, DXO 5338D standard size, 10 sheets'),
+    'Create SO for Profitto, DXO 5338D standard size, 10 sheets'
+  );
+});
+
+test('maps OK create only when a create preview is pending', () => {
+  assert.equal(normalizeVoiceCommand('OK, create', 'create_so'), 'APPROVE CREATE SO');
+  assert.equal(normalizeVoiceCommand('OK, create', null), 'OK, create');
+});
+
+test('keeps revision instructions as natural language', () => {
+  assert.equal(
+    normalizeVoiceCommand('Hello VIA, revise the quantity to 5 sheets', 'create_so'),
+    'revise the quantity to 5 sheets'
+  );
+});

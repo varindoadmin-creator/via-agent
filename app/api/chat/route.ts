@@ -110,7 +110,24 @@ export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>
 
     // ─── Extract Order Intent ─────────────────────────────────────────────────
 
-    const extraction = await extractOrder(trimmedMessage, attachmentText || undefined);
+    const pendingCreatePreview = pendingAction?.type === 'create_so'
+      ? pendingAction.data as SOPreview
+      : null;
+    const isCreateRevision = Boolean(
+      pendingCreatePreview &&
+      /\b(?:revise|change|replace|make it|instead|correct|quantity|size|standard|jumbo|sheet|sht)\b/i.test(trimmedMessage)
+    );
+    const extractionMessage = isCreateRevision && pendingCreatePreview
+      ? [
+          'Revise the pending Sales Order preview using the correction below.',
+          `Customer: ${pendingCreatePreview.customer_name}`,
+          `Current items: ${pendingCreatePreview.items.map((item) => `${item.item_code}, ${item.quantity} ${item.unit}`).join('; ')}`,
+          `Correction: ${trimmedMessage}`,
+          'Return the complete corrected order as a create_so intent.',
+        ].join('\n')
+      : trimmedMessage;
+
+    const extraction = await extractOrder(extractionMessage, attachmentText || undefined);
 
     // ─── Route by Intent ──────────────────────────────────────────────────────
 

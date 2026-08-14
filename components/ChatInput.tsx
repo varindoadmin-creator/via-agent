@@ -1,14 +1,49 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { Send, Paperclip, X, Loader2, Image, FileText } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Send, Paperclip, X, Loader2, Image, FileText, Mic, MicOff } from 'lucide-react';
 import { Attachment } from '@/types/chat';
+import { normalizeVoiceCommand, type VoicePendingAction } from '@/lib/ai/voiceCommands';
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+}
+
+interface SpeechRecognitionErrorEventLike extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 interface ChatInputProps {
   onSend: (message: string, attachments: Attachment[]) => void;
   isLoading: boolean;
   disabled?: boolean;
   placeholder?: string;
+  pendingAction?: VoicePendingAction;
 }
 
 const QUICK_COMMANDS = [
@@ -24,19 +59,36 @@ export default function ChatInput({
   isLoading,
   disabled = false,
   placeholder = 'Type a message, paste an order, or upload a file...',
+  pendingAction = null,
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceBaseMessageRef = useRef('');
+  const finalTranscriptRef = useRef('');
+  const voiceSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    setVoiceSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
+    return () => recognitionRef.current?.abort();
+  }, []);
 
   const handleSend = useCallback(() => {
     const trimmed = message.trim();
     if (!trimmed && attachments.length === 0) return;
     if (isLoading || disabled) return;
 
+    if (recognitionRef.current) {
+      voiceSubmittedRef.current = true;
+      recognitionRef.current.stop();
+    }
     onSend(trimmed, attachments);
     setMessage('');
     setAttachments([]);
@@ -107,6 +159,71 @@ export default function ChatInput({
     textareaRef.current?.focus();
   };
 
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+  }, []);
+
+  const startListening = useCallback(() => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition || isLoading || disabled) return;
+
+    setVoiceError(null);
+    voiceBaseMessageRef.current = message.trim();
+    finalTranscriptRef.current = '';
+    voiceSubmittedRef.current = false;
+
+    const recognition = new Recognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-ID';
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const transcript = event.results[i][0]?.transcript || '';
+        if (event.results[i].isFinal) finalTranscriptRef.current += transcript + ' ';
+        else interim += transcript;
+      }
+
+      const spoken = `${finalTranscriptRef.current}${interim}`.trim();
+      const prefix = voiceBaseMessageRef.current;
+      setMessage([prefix, spoken].filter(Boolean).join(prefix && spoken ? ' ' : ''));
+    };
+
+    recognition.onerror = (event) => {
+      const friendlyMessage = event.error === 'not-allowed'
+        ? 'Microphone permission was denied. Allow microphone access in the browser and try again.'
+        : event.error === 'no-speech'
+          ? 'No speech was detected. Please try again.'
+          : `Voice input stopped: ${event.error}.`;
+      setVoiceError(friendlyMessage);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+      const command = normalizeVoiceCommand(finalTranscriptRef.current, pendingAction);
+      if (command && !voiceSubmittedRef.current) {
+        voiceSubmittedRef.current = true;
+        setMessage('');
+        onSend(command, []);
+      } else {
+        window.setTimeout(() => textareaRef.current?.focus(), 0);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setIsListening(false);
+      setVoiceError('Voice input could not start. Please try again.');
+    }
+  }, [disabled, isLoading, message, onSend, pendingAction]);
+
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return <Image className="w-3 h-3" />;
     return <FileText className="w-3 h-3" />;
@@ -158,6 +275,12 @@ export default function ChatInput({
         </div>
       )}
 
+      {voiceError && (
+        <div className="mb-2 px-3 py-2 rounded bg-red-50 border border-red-200 text-xs text-[var(--danger)]">
+          {voiceError}
+        </div>
+      )}
+
       {/* Input row */}
       <div className="flex items-end gap-2">
         {/* File upload button */}
@@ -181,6 +304,23 @@ export default function ChatInput({
             disabled={disabled || isLoading}
           />
         </label>
+
+        {/* Voice input button — transcription is reviewed before sending */}
+        <button
+          type="button"
+          onClick={isListening ? stopListening : startListening}
+          disabled={!voiceSupported || disabled || isLoading}
+          className={`shrink-0 p-2.5 rounded-lg border transition-colors ${
+            isListening
+              ? 'bg-red-50 border-red-300 text-red-600 animate-pulse'
+              : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-3)] hover:border-[var(--accent-border)] hover:text-[var(--accent)]'
+          } disabled:opacity-40 disabled:cursor-not-allowed`}
+          title={voiceSupported ? (isListening ? 'Stop voice input' : 'Start voice input') : 'Voice input is not supported in this browser'}
+          aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+          aria-pressed={isListening}
+        >
+          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+        </button>
 
         {/* Textarea */}
         <div className="flex-1 relative">
@@ -216,7 +356,9 @@ export default function ChatInput({
       </div>
 
       <div className="mt-2 text-xs text-[var(--text-4)] text-center">
-        Press Enter to send • Shift+Enter for new line
+        {isListening
+          ? 'Listening… speak naturally, then pause; VIA will submit the transcript'
+          : 'Press Enter to send • Shift+Enter for new line • Say “Hello VIA…” after tapping the microphone'}
       </div>
     </div>
   );

@@ -34,9 +34,11 @@ I'm your internal AI assistant connected to Zoho Books. I can help you with:
 - **Sales Order Preview** — Review before creating
 - **Create/Update SO** — With exact approval commands
 - **SO vs Stock/PO Check** — Analyze confirmed SO items
+- **Voice Commands** — Tap the microphone, speak an order, review the transcript, then send
 
 **Quick examples:**
 - "I want to create an SO for PT Profitto - DXO 5338D, 50 sht"
+- Voice: "Create a Sales Order for Profitto, DXO 5338D, 5 sheets"
 - "What is the price of WY 5217?"
 - "Check SO-00001 against stock and PO"
 - "Find customer Maju Bersama"
@@ -397,6 +399,7 @@ export default function ChatInterface() {
           onSend={handleSend}
           isLoading={isLoading}
           disabled={!activeConversationId}
+          pendingAction={pendingAction?.type || null}
         />
       </div>
     </div>
