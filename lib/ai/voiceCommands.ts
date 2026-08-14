@@ -10,7 +10,7 @@ export function normalizeVoiceCommand(
 ): string {
   const withoutWakeWord = transcript
     .trim()
-    .replace(/^(?:hello|hey|hi|halo|hai)\s*,?\s*via\s*[,.:;-]?\s*/i, '')
+    .replace(/^(?:hello|hey|hi|halo|hai)\s*,?\s*(?:via|varindo)\s*[,.:;-]?\s*/i, '')
     .trim();
 
   if (!withoutWakeWord) return '';

@@ -358,7 +358,7 @@ export default function ChatInput({
       <div className="mt-2 text-xs text-[var(--text-4)] text-center">
         {isListening
           ? 'Listening… speak naturally, then pause; VIA will submit the transcript'
-          : 'Press Enter to send • Shift+Enter for new line • Say “Hello VIA…” after tapping the microphone'}
+          : 'Press Enter to send • Shift+Enter for new line • Say “Hello VIA…” or “Hello Varindo…” after tapping the microphone'}
       </div>
     </div>
   );

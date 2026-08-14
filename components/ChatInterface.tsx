@@ -39,7 +39,7 @@ I'm your internal AI assistant connected to Zoho Books. I can help you with:
 
 **Quick examples:**
 - "I want to create an SO for PT Profitto - DXO 5338D, 50 sht"
-- Voice: "Create a Sales Order for Profitto, DXO 5338D, 5 sheets"
+- Voice: "Hello VIA" or "Hello Varindo, create a Sales Order for Profitto, DXO 5338D, 5 sheets"
 - "What is the price of WY 5217?"
 - "Check SO-00001 against stock and PO"
 - "Find customer Maju Bersama"

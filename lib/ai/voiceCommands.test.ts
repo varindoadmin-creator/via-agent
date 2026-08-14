@@ -28,3 +28,14 @@ test('supports Bahasa wake and approval phrases', () => {
   );
   assert.equal(normalizeVoiceCommand('OK, buat', 'create_so'), 'APPROVE CREATE SO');
 });
+
+test('accepts Varindo as an alternative wake name', () => {
+  assert.equal(
+    normalizeVoiceCommand('Hello, Varindo. Create SO for Profitto'),
+    'Create SO for Profitto'
+  );
+  assert.equal(
+    normalizeVoiceCommand('Halo Varindo, buat Sales Order untuk Profitto'),
+    'buat Sales Order untuk Profitto'
+  );
+});
