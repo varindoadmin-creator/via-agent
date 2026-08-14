@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bug, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
+import { Bug, RefreshCw, AlertCircle, Sparkles, Volume2, VolumeX } from 'lucide-react';
 
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 
 import { ChatMessage as ChatMessageType, Conversation, Attachment, PendingAction } from '@/types/chat';
 import { SOPreview } from '@/types/order';
+import { choosePreferredVoice, textForSpeech } from '@/lib/ai/speech';
 
 // Simple UUID generator (no external dependency)
 function generateId(): string {
@@ -57,9 +58,43 @@ export default function ChatInterface() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isMockMode, setIsMockMode] = useState(true);
+  const [voiceReplies, setVoiceReplies] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVoiceReplies(window.localStorage.getItem('via-voice-replies') === 'true');
+    return () => window.speechSynthesis?.cancel();
+  }, []);
+
+  const speakReply = useCallback((content: string) => {
+    if (!voiceReplies || !('speechSynthesis' in window)) return;
+    const spokenText = textForSpeech(content);
+    if (!spokenText) return;
+
+    const utterance = new SpeechSynthesisUtterance(spokenText);
+    const preferredVoice = choosePreferredVoice(window.speechSynthesis.getVoices());
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+      utterance.lang = preferredVoice.lang;
+    } else {
+      utterance.lang = 'id-ID';
+    }
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [voiceReplies]);
+
+  const toggleVoiceReplies = useCallback(() => {
+    setVoiceReplies((current) => {
+      const next = !current;
+      window.localStorage.setItem('via-voice-replies', String(next));
+      if (!next) window.speechSynthesis?.cancel();
+      return next;
+    });
+  }, []);
 
   // Detect mock mode
   useEffect(() => {
@@ -199,6 +234,7 @@ export default function ChatInterface() {
           isLoading: false,
           isError: data.type === 'error',
         });
+        if (data.type !== 'error') speakReply(data.message);
 
         // Handle pending action state
         if (data.type === 'so_preview') {
@@ -243,7 +279,7 @@ export default function ChatInterface() {
         setIsLoading(false);
       }
     },
-    [activeConversationId, conversations, pendingAction, addMessage, updateLastMessage]
+    [activeConversationId, conversations, pendingAction, addMessage, updateLastMessage, speakReply]
   );
 
   const handleNewConversation = useCallback(() => {
@@ -317,6 +353,21 @@ export default function ChatInterface() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleVoiceReplies}
+              className={`p-1.5 rounded-md text-xs transition-colors flex items-center gap-1.5 ${
+                voiceReplies
+                  ? 'bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)]'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-3)] hover:bg-[var(--surface-3)]'
+              }`}
+              title={voiceReplies ? 'Turn voice replies off' : 'Turn voice replies on'}
+              aria-label={voiceReplies ? 'Turn voice replies off' : 'Turn voice replies on'}
+              aria-pressed={voiceReplies}
+            >
+              {voiceReplies ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              <span>{voiceReplies ? 'Voice on' : 'Voice off'}</span>
+            </button>
+
             {/* Debug toggle */}
             <button
               onClick={() => setShowDebug(!showDebug)}

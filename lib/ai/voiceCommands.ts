@@ -10,7 +10,7 @@ export function normalizeVoiceCommand(
 ): string {
   const withoutWakeWord = transcript
     .trim()
-    .replace(/^(?:hello|hey|hi)\s*,?\s*via\s*[,.:;-]?\s*/i, '')
+    .replace(/^(?:hello|hey|hi|halo|hai)\s*,?\s*via\s*[,.:;-]?\s*/i, '')
     .trim();
 
   if (!withoutWakeWord) return '';
@@ -23,14 +23,14 @@ export function normalizeVoiceCommand(
 
   if (
     pendingAction === 'create_so' &&
-    /^(?:ok|okay)?\s*(?:please\s+)?(?:create|create it|create so|confirm|go ahead)$/.test(controlPhrase)
+    /^(?:ok|okay)?\s*(?:please|tolong)?\s*(?:create|create it|create so|confirm|go ahead|buat|buatkan|lanjut buat)$/.test(controlPhrase)
   ) {
     return 'APPROVE CREATE SO';
   }
 
   if (
     pendingAction === 'update_so' &&
-    /^(?:ok|okay)?\s*(?:please\s+)?(?:update|update it|update so|confirm|go ahead)$/.test(controlPhrase)
+    /^(?:ok|okay)?\s*(?:please|tolong)?\s*(?:update|update it|update so|confirm|go ahead|ubah|lanjut ubah)$/.test(controlPhrase)
   ) {
     return 'APPROVE UPDATE SO';
   }

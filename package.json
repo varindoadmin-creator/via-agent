@@ -20,6 +20,7 @@
     "test:customer-cleanup": "node --experimental-strip-types --test lib/customerCleanup/rules.test.ts",
     "test:google-ads": "node --experimental-strip-types --test lib/googleAds/report.test.ts",
     "test:voice-commands": "node --experimental-strip-types --test lib/ai/voiceCommands.test.ts",
+    "test:speech": "node --experimental-strip-types --test lib/ai/speech.test.ts",
     "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
     "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts"
   },

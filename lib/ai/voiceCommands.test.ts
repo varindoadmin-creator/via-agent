@@ -20,3 +20,11 @@ test('keeps revision instructions as natural language', () => {
     'revise the quantity to 5 sheets'
   );
 });
+
+test('supports Bahasa wake and approval phrases', () => {
+  assert.equal(
+    normalizeVoiceCommand('Halo VIA, buat Sales Order untuk Profitto'),
+    'buat Sales Order untuk Profitto'
+  );
+  assert.equal(normalizeVoiceCommand('OK, buat', 'create_so'), 'APPROVE CREATE SO');
+});
