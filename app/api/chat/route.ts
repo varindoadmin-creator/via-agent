@@ -6,6 +6,7 @@ import { aiCompletion } from '@/lib/ai/provider';
 import { extractOrder } from '@/lib/ai/orderExtraction';
 import { SYSTEM_PROMPT_MAIN } from '@/lib/ai/prompts';
 import { getGreetingReply } from '@/lib/ai/greetings';
+import { answerFeatureQuestion, detectLiveQuestion, type LiveQuestion } from '@/lib/ai/liveQuestions';
 import {
   searchCustomers,
   scoreCustomerMatch,
@@ -118,6 +119,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>
       }
     }
 
+    // Read-only operational questions must use live VIA/Zoho-backed endpoints,
+    // not the language model's memory. This never creates or changes records.
+    if (!attachments?.length) {
+      const liveQuestion = detectLiveQuestion(trimmedMessage);
+      if (liveQuestion) {
+        const liveAnswer = await handleLiveQuestion(req, liveQuestion);
+        if (liveAnswer) return liveAnswer;
+      }
+    }
+
     // ─── Extract Order Intent ─────────────────────────────────────────────────
 
     const pendingCreatePreview = pendingAction?.type === 'create_so'
@@ -177,6 +188,83 @@ export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>
       },
       { status: 500 }
     );
+  }
+}
+
+function formatLiveRupiah(value: number): string {
+  return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
+}
+
+function jakartaToday(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}
+
+async function fetchViaJson(req: NextRequest, path: string): Promise<Record<string, any>> {
+  const response = await fetch(new URL(path, req.nextUrl.origin), {
+    headers: { cookie: req.headers.get('cookie') || '' },
+    cache: 'no-store',
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) throw new Error(data.error || `VIA returned HTTP ${response.status}`);
+  return data;
+}
+
+async function handleLiveQuestion(req: NextRequest, question: LiveQuestion): Promise<NextResponse<ChatResponse> | null> {
+  if (question.kind === 'feature') {
+    const answer = answerFeatureQuestion(question.query);
+    return answer ? NextResponse.json({ message: answer, type: 'text', metadata: { intent: 'general_question', warnings: [] } }) : null;
+  }
+
+  try {
+    if (question.kind === 'brand_sales') {
+      const data = await fetchViaJson(req, `/api/reports/gross-profit?month=${encodeURIComponent(question.month)}`);
+      const brands = Array.isArray(data.groups?.brand) ? data.groups.brand : [];
+      const hint = question.brandHint.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const row = brands.find((brand: Record<string, unknown>) => String(brand.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes(hint));
+      if (!row) {
+        return NextResponse.json({
+          message: `I checked the live Gross Profit report for **${question.month}**, but could not find brand **${question.brandHint}**. [Open Gross Profit](/reports/gross-profit)`,
+          type: 'text', metadata: { intent: 'general_question', warnings: ['Brand not found in live report'] },
+        });
+      }
+      return NextResponse.json({
+        message: `**${row.name} sales for ${question.month}: ${formatLiveRupiah(Number(row.revenue) || 0)}**\n\nGross profit: ${formatLiveRupiah(Number(row.gross_profit) || 0)} · ${Number(row.invoice_count) || 0} invoices.\n\nSource: live VIA Gross Profit report; all issued invoices, revenue before PPN. Draft and void invoices excluded. [View details](/reports/gross-profit)`,
+        type: 'text', metadata: { intent: 'general_question', warnings: [], zohoData: row },
+      });
+    }
+
+    if (question.kind === 'shipments_out') {
+      const data = await fetchViaJson(req, '/api/shipments?mode=pending');
+      const pending = Array.isArray(data.pending) ? data.pending : [];
+      const today = jakartaToday();
+      const rows = question.todayOnly ? pending.filter((so: Record<string, any>) =>
+        Array.isArray(so.packages) && so.packages.some((pkg: Record<string, unknown>) => String(pkg.shipment_date || pkg.date || '').slice(0, 10) === today)
+      ) : pending;
+      const label = question.todayOnly ? `out for delivery today (${today})` : 'currently pending delivery';
+      const details = rows.slice(0, 8).map((so: Record<string, unknown>) => `- ${so.salesorder_number} — ${so.customer_name}`).join('\n');
+      return NextResponse.json({
+        message: `**${rows.length} shipment${rows.length === 1 ? '' : 's'} ${label}.**${details ? `\n\n${details}` : ''}\n\nSource: live Zoho shipment status through VIA. [Open Shipments](/inventory/shipments)`,
+        type: 'text', metadata: { intent: 'general_question', warnings: [], zohoData: rows },
+      });
+    }
+
+    const data = await fetchViaJson(req, '/api/salesorders/purchase-gap-check');
+    const gaps = Array.isArray(data.gaps) ? data.gaps : [];
+    const details = gaps.slice(0, 10).map((so: Record<string, unknown>) => `- ${so.salesorder_number} — ${so.customer_name} — ${so.sub_status_formatted}`).join('\n');
+    return NextResponse.json({
+      message: gaps.length
+        ? `**Yes — ${gaps.length} Sales Order${gaps.length === 1 ? '' : 's'} confirmed today have not yet been ordered or marked Stock Ready.**\n\n${details}\n\n[Review Purchase Orders](/purchases)`
+        : '**No purchase gaps found today.** Every Sales Order confirmed today is ordered or marked Stock Ready.\n\n[Review Purchase Orders](/purchases)',
+      type: 'text', metadata: { intent: 'general_question', warnings: [], zohoData: gaps },
+    });
+  } catch (error) {
+    const page = question.kind === 'brand_sales' ? '/reports/gross-profit' : question.kind === 'shipments_out' ? '/inventory/shipments' : '/purchases';
+    return NextResponse.json({
+      message: `I recognized this as a live operational question, but VIA could not retrieve the current data: ${error instanceof Error ? error.message : String(error)}. [Open the relevant page](${page})`,
+      type: 'warning', metadata: { intent: 'general_question', warnings: ['Live data unavailable; no estimate was returned'] },
+    });
   }
 }
 
