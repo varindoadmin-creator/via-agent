@@ -4,9 +4,7 @@ import {
   CampaignMetrics,
   GoogleAdsCampaignRow,
   aggregateCampaigns,
-  groupBrandCampaigns,
   normalizeCampaign,
-  parseMatcher,
 } from '@/lib/googleAds/report';
 
 export const dynamic = 'force-dynamic';
@@ -118,47 +116,21 @@ export async function GET(request: NextRequest) {
     const month = request.nextUrl.searchParams.get('month') || fallbackMonth;
     const ranges = monthRanges(month);
     const client = oauthClient();
-    const matchers = {
-      Lamitak: parseMatcher(process.env.GOOGLE_ADS_LAMITAK_MATCH, 'LAMITAK'),
-      EDL: parseMatcher(process.env.GOOGLE_ADS_EDL_MATCH, 'EDL'),
-    };
-    const brandCustomerIds = {
-      Lamitak: process.env.GOOGLE_ADS_LAMITAK_CUSTOMER_ID?.trim(),
-      EDL: process.env.GOOGLE_ADS_EDL_CUSTOMER_ID?.trim(),
-    };
-    const separateAccounts = Boolean(brandCustomerIds.Lamitak && brandCustomerIds.EDL);
-    let brands;
-    let previousBrands;
-    let unmatchedCampaigns: string[] = [];
-
-    if (separateAccounts) {
-      const [lamitak, edl, previousLamitak, previousEdl] = await Promise.all([
-        fetchCampaigns(ranges.current, client, brandCustomerIds.Lamitak!),
-        fetchCampaigns(ranges.current, client, brandCustomerIds.EDL!),
-        fetchCampaigns(ranges.previous, client, brandCustomerIds.Lamitak!),
-        fetchCampaigns(ranges.previous, client, brandCustomerIds.EDL!),
-      ]);
-      brands = [aggregateCampaigns('Lamitak', lamitak), aggregateCampaigns('EDL', edl)];
-      previousBrands = [aggregateCampaigns('Lamitak', previousLamitak), aggregateCampaigns('EDL', previousEdl)];
-    } else {
-      const customerId = required('GOOGLE_ADS_CUSTOMER_ID');
-      const [currentCampaigns, previousCampaigns] = await Promise.all([
-        fetchCampaigns(ranges.current, client, customerId), fetchCampaigns(ranges.previous, client, customerId),
-      ]);
-      brands = groupBrandCampaigns(currentCampaigns, matchers);
-      previousBrands = groupBrandCampaigns(previousCampaigns, matchers);
-      unmatchedCampaigns = currentCampaigns
-        .filter(campaign => !Object.values(matchers).flat().some(term => campaign.name.toLowerCase().includes(term.toLowerCase())))
-        .map(campaign => campaign.name);
-    }
+    const customerId = required('GOOGLE_ADS_CUSTOMER_ID');
+    const [currentCampaigns, previousCampaigns] = await Promise.all([
+      fetchCampaigns(ranges.current, client, customerId),
+      fetchCampaigns(ranges.previous, client, customerId),
+    ]);
+    const brands = [aggregateCampaigns('Varindo Campaign', currentCampaigns)];
+    const previousBrands = [aggregateCampaigns('Varindo Campaign', previousCampaigns)];
     return NextResponse.json({
       success: true,
       month,
       ranges,
-      account_mode: separateAccounts ? 'separate' : 'shared',
+      account_mode: 'shared',
       brands,
       previous_brands: previousBrands,
-      unmatched_campaigns: unmatchedCampaigns,
+      unmatched_campaigns: [],
       generated_at: new Date().toISOString(),
       basis: 'Read-only Google Ads campaign metrics. Current month is month-to-date; previous month is compared through the same day where possible.',
     });
