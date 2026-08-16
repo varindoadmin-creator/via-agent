@@ -49,19 +49,30 @@ function monthRanges(month: string): { current: DateRange; previous: DateRange }
   };
 }
 
-async function accessToken(): Promise<string> {
+function oauthClient(): OAuth2Client {
   const client = new OAuth2Client(required('GOOGLE_ADS_CLIENT_ID'), required('GOOGLE_ADS_CLIENT_SECRET'));
   client.setCredentials({ refresh_token: required('GOOGLE_ADS_REFRESH_TOKEN') });
-  const token = await client.getAccessToken();
-  if (!token.token) throw new Error('Google Ads OAuth did not return an access token');
-  return token.token;
+  return client;
 }
 
-async function fetchCampaigns(range: DateRange, token: string, rawCustomerId: string): Promise<CampaignMetrics[]> {
+type GoogleAdsResponse = Array<{ results?: GoogleAdsCampaignRow[] }>;
+type GoogleAdsErrorBody = { error?: { message?: string; status?: string } };
+
+function googleAdsError(error: unknown, stage: string): Error {
+  if (error instanceof Error && 'response' in error) {
+    const response = (error as Error & { response?: { data?: unknown } }).response;
+    const body = response?.data as GoogleAdsErrorBody | undefined;
+    const apiError = body?.error;
+    return new Error(`${stage}: ${apiError?.message || apiError?.status || error.message}`);
+  }
+  const cause = error instanceof Error && error.cause instanceof Error ? ` (${error.cause.message})` : '';
+  return new Error(`${stage}: ${error instanceof Error ? error.message : String(error)}${cause}`);
+}
+
+async function fetchCampaigns(range: DateRange, client: OAuth2Client, rawCustomerId: string): Promise<CampaignMetrics[]> {
   const version = (process.env.GOOGLE_ADS_API_VERSION || 'v25').replace(/^v?/, 'v');
   const customerId = cleanId(rawCustomerId);
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
     'developer-token': required('GOOGLE_ADS_DEVELOPER_TOKEN'),
   };
@@ -83,16 +94,18 @@ async function fetchCampaigns(range: DateRange, token: string, rawCustomerId: st
       AND campaign.status != 'REMOVED'
     ORDER BY metrics.cost_micros DESC
   `.replace(/\s+/g, ' ').trim();
-  const response = await fetch(`https://googleads.googleapis.com/${version}/customers/${customerId}/googleAds:searchStream`, {
-    method: 'POST', headers, body: JSON.stringify({ query }), cache: 'no-store',
-  });
-  const body = await response.json().catch(() => null) as Array<{ results?: GoogleAdsCampaignRow[] }> | { error?: { message?: string; status?: string } } | null;
-  if (!response.ok) {
-    const apiError = body && !Array.isArray(body) ? body.error : undefined;
-    throw new Error(`Google Ads ${response.status}: ${apiError?.message || apiError?.status || 'request failed'}`);
+  try {
+    const response = await client.request<GoogleAdsResponse>({
+      url: `https://googleads.googleapis.com/${version}/customers/${customerId}/googleAds:searchStream`,
+      method: 'POST',
+      headers,
+      data: { query },
+    });
+    const batches = Array.isArray(response.data) ? response.data : [];
+    return batches.flatMap(batch => batch.results || []).map(normalizeCampaign);
+  } catch (error) {
+    throw googleAdsError(error, `Google Ads account ${customerId}`);
   }
-  const batches = Array.isArray(body) ? body : [];
-  return batches.flatMap(batch => batch.results || []).map(normalizeCampaign);
 }
 
 export async function GET(request: NextRequest) {
@@ -101,7 +114,7 @@ export async function GET(request: NextRequest) {
     const fallbackMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const month = request.nextUrl.searchParams.get('month') || fallbackMonth;
     const ranges = monthRanges(month);
-    const token = await accessToken();
+    const client = oauthClient();
     const matchers = {
       Lamitak: parseMatcher(process.env.GOOGLE_ADS_LAMITAK_MATCH, 'LAMITAK'),
       EDL: parseMatcher(process.env.GOOGLE_ADS_EDL_MATCH, 'EDL'),
@@ -117,17 +130,17 @@ export async function GET(request: NextRequest) {
 
     if (separateAccounts) {
       const [lamitak, edl, previousLamitak, previousEdl] = await Promise.all([
-        fetchCampaigns(ranges.current, token, brandCustomerIds.Lamitak!),
-        fetchCampaigns(ranges.current, token, brandCustomerIds.EDL!),
-        fetchCampaigns(ranges.previous, token, brandCustomerIds.Lamitak!),
-        fetchCampaigns(ranges.previous, token, brandCustomerIds.EDL!),
+        fetchCampaigns(ranges.current, client, brandCustomerIds.Lamitak!),
+        fetchCampaigns(ranges.current, client, brandCustomerIds.EDL!),
+        fetchCampaigns(ranges.previous, client, brandCustomerIds.Lamitak!),
+        fetchCampaigns(ranges.previous, client, brandCustomerIds.EDL!),
       ]);
       brands = [aggregateCampaigns('Lamitak', lamitak), aggregateCampaigns('EDL', edl)];
       previousBrands = [aggregateCampaigns('Lamitak', previousLamitak), aggregateCampaigns('EDL', previousEdl)];
     } else {
       const customerId = required('GOOGLE_ADS_CUSTOMER_ID');
       const [currentCampaigns, previousCampaigns] = await Promise.all([
-        fetchCampaigns(ranges.current, token, customerId), fetchCampaigns(ranges.previous, token, customerId),
+        fetchCampaigns(ranges.current, client, customerId), fetchCampaigns(ranges.previous, client, customerId),
       ]);
       brands = groupBrandCampaigns(currentCampaigns, matchers);
       previousBrands = groupBrandCampaigns(previousCampaigns, matchers);
