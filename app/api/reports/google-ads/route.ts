@@ -74,7 +74,10 @@ async function fetchCampaigns(range: DateRange, client: OAuth2Client, rawCustome
   const customerId = cleanId(rawCustomerId);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'developer-token': required('GOOGLE_ADS_DEVELOPER_TOKEN'),
+    // Secret Manager values are sometimes entered with an embedded line break.
+    // Google Ads developer tokens are whitespace-free, so normalize before using
+    // the value as an HTTP header.
+    'developer-token': required('GOOGLE_ADS_DEVELOPER_TOKEN').replace(/\s+/g, ''),
   };
   const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.trim();
   if (loginCustomerId) headers['login-customer-id'] = cleanId(loginCustomerId);
