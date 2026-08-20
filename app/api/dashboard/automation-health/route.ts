@@ -15,6 +15,7 @@ const JOBS = [
   { name: 'shipments-aging-check', label: 'Shipment Aging Check', hour: 9, minute: 25 },
   { name: 'data-quality-monitor', label: 'Monitor Data Quality', hour: 9, minute: 30 },
   { name: 'customers-duplicate-check', label: 'Check Duplicate Customers', hour: 9, minute: 35 },
+  { name: 'leads-auto-repair', label: 'Normalize Leads and Sub-Dealer Data', hour: 9, minute: 40 },
   { name: 'salesorders-purchase-gap-check', label: 'Sales Order Purchase-Gap Check', hour: 15, minute: 0 },
 ] as const;
 

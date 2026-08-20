@@ -20,7 +20,11 @@ type DailyBriefDay = {
 
 const formatRp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
-type PurchaseGapSO = { salesorder_id: string; salesorder_number: string; customer_name: string; total: number; confirmed_at: string; sub_status_formatted: string };
+type PurchaseGapSO = {
+  salesorder_id: string; salesorder_number: string; customer_name: string; total: number;
+  confirmed_at: string; sub_status_formatted: string; locations: string[];
+  uncovered_items: Array<{ item_name: string; sku: string; required_quantity: number; stock_on_hand: number; location_name: string }>;
+};
 
 type AutomationHealthJob = {
   name: string; label: string; schedule: string;
@@ -249,12 +253,12 @@ function PurchaseGapAlert() {
     <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>
-          ⚠ {gaps.length} Confirmed SO{gaps.length === 1 ? '' : 's'} not Ordered today
+          ⚠ {gaps.length} Confirmed SO{gaps.length === 1 ? '' : 's'} without stock or PO coverage
         </h2>
         <button onClick={load} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}>↻</button>
       </div>
       <div className="text-xs mb-2" style={{ color: 'var(--text-2)' }}>
-        Confirmed today but no Purchase Order has been placed yet — Admin may have forgotten.
+        Checks all confirmed Sales Orders, regardless of date. Only items that are neither Ordered nor Stock Ready at the assigned HUB are shown.
       </div>
       <div className="space-y-1">
         {gaps.map(g => (
@@ -263,7 +267,9 @@ function PurchaseGapAlert() {
               <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-text)', fontWeight: 500 }}>{g.salesorder_number}</span>
               {' — '}{g.customer_name || '(unnamed)'}
             </span>
-            <span style={{ color: 'var(--muted)' }}>{formatRp(g.total)} · {g.sub_status_formatted}</span>
+            <span style={{ color: 'var(--muted)' }}>
+              {g.locations?.join(', ') || 'HUB not assigned'} · {g.uncovered_items?.map(item => `${item.sku || item.item_name}: need ${item.required_quantity}, stock ${item.stock_on_hand}`).join('; ') || g.sub_status_formatted}
+            </span>
           </div>
         ))}
       </div>

@@ -21,6 +21,7 @@
     "test:customer-duplicate-merge": "node --experimental-strip-types --test lib/customerDuplicates/mergeRequest.test.ts",
     "test:customer-duplicate-detection": "node --experimental-strip-types --test lib/customerCleanup/duplicates.test.ts",
     "test:customer-cleanup": "node --experimental-strip-types --test lib/customerCleanup/rules.test.ts",
+    "test:lead-cleanup": "node --experimental-strip-types --test lib/leadCleanup/rules.test.ts",
     "test:google-ads": "node --experimental-strip-types --test lib/googleAds/report.test.ts",
     "test:voice-commands": "node --experimental-strip-types --test lib/ai/voiceCommands.test.ts",
     "test:speech": "node --experimental-strip-types --test lib/ai/speech.test.ts",

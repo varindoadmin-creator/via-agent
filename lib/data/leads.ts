@@ -2,6 +2,8 @@
 // research (Level 2: local toko HPL). Reference data is static; outreach
 // progress (stage/notes) is tracked separately in Supabase (see /api/leads).
 
+import { normalizeLeadRecord } from '../leadCleanup/rules';
+
 export type LamitakStatus = 'yes' | 'unconfirmed' | 'no';
 
 export interface Lead {
@@ -202,11 +204,17 @@ const RAW: Array<Omit<Lead, 'tierGroup' | 'carriesLamitak'>> = [
   },
 ];
 
-export const LEADS: Lead[] = RAW.map(r => ({
-  ...r,
-  tierGroup: tierGroup(r.tier),
-  carriesLamitak: lamitakStatus(r.carriesLamitakNote),
-}));
+export const LEADS: Lead[] = RAW.map(r => {
+  const normalized = normalizeLeadRecord({ customer_name: r.storeName, phone: r.contact, address: r.address }, 'business');
+  return {
+    ...r,
+    storeName: normalized.customer_name,
+    contact: normalized.phone,
+    address: normalized.address,
+    tierGroup: tierGroup(r.tier),
+    carriesLamitak: lamitakStatus(r.carriesLamitakNote),
+  };
+});
 
 // ─── 30-day recruitment plan (reference only, not per-lead tracked) ───────────
 

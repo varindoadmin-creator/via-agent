@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { formatBusinessName, normalizeSpaces } from '@/lib/customerCleanup/rules';
+import { normalizeLeadRecord } from '@/lib/leadCleanup/rules';
 
 const MARKS_TABLE = 'lead_customer_marks';
 
@@ -140,13 +140,10 @@ export async function GET() {
 
     const customers = Array.from(byKey.entries())
       .filter(([key]) => !markedKeys.has(key))
-      .map(([key, c]) => ({
-        key,
-        ...c,
-        name: c.name ? formatBusinessName(c.name) : c.name,
-        address: c.address ? normalizeSpaces(c.address) : c.address,
-        types: Array.from(c.types),
-      }))
+      .map(([key, c]) => {
+        const normalized = normalizeLeadRecord({ customer_name: c.name, phone: c.phone, address: c.address });
+        return { key, ...c, name: normalized.customer_name, phone: normalized.phone, address: normalized.address, types: Array.from(c.types) };
+      })
       .sort((a, b) => b.last_at.localeCompare(a.last_at));
 
     return NextResponse.json({ success: true, customers });

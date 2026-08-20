@@ -62,32 +62,34 @@ export async function POST() {
           <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5;font-family:monospace">${g.salesorder_number}</td>
           <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${g.customer_name || '(unnamed)'}</td>
           <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5;text-align:right">${formatRp(g.total)}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${g.sub_status_formatted}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${g.locations.join(', ') || 'HUB not assigned'}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e5e5e5">${g.uncovered_items.map(item => `${item.sku || item.item_name}: need ${item.required_quantity}, stock ${item.stock_on_hand}`).join('<br>')}</td>
         </tr>`).join('');
 
       const html = `
-        <p>${newGaps.length} Sales Order${newGaps.length === 1 ? ' was' : 's were'} confirmed today but ${newGaps.length === 1 ? "hasn't" : "haven't"} been Ordered (no Purchase Order placed) yet:</p>
+        <p>${newGaps.length} confirmed Sales Order${newGaps.length === 1 ? ' has' : 's have'} item demand that is neither Ordered nor Stock Ready at the assigned HUB:</p>
         <table style="border-collapse:collapse;width:100%;max-width:640px">
           <thead>
             <tr style="background:#f5f5f5;text-align:left;font-size:12px;text-transform:uppercase;color:#666">
               <th style="padding:6px 10px">SO Number</th>
               <th style="padding:6px 10px">Customer</th>
               <th style="padding:6px 10px;text-align:right">Total</th>
-              <th style="padding:6px 10px">Status</th>
+              <th style="padding:6px 10px">HUB</th>
+              <th style="padding:6px 10px">Uncovered Items</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
         <p style="margin-top:16px"><a href="https://varindoapp.com/purchases">Open Purchases in VIA →</a></p>
-        <p style="color:#999;font-size:12px;margin-top:24px">Checked at 15:00 Asia/Jakarta. A Sales Order stops appearing here once a Purchase Order is placed for it.</p>
+        <p style="color:#999;font-size:12px;margin-top:24px">Checked daily at 15:00 Asia/Jakarta. Confirmation date is not used, so weekends and purchasing lead time do not cause false positives.</p>
       `;
-      const text = `${newGaps.length} Sales Order(s) confirmed today have not been Ordered yet:\n\n` +
-        newGaps.map(g => `${g.salesorder_number} — ${g.customer_name || '(unnamed)'} — ${formatRp(g.total)} — ${g.sub_status_formatted}`).join('\n') +
+      const text = `${newGaps.length} confirmed Sales Order(s) have items without PO or stock coverage:\n\n` +
+        newGaps.map(g => `${g.salesorder_number} — ${g.customer_name || '(unnamed)'} — ${g.locations.join(', ') || 'HUB not assigned'} — ${g.uncovered_items.map(item => `${item.sku || item.item_name}: need ${item.required_quantity}, stock ${item.stock_on_hand}`).join('; ')}`).join('\n') +
         `\n\nOpen Purchases in VIA: https://varindoapp.com/purchases`;
 
       await sendMail({
         to: ALERT_TO,
-        subject: `VIA Alert: ${newGaps.length} Confirmed SO${newGaps.length === 1 ? '' : 's'} not Ordered today`,
+        subject: `VIA Alert: ${newGaps.length} Confirmed SO${newGaps.length === 1 ? '' : 's'} without stock or PO coverage`,
         text,
         html,
       });

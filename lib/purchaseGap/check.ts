@@ -6,8 +6,9 @@
 // place the purchase. Server-side only.
 
 import { zohoRequest } from '@/lib/zoho/client';
-
-const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta is a fixed UTC+7, no DST.
+import { getItemWithStock, type ItemStockSummary } from '@/lib/zoho/items';
+import { getSalesOrderStockCoverage, type SalesOrderStockCoverage } from './coverage';
+export { isSalesOrderCoveredByStock } from './coverage';
 
 // Same codes used in lib/zoho/poApprovalEngine.ts — Zoho's own confirmed-SO
 // sub-statuses. 'cs_awaitin' means a PO already exists for this SO's demand;
@@ -23,10 +24,25 @@ export interface PurchaseGapSO {
   total: number;
   confirmed_at: string;
   sub_status_formatted: string;
+  locations: string[];
+  uncovered_items: SalesOrderStockCoverage['uncovered_items'];
 }
 
-function jakartaDateStr(d: Date): string {
-  return new Date(d.getTime() + JAKARTA_OFFSET_MS).toISOString().split('T')[0];
+async function getStockCoverage(salesOrderId: string): Promise<SalesOrderStockCoverage> {
+  const response = await zohoRequest<Record<string, unknown>>(`/salesorders/${encodeURIComponent(salesOrderId)}`);
+  const detail = response.salesorder as import('./coverage').SalesOrderDetail | undefined;
+  if (!detail) return { covered: false, locations: [], uncovered_items: [] };
+
+  const itemIds = Array.from(new Set(
+    (detail.line_items || []).map(line => String(line.item_id || '')).filter(Boolean),
+  ));
+  const stocks = await Promise.all(itemIds.map(itemId => getItemWithStock(itemId)));
+  const stockByItem = new Map<string, ItemStockSummary>();
+  itemIds.forEach((itemId, index) => {
+    const stock = stocks[index];
+    if (stock) stockByItem.set(itemId, stock);
+  });
+  return getSalesOrderStockCoverage(detail, stockByItem);
 }
 
 async function fetchConfirmedSOs(): Promise<Record<string, unknown>[]> {
@@ -47,22 +63,27 @@ async function fetchConfirmedSOs(): Promise<Record<string, unknown>[]> {
 }
 
 /**
- * Confirmed Sales Orders that were confirmed on today's Jakarta calendar date
- * but haven't reached Zoho's "Ordered" sub-status yet — i.e. no Purchase
- * Order has been placed for them today.
+ * Confirmed Sales Orders whose remaining item demand is neither represented by
+ * Zoho's Ordered/Stock Ready status nor covered by stock at the assigned HUB.
+ * Confirmation date is intentionally irrelevant: weekends and purchasing lead
+ * time must not create false positives.
  */
 export async function findSameDayPurchaseGaps(): Promise<PurchaseGapSO[]> {
   const soList = await fetchConfirmedSOs();
-  const today = jakartaDateStr(new Date());
 
   const gaps: PurchaseGapSO[] = [];
   for (const so of soList) {
     const confirmedAt = String(so.submitted_date || so.last_modified_time || so.date || '');
     if (!confirmedAt) continue;
-    if (jakartaDateStr(new Date(confirmedAt)) !== today) continue;
 
     const subStatus = String(so.current_sub_status || '');
     if (subStatus === SO_SUB_STATUS_ORDERED || subStatus === SO_SUB_STATUS_STOCK_READY) continue;
+
+    // A PO that has already been received and converted to a bill may no longer
+    // drive Zoho's "Ordered" sub-status. Do not report a false gap when the
+    // resulting stock fully covers the SO at its assigned warehouse.
+    const coverage = await getStockCoverage(String(so.salesorder_id || ''));
+    if (coverage.covered) continue;
 
     gaps.push({
       salesorder_id: String(so.salesorder_id || ''),
@@ -71,6 +92,8 @@ export async function findSameDayPurchaseGaps(): Promise<PurchaseGapSO[]> {
       total: Number(so.total) || 0,
       confirmed_at: confirmedAt,
       sub_status_formatted: String(so.current_sub_status_formatted || 'Not Yet Ordered'),
+      locations: coverage.locations,
+      uncovered_items: coverage.uncovered_items,
     });
   }
   return gaps;

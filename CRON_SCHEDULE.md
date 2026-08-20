@@ -18,6 +18,7 @@ the header `x-cron-secret: <CRON_SECRET>`.
 | 09:25 | `/api/shipments/aging-check` | `{}` |
 | 09:30 | `/api/data-quality` | `{}` |
 | 09:35 | `/api/customers/duplicates/scan` | `{}` |
+| 09:40 | `/api/leads/auto-repair` | `{}` |
 | 15:00 | `/api/salesorders/purchase-gap-check` | `{}` |
 
 The application records every completed or failed invocation in
