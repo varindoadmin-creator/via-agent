@@ -24,7 +24,7 @@ const requestSchema = z.object({
     type: z.literal('create_so'),
     data: z.object({ approval_id: z.string().uuid() }).passthrough(),
     previewShown: z.literal(true),
-  }).optional(),
+  }).nullish(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>> {

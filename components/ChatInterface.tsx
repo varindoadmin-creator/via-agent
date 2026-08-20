@@ -259,7 +259,7 @@ export default function ChatInterface({
             conversationId: activeConversationId,
             attachments: attachments.length > 0 ? attachments : undefined,
             history,
-            pendingAction,
+            pendingAction: pendingAction || undefined,
           }),
         });
 
