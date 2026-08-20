@@ -10,6 +10,7 @@ export type MessageType =
   | 'search_results'
   | 'action_result'
   | 'warning'
+  | 'update'
   | 'error';
 
 export interface Attachment {
@@ -39,6 +40,7 @@ export interface MessageMetadata {
   previewData?: unknown;
   actionResult?: unknown;
   warnings?: string[];
+  actions?: unknown[];
   debugInfo?: unknown;
 }
 

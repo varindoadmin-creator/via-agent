@@ -11,6 +11,7 @@ import JsonDebugPanel from './JsonDebugPanel';
 interface ChatMessageProps {
   message: ChatMessageType;
   showDebug?: boolean;
+  assistantName?: string;
 }
 
 function LoadingDots() {
@@ -303,9 +304,13 @@ function UpdateActions({ actions }: { actions: Action[] }) {
   );
 }
 
-export default function ChatMessage({ message, showDebug = false }: ChatMessageProps) {
+export default function ChatMessage({ message, showDebug = false, assistantName = 'VIA' }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
+  const updateActions: Action[] = message.type === 'update' && Array.isArray(message.metadata?.actions)
+    ? message.metadata.actions as Action[]
+    : [];
+  const previewData = message.metadata?.previewData as SOPreview | undefined;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -333,7 +338,7 @@ export default function ChatMessage({ message, showDebug = false }: ChatMessageP
         {/* Name + time */}
         <div className={`flex items-center gap-2 mb-1.5 ${isUser ? 'flex-row-reverse' : ''}`}>
           <span className={`text-xs font-semibold ${isUser ? 'text-[var(--accent-text)]' : 'text-[var(--accent)]'}`}>
-            {isUser ? 'You' : 'VIA'}
+            {isUser ? 'You' : assistantName}
           </span>
           <span className="text-xs text-[var(--text-4)]">
             {new Date(message.timestamp).toLocaleTimeString('id-ID', {
@@ -382,18 +387,15 @@ export default function ChatMessage({ message, showDebug = false }: ChatMessageP
               </div>
 
               {/* Update Action Buttons */}
-              {message.type === 'update' && message.metadata?.actions && (message.metadata.actions as unknown[]).length > 0 && (
-                <UpdateActions actions={message.metadata.actions as Action[]} />
-              )}
+              {updateActions.length > 0 ? <UpdateActions actions={updateActions} /> : null}
 
               {/* SO Preview Card */}
-              {(message.type === 'so_preview' || message.type === 'so_update_preview') &&
-                message.metadata?.previewData && (
+              {(message.type === 'so_preview' || message.type === 'so_update_preview') && previewData ? (
                   <ActionPreviewCard
-                    preview={message.metadata.previewData as SOPreview}
+                    preview={previewData}
                     type={message.type === 'so_preview' ? 'create' : 'update'}
                   />
-                )}
+                ) : null}
 
               {/* Warnings */}
               {message.metadata?.warnings && (message.metadata.warnings as string[]).length > 0 && (

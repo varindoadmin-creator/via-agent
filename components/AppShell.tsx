@@ -27,6 +27,7 @@ interface NavSection {
 
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
   { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Home' }, hidden: true },
+  { type: 'standalone', item: { id: 'jarvis', href: '/jarvis', icon: Sparkles, label: 'JARVIS' } },
   { type: 'standalone', item: { id: 'sidekick', href: '/sidekick', icon: Sparkles, label: 'Sidekick' }, hidden: true },
   { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
   {

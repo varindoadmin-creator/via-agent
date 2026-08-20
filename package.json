@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Varindo Intelligence Agent - Internal AI Assistant",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -25,10 +28,12 @@
     "test:greetings": "node --experimental-strip-types --test lib/ai/greetings.test.ts",
     "test:phonetic-matching": "node --experimental-strip-types --test lib/ai/phoneticMatching.test.ts",
     "test:sidekick-knowledge": "node --experimental-strip-types --test lib/ai/liveQuestions.test.ts",
+    "test:jarvis": "node --experimental-strip-types --test lib/jarvis/*.test.ts",
     "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
     "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts"
   },
   "dependencies": {
+    "@openai/agents": "^0.17.0",
     "@types/node": "^20.17.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -48,7 +53,8 @@
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/nodemailer": "^8.0.1",

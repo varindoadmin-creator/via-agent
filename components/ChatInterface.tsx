@@ -29,7 +29,17 @@ const WELCOME_MESSAGE: ChatMessageType = {
   timestamp: new Date(),
 };
 
-export default function ChatInterface() {
+interface ChatInterfaceProps {
+  apiEndpoint?: string;
+  assistantName?: string;
+  welcomeMessage?: string;
+}
+
+export default function ChatInterface({
+  apiEndpoint = '/api/chat',
+  assistantName = 'VIA',
+  welcomeMessage = WELCOME_MESSAGE.content,
+}: ChatInterfaceProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -148,13 +158,13 @@ export default function ChatInterface() {
     const defaultConv: Conversation = {
       id: generateId(),
       title: 'Welcome',
-      messages: [WELCOME_MESSAGE],
+      messages: [{ ...WELCOME_MESSAGE, content: welcomeMessage }],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
     setConversations([defaultConv]);
     setActiveConversationId(defaultConv.id);
-  }, []);
+  }, [welcomeMessage]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -241,7 +251,7 @@ export default function ChatInterface() {
           .slice(-20)
           .map((m) => ({ role: m.role, content: m.content }));
 
-        const response = await fetch('/api/chat', {
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -313,14 +323,14 @@ export default function ChatInterface() {
         setIsLoading(false);
       }
     },
-    [activeConversationId, conversations, pendingAction, addMessage, updateLastMessage, speakReply]
+    [activeConversationId, conversations, pendingAction, addMessage, updateLastMessage, speakReply, apiEndpoint]
   );
 
   const handleNewConversation = useCallback(() => {
     const newConv: Conversation = {
       id: generateId(),
       title: 'New Conversation',
-      messages: [{ ...WELCOME_MESSAGE, id: generateId() }],
+      messages: [{ ...WELCOME_MESSAGE, id: generateId(), content: welcomeMessage }],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -328,7 +338,7 @@ export default function ChatInterface() {
     setActiveConversationId(newConv.id);
     setPendingAction(null);
     setError(null);
-  }, []);
+  }, [welcomeMessage]);
 
   const handleSelectConversation = useCallback((id: string) => {
     setActiveConversationId(id);
@@ -351,7 +361,7 @@ export default function ChatInterface() {
         c.id === activeConversationId
           ? {
               ...c,
-              messages: [{ ...WELCOME_MESSAGE, id: generateId() }],
+              messages: [{ ...WELCOME_MESSAGE, id: generateId(), content: welcomeMessage }],
               updatedAt: new Date(),
               title: 'New Conversation',
             }
@@ -360,7 +370,7 @@ export default function ChatInterface() {
     );
     setPendingAction(null);
     setError(null);
-  }, [activeConversationId]);
+  }, [activeConversationId, welcomeMessage]);
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)", height: "100vh" }}>
@@ -373,7 +383,7 @@ export default function ChatInterface() {
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-sm font-semibold text-[var(--text)]">
-                {activeConversation?.title || 'VIA'}
+                {activeConversation?.title || assistantName}
               </h1>
               <div className="text-xs text-[var(--text-3)]">
                 {activeConversation?.messages.filter(m => !m.isLoading).length || 0} messages
@@ -472,6 +482,7 @@ export default function ChatInterface() {
                   key={msg.id}
                   message={msg}
                   showDebug={showDebug}
+                  assistantName={assistantName}
                 />
               ))}
               <div ref={messagesEndRef} className="h-4" />

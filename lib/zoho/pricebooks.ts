@@ -15,6 +15,11 @@ interface PricebookItem {
   pricebook_discount?: string; // e.g. "2.00%"
 }
 
+export interface PricebookRateEntry {
+  rate: number;
+  discount_percent: number;
+}
+
 interface PricebookResponse {
   pricebook: {
     pricebook_id: string;
@@ -98,6 +103,21 @@ export async function getItemPricebookRate(
   if (!pricebookId || !itemId) return baseRate;
   const rateMap = await getPricebookRateMap(pricebookId);
   return rateMap.get(itemId) ?? baseRate;
+}
+
+/** Strict pricebook lookup used when a missing/error result must not silently become a base price. */
+export async function getItemPricebookEntry(
+  pricebookId: string,
+  itemId: string,
+): Promise<PricebookRateEntry | null> {
+  if (!pricebookId || !itemId) return null;
+  const items = await fetchPricebookItems(pricebookId);
+  const item = items.find(row => row.item_id === itemId);
+  if (!item) return null;
+  return {
+    rate: Number(item.pricebook_rate) || 0,
+    discount_percent: parseFloat(String(item.pricebook_discount || '0').replace('%', '')) || 0,
+  };
 }
 
 export interface PriceListItem {

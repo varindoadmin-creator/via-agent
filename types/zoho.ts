@@ -21,6 +21,8 @@ export interface ZohoContact {
   contact_type: string;
   currency_code?: string;
   outstanding_receivable_amount?: number;
+  pricebook_id?: string;
+  cf_tier?: string;
   billing_address?: ZohoAddress;
   shipping_address?: ZohoAddress;
 }
@@ -217,6 +219,10 @@ export interface ZohoPurchaseOrder {
 export interface ZohoPOListResponse {
   purchaseorders: ZohoPurchaseOrder[];
   page_context?: ZohoPageContext;
+}
+
+export interface ZohoPOResponse {
+  purchaseorder: ZohoPurchaseOrder;
 }
 
 // ─── Common ───────────────────────────────────────────────────────────────────

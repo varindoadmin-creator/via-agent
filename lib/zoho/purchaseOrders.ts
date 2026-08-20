@@ -1,6 +1,6 @@
 // ─── Zoho Books Purchase Orders ───────────────────────────────────────────────
 
-import { ZohoPurchaseOrder, ZohoPOListResponse } from '@/types/zoho';
+import { ZohoPurchaseOrder, ZohoPOListResponse, ZohoPOResponse } from '@/types/zoho';
 import { zohoRequest, isMockMode } from './client';
 import { normalizeItemCode } from '@/lib/utils/normalizeItemCode';
 
@@ -84,13 +84,56 @@ export async function getOpenPurchaseOrders(limit = 50): Promise<ZohoPurchaseOrd
   const response = await zohoRequest<ZohoPOListResponse>('/purchaseorders', {
     queryParams: {
       status: 'open',
-      per_page: limit,
+      per_page: Math.max(1, Math.min(200, limit)),
       sort_column: 'date',
       sort_order: 'D',
     },
   });
 
   return response.purchaseorders || [];
+}
+
+export async function searchPurchaseOrders(
+  query?: string,
+  status?: string,
+  limit = 10,
+): Promise<ZohoPurchaseOrder[]> {
+  if (isMockMode()) {
+    const normalized = query?.trim().toUpperCase();
+    return MOCK_PURCHASE_ORDERS.filter(po =>
+      (!status || po.status === status) &&
+      (!normalized || po.purchaseorder_number.toUpperCase().includes(normalized) || po.vendor_name.toUpperCase().includes(normalized))
+    ).slice(0, limit);
+  }
+
+  const queryParams: Record<string, string | number | boolean> = {
+    per_page: Math.max(1, Math.min(50, limit)),
+    sort_column: 'date',
+    sort_order: 'D',
+  };
+  if (query) queryParams.search_text = query;
+  if (status) queryParams.status = status;
+  const response = await zohoRequest<ZohoPOListResponse>('/purchaseorders', { queryParams });
+  return response.purchaseorders || [];
+}
+
+export async function getPurchaseOrderById(poId: string): Promise<ZohoPurchaseOrder | null> {
+  if (isMockMode()) return MOCK_PURCHASE_ORDERS.find(po => po.purchaseorder_id === poId) || null;
+  try {
+    const response = await zohoRequest<ZohoPOResponse>(`/purchaseorders/${encodeURIComponent(poId)}`);
+    return response.purchaseorder || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getPurchaseOrderByNumber(poNumber: string): Promise<ZohoPurchaseOrder | null> {
+  if (isMockMode()) {
+    return MOCK_PURCHASE_ORDERS.find(po => po.purchaseorder_number.toUpperCase() === poNumber.toUpperCase()) || null;
+  }
+  const matches = await searchPurchaseOrders(poNumber, undefined, 10);
+  const summary = matches.find(po => po.purchaseorder_number.toUpperCase() === poNumber.toUpperCase());
+  return summary ? getPurchaseOrderById(summary.purchaseorder_id) : null;
 }
 
 /**
@@ -101,10 +144,55 @@ export async function searchPOsForItem(
   itemId: string,
   itemCode?: string
 ): Promise<ZohoPurchaseOrder[]> {
-  const openPOs = await getOpenPurchaseOrders();
+  const result = await searchPOCoverageForItem(itemId, itemCode);
+  return result.orders;
+}
 
-  return openPOs.filter((po) => {
-    return po.line_items.some((li) => {
+export interface PurchaseOrderCoverageSearch {
+  orders: ZohoPurchaseOrder[];
+  scannedOpenPurchaseOrders: number;
+  hasMoreOpenPurchaseOrders: boolean;
+}
+
+/** Search the newest open-PO page and expose whether older pages also exist. */
+export async function searchPOCoverageForItem(
+  itemId: string,
+  itemCode?: string
+): Promise<PurchaseOrderCoverageSearch> {
+  let summaries: ZohoPurchaseOrder[];
+  let hasMoreOpenPurchaseOrders = false;
+
+  if (isMockMode()) {
+    summaries = MOCK_PURCHASE_ORDERS.filter(
+      po => po.status === 'open' || po.status === 'draft'
+    );
+  } else {
+    const response = await zohoRequest<ZohoPOListResponse>('/purchaseorders', {
+      queryParams: {
+        status: 'open',
+        per_page: 200,
+        page: 1,
+        sort_column: 'date',
+        sort_order: 'D',
+      },
+    });
+    summaries = response.purchaseorders || [];
+    hasMoreOpenPurchaseOrders = Boolean(response.page_context?.has_more_page);
+  }
+
+  // List endpoints do not consistently include line_items. Hydrate each bounded
+  // candidate before calculating item coverage.
+  const openPOs: ZohoPurchaseOrder[] = [];
+  for (let index = 0; index < summaries.length; index += 5) {
+    const batch = summaries.slice(index, index + 5);
+    const hydrated = await Promise.all(
+      batch.map(po => po.line_items?.length ? Promise.resolve(po) : getPurchaseOrderById(po.purchaseorder_id)),
+    );
+    openPOs.push(...hydrated.filter((po): po is ZohoPurchaseOrder => Boolean(po)));
+  }
+
+  const orders = openPOs.filter((po) => {
+    return (po.line_items || []).some((li) => {
       if (li.item_id && li.item_id === itemId) return true;
       if (itemCode && li.name) {
         const normalizedLineName = normalizeItemCode(li.name);
@@ -114,6 +202,12 @@ export async function searchPOsForItem(
       return false;
     });
   });
+
+  return {
+    orders,
+    scannedOpenPurchaseOrders: summaries.length,
+    hasMoreOpenPurchaseOrders,
+  };
 }
 
 /**
@@ -129,7 +223,7 @@ export function getOpenPOQuantityForItem(
 
   for (const po of openPOs) {
     let addedPO = false;
-    for (const li of po.line_items) {
+    for (const li of po.line_items || []) {
       const matchById = li.item_id && li.item_id === itemId;
       const matchByCode =
         itemCode &&

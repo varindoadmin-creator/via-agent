@@ -107,6 +107,16 @@ export async function getItemWithStock(itemId: string): Promise<ItemStockSummary
   }
 }
 
+/** Read the exact Zoho item record, including base sales and purchase rates. */
+export async function getItemDetail(itemId: string): Promise<ZohoItem | null> {
+  try {
+    const res = await zohoRequest(`/items/${encodeURIComponent(itemId)}`);
+    return (res.item as ZohoItem | undefined) || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Search items and return stock summary for each match.
  */
