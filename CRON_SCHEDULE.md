@@ -11,6 +11,7 @@ the header `x-cron-secret: <CRON_SECRET>`.
 |---|---|---|
 | 09:00 | `/api/shipments/auto-invoice` | `{}` |
 | 09:05 | `/api/customers/auto-repair` | `{}` |
+| 09:08 | `/api/documents/npwp-repair` | `{}` |
 | 09:10 | `/api/invoices-page/auto-send` | `{}` |
 | 09:15 | `/api/inventory/price-lists/sync` | `{"dry_run":false}` |
 | 09:20 | `/api/salesperson-map/sync` | `{"mode":"incremental"}` |

@@ -60,23 +60,6 @@ interface ConvertResult {
   error?: string;
 }
 
-interface PrintInvoice {
-  invoice_id: string;
-  invoice_number: string;
-  customer_name: string;
-  date: string;
-  due_date: string;
-  total: number;
-  balance: number;
-  status: string;
-  has_attachment: boolean;
-}
-
-interface CustomerOption {
-  contact_id: string;
-  contact_name: string;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
@@ -249,17 +232,6 @@ export default function InvoicesPage() {
 
 
 
-  // Print section state
-  const [customers, setCustomers] = useState<CustomerOption[]>([]);
-  const [printCustomerId, setPrintCustomerId] = useState('');
-  const [printDateFrom, setPrintDateFrom] = useState('');
-  const [printDateTo, setPrintDateTo] = useState('');
-  const [printResults, setPrintResults] = useState<PrintInvoice[] | null>(null);
-  const [printResultsLoading, setPrintResultsLoading] = useState(false);
-  const [printResultsError, setPrintResultsError] = useState('');
-  const [printSelected, setPrintSelected] = useState<Set<string>>(new Set());
-  const [printingPdf, setPrintingPdf] = useState(false);
-
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -276,65 +248,6 @@ export default function InvoicesPage() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  useEffect(() => {
-    fetch('/api/zoho/customers')
-      .then(res => res.json())
-      .then(data => setCustomers(data.customers || []))
-      .catch(() => {});
-  }, []);
-
-  async function handleShowPrint() {
-    if (!printCustomerId && (!printDateFrom || !printDateTo)) {
-      setPrintResultsError('Select a customer or a full date range.');
-      return;
-    }
-    setPrintResultsLoading(true);
-    setPrintResultsError('');
-    setPrintSelected(new Set());
-    try {
-      const params = new URLSearchParams();
-      if (printCustomerId) params.set('customer_id', printCustomerId);
-      if (printDateFrom) params.set('from', printDateFrom);
-      if (printDateTo) params.set('to', printDateTo);
-      const res = await fetch('/api/invoices?' + params.toString());
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || data.message);
-      setPrintResults(data.invoices || []);
-    } catch (e) { setPrintResultsError(String(e)); }
-    finally { setPrintResultsLoading(false); }
-  }
-
-  function togglePrintSelected(id: string) {
-    setPrintSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }
-  function togglePrintSelectAll() {
-    if (!printResults) return;
-    setPrintSelected(prev =>
-      prev.size === printResults.length ? new Set() : new Set(printResults.map(i => i.invoice_id))
-    );
-  }
-
-  async function handlePrintSelected() {
-    if (printSelected.size === 0) return;
-    setPrintingPdf(true);
-    try {
-      const res = await fetch('/api/sales/tax-invoices/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoice_ids: Array.from(printSelected) }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to generate PDF');
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-    } catch (e) { setPrintResultsError(String(e)); }
-    finally { setPrintingPdf(false); }
-  }
 
   // Sorting
   function sortData<T extends Record<string, unknown>>(data: T[], key: string, dir: SortDir): T[] {
@@ -725,101 +638,6 @@ export default function InvoicesPage() {
               </table>
             </div>
           )}
-        </div>
-
-        {/* ── PRINT SECTION ── */}
-        <div className="via-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-[var(--border)]">
-            <h2 className="text-[var(--text)] font-semibold text-sm">Print</h2>
-            <p className="text-[var(--text-3)] text-xs mt-0.5">
-              Pick a customer and/or a period, then Show to list invoices. Selected invoices print with their Tax Invoice (Faktur Pajak) attached, if one exists.
-            </p>
-          </div>
-          <div className="p-5">
-            <div className="flex items-center gap-3 flex-wrap">
-              <select value={printCustomerId} onChange={e => setPrintCustomerId(e.target.value)}
-                className="via-input text-xs py-1.5 px-3 w-60">
-                <option value="">All Customers</option>
-                {customers.map(c => (
-                  <option key={c.contact_id} value={c.contact_id}>{c.contact_name}</option>
-                ))}
-              </select>
-              <input type="date" value={printDateFrom} onChange={e => setPrintDateFrom(e.target.value)}
-                className="via-input text-xs py-1.5 px-3" />
-              <span className="text-[var(--text-3)] text-xs">to</span>
-              <input type="date" value={printDateTo} onChange={e => setPrintDateTo(e.target.value)}
-                className="via-input text-xs py-1.5 px-3" />
-              <button onClick={handleShowPrint} disabled={printResultsLoading}
-                className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
-                {printResultsLoading ? 'Loading…' : 'Show'}
-              </button>
-              {printSelected.size > 0 && (
-                <button onClick={handlePrintSelected} disabled={printingPdf}
-                  className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text)] text-xs font-medium rounded-lg border border-[var(--border)] transition-colors disabled:opacity-50">
-                  {printingPdf ? 'Preparing PDF…' : `🖨 Print Selected (${printSelected.size})`}
-                </button>
-              )}
-            </div>
-
-            {printResultsError && (
-              <div className="mt-3 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg text-[var(--danger)] text-xs">
-                {printResultsError}
-              </div>
-            )}
-
-            {printResults && (
-              <div className="mt-4 overflow-x-auto border border-[var(--border)] rounded-lg">
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ ...thStyle, width: 36 }}>
-                        <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                          checked={printSelected.size === printResults.length && printResults.length > 0}
-                          onChange={togglePrintSelectAll} />
-                      </th>
-                      <th style={{ ...thStyle, width: 36, textAlign: 'center' }} title="Tax Invoice / Faktur Pajak attached">FP</th>
-                      <th style={thStyle}>Invoice No.</th>
-                      <th style={thStyle}>Customer</th>
-                      <th style={thStyle}>Date</th>
-                      <th style={thStyle}>Status</th>
-                      <th style={{ ...thStyle, textAlign: 'right' }}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printResults.length === 0 && (
-                      <tr>
-                        <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>
-                          No invoices found.
-                        </td>
-                      </tr>
-                    )}
-                    {printResults.map(inv => (
-                      <tr key={inv.invoice_id}
-                        onClick={() => togglePrintSelected(inv.invoice_id)}
-                        className={`cursor-pointer transition-colors ${printSelected.has(inv.invoice_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}
-                        style={{ borderBottom: '1px solid var(--border-muted)' }}>
-                        <td style={{ padding: '7px 12px' }} onClick={e => e.stopPropagation()}>
-                          <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                            checked={printSelected.has(inv.invoice_id)}
-                            onChange={() => togglePrintSelected(inv.invoice_id)} />
-                        </td>
-                        <td style={{ padding: '7px 12px', textAlign: 'center' }}>
-                          {inv.has_attachment
-                            ? <span title="Faktur Pajak attached" style={{ fontSize: 13 }}>📎</span>
-                            : <span style={{ color: 'var(--border)', fontSize: 11 }}>—</span>}
-                        </td>
-                        <td style={{ padding: '7px 12px', ...mono, fontSize: 12, color: 'var(--accent-text)', fontWeight: 500 }}>{inv.invoice_number}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, color: 'var(--text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 12, color: 'var(--text-3)' }}>{inv.date}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 11, color: 'var(--text-3)', textTransform: 'capitalize' }}>{inv.status?.replace('_', ' ')}</td>
-                        <td style={{ padding: '7px 12px', textAlign: 'right', ...mono, fontSize: 12, color: 'var(--text-2)' }}>{formatRp(inv.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Confirm modal */}

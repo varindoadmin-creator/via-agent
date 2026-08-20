@@ -4,6 +4,8 @@ import { getZohoAccessToken, getZohoApiBaseUrl } from "@/lib/zoho/auth";
 import { fetchWithRetry } from "@/lib/zoho/retry";
 import { collectOpenInvoices, OpenInvoice } from "@/lib/reconciliation/openInvoices";
 import { compareInvoiceMatches } from "@/lib/reconciliation/matchRanking";
+import { parseBcaStatementPdfText } from "@/lib/reconciliation/bcaPdf";
+import { PDFParse } from "pdf-parse";
 
 const ORG_ID = () => process.env.ZOHO_ORGANIZATION_ID || "";
 
@@ -897,6 +899,54 @@ async function runCsvMatch(file: File) {
   });
 }
 
+async function runPdfMatch(file: File) {
+  if (file.size > 15 * 1024 * 1024) {
+    return NextResponse.json({ success: false, error: 'PDF must be 15 MB or smaller.' }, { status: 400 });
+  }
+  const parser = new PDFParse({ data: new Uint8Array(await file.arrayBuffer()) });
+  let text = '';
+  try {
+    text = (await parser.getText()).text || '';
+  } finally {
+    await parser.destroy();
+  }
+  const parsed = parseBcaStatementPdfText(text);
+  const transactions: BankTransaction[] = parsed.map(row => {
+    const transaction = {
+      date: row.date,
+      description: row.description,
+      name_in_statement: row.nameInStatement,
+      amount: row.amount,
+      direction: 'CR' as const,
+    };
+    return { ...transaction, row_hash: makeBankRowHash(transaction) };
+  });
+  const [receivedHashes, bankNameHistory, allInvoices] = await Promise.all([
+    getReceivedLedgerHashes(), getBankNameHistory(), fetchOpenInvoices(),
+  ]);
+  const hiddenReceived = transactions.filter(transaction => receivedHashes.has(transaction.row_hash)).length;
+  const results = matchTransactions(
+    transactions.filter(transaction => !receivedHashes.has(transaction.row_hash)),
+    allInvoices,
+    bankNameHistory,
+  );
+  return NextResponse.json({
+    success: true,
+    file_type: 'pdf',
+    summary: {
+      total_statement_rows: transactions.length,
+      total_csv_rows: transactions.length,
+      total_cr_transactions: transactions.length,
+      hidden_received_transactions: hiddenReceived,
+      matched: results.filter(result => result.status === 'matched').length,
+      possible: results.filter(result => result.status === 'possible').length,
+      no_match: results.filter(result => result.status === 'no_match').length,
+      total_invoices_checked: allInvoices.length,
+    },
+    results,
+  });
+}
+
 interface LedgerRow {
   bank_row_hash: string;
   date: string;
@@ -958,8 +1008,8 @@ export async function POST(request: NextRequest) {
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
-      const mode = String(formData.get("mode") || "match_csv");
-      if (mode !== "match_csv")
+      const mode = String(formData.get("mode") || "match_statement");
+      if (mode !== "match_csv" && mode !== "match_statement")
         return NextResponse.json(
           { success: false, error: "Unknown form mode" },
           { status: 400 },
@@ -967,10 +1017,13 @@ export async function POST(request: NextRequest) {
       const file = formData.get("file");
       if (!(file instanceof File))
         return NextResponse.json(
-          { success: false, error: "CSV file is required." },
+          { success: false, error: "CSV or PDF bank statement is required." },
           { status: 400 },
         );
-      return runCsvMatch(file);
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isCsv = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv');
+      if (!isPdf && !isCsv) return NextResponse.json({ success: false, error: 'Only CSV and PDF bank statements are supported.' }, { status: 400 });
+      return isPdf ? runPdfMatch(file) : runCsvMatch(file);
     }
 
     const body = await request.json();

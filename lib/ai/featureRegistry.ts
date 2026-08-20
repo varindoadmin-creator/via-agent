@@ -5,10 +5,10 @@ export interface ViaFeature {
   capabilities: string[];
 }
 
-// Sidekick's searchable map of VIA. Keep this aligned with AppShell navigation.
+// JARVIS's searchable map of VIA. Keep this aligned with AppShell navigation.
 export const VIA_FEATURES: ViaFeature[] = [
   { section: 'Main', label: 'Home', path: '/dashboard', capabilities: ['daily overview', 'automation health', 'duplicate customer alerts', 'scheduled tasks'] },
-  { section: 'Main', label: 'Sidekick', path: '/sidekick', capabilities: ['voice commands', 'questions', 'prices', 'stock', 'create sales order'] },
+  { section: 'Main', label: 'JARVIS', path: '/jarvis', capabilities: ['business questions', 'prices', 'system stock', 'analytics', 'controlled sales order creation'] },
   { section: 'Main', label: 'Leads', path: '/leads', capabilities: ['sales leads', 'lead follow-up'] },
   { section: 'Items', label: 'Items', path: '/inventory', capabilities: ['active items', 'stock by location', 'item search', 'inventory exceptions'] },
   { section: 'Items', label: 'Price Lists', path: '/inventory/price-lists', capabilities: ['Zoho price lists', 'customer tiers', 'active items', 'Bronze Plus'] },

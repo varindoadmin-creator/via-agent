@@ -184,10 +184,10 @@ export default function ReconcilePage() {
 
   useEffect(() => { fetchRecordedStatements(); }, []);
 
-  async function runMatchFromCsv() {
+  async function runMatchFromStatement() {
     const file = fileInputRef.current?.files?.[0];
     if (!file) {
-      setError("Please upload a CSV bank statement first.");
+      setError("Please upload a CSV or PDF bank statement first.");
       return;
     }
 
@@ -202,7 +202,7 @@ export default function ReconcilePage() {
 
     try {
       const form = new FormData();
-      form.append("mode", "match_csv");
+      form.append("mode", "match_statement");
       form.append("file", file);
 
       const res = await fetch("/api/reconcile", { method: "POST", body: form });
@@ -376,7 +376,7 @@ export default function ReconcilePage() {
       );
       setReceiveResults(data.results || []);
       if (received.length > 0) {
-        const okKeys = new Set(
+        const okKeys = new Set<string>(
           received.map((r: Record<string, unknown>) =>
             String(r.transaction_key),
           ),
@@ -442,14 +442,14 @@ export default function ReconcilePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.pdf,text/csv,application/pdf"
                 onChange={(e) => setFileName(e.target.files?.[0]?.name || "")}
                 className="block w-full text-sm text-[var(--text-2)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:text-white hover:file:bg-[var(--accent-hover)]"
               />
             </div>
 
             <button
-              onClick={runMatchFromCsv}
+              onClick={runMatchFromStatement}
               disabled={loading}
               className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
@@ -482,7 +482,7 @@ export default function ReconcilePage() {
           </div>
           {fileName && (
             <div className="text-xs text-[var(--text-3)] mt-3">
-              Selected CSV: {fileName}
+              Selected statement: {fileName}
             </div>
           )}
         </div>
@@ -497,8 +497,8 @@ export default function ReconcilePage() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
             {[
               {
-                label: "CSV Transactions",
-                value: summary.total_csv_rows,
+                label: "Statement Transactions",
+                value: summary.total_statement_rows ?? summary.total_csv_rows,
                 color: "text-[var(--text)]",
               },
               {

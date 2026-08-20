@@ -170,9 +170,6 @@ function PendingApprovalSOTable({ onSummary }: { onSummary: (summary: TableSumma
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [approving, setApproving] = useState(false);
-  const [approveResults, setApproveResults] = useState<{number: string; success: boolean; error?: string}[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [soLineItems, setSoLineItems] = useState<Record<string, Array<{name: string; quantity: number; unit: string; rate: number; item_total: number; location_name: string}>>>({});
   const [loadingLines, setLoadingLines] = useState<Set<string>>(new Set());
@@ -210,61 +207,18 @@ function PendingApprovalSOTable({ onSummary }: { onSummary: (summary: TableSumma
     }
   }
 
-  async function handleApprove() {
-    if (!selected.size) return;
-    setApproving(true); setApproveResults([]);
-    const results: {number: string; success: boolean; error?: string}[] = [];
-    for (const soId of selected) {
-      const item = items.find(i => i.salesorder_id === soId);
-      try {
-        const res = await fetch(`/api/shipments?mode=approve_draft&id=${soId}`);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        results.push({ number: item?.salesorder_number || soId, success: true });
-      } catch(e) {
-        results.push({ number: item?.salesorder_number || soId, success: false, error: String(e) });
-      }
-    }
-    setApproveResults(results);
-    setSelected(new Set());
-    await fetchData();
-    setApproving(false);
-  }
-
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
 
   return (
     <TableShell title="Pending Approval" groupColor="var(--warning)"
-      totalLabel={`${filtered.length} SOs`} loading={loading} search={search} onSearch={setSearch}
-      extra={selected.size > 0 ? (
-        <button onClick={handleApprove} disabled={approving}
-          className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
-          {approving ? 'Approving…' : `✓ Approve (${selected.size})`}
-        </button>
-      ) : undefined}>
+      totalLabel={`${filtered.length} SOs`} loading={loading} search={search} onSearch={setSearch}>
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
-      {approveResults.length > 0 && (
-        <div className="px-5 py-3 border-b border-[var(--border)] space-y-1">
-          {approveResults.map((r, i) => (
-            <div key={i} className={`text-xs flex gap-2 ${r.success ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
-              <span>{r.success ? '✓' : '✗'}</span>
-              <span style={mono} className="font-medium">{r.number}</span>
-              <span>{r.success ? 'Approved' : r.error}</span>
-            </div>
-          ))}
-        </div>
-      )}
       {!loading && !error && filtered.length === 0 && <EmptyState icon="✓" msg="No SOs pending approval." />}
       {!loading && !error && filtered.length > 0 && (
         <div className="overflow-x-auto">
           <table className="via-table">
             <thead><tr>
-              <th className="w-8">
-                <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                  checked={selected.size === filtered.length && filtered.length > 0}
-                  onChange={() => selected.size === filtered.length ? setSelected(new Set()) : setSelected(new Set(filtered.map(i => i.salesorder_id)))} />
-              </th>
               <th className="w-8"></th>
               <th>SO Number</th><th>Customer</th><th>Date</th>
               <th className="text-right">Aging</th><th>Location</th>
@@ -277,12 +231,7 @@ function PendingApprovalSOTable({ onSummary }: { onSummary: (summary: TableSumma
                 const ageColor = ageDays >= 7 ? 'var(--danger)' : ageDays >= 3 ? 'var(--warning)' : 'var(--text-4)';
                 return (
                   <React.Fragment key={item.salesorder_id}>
-                    <tr className={`transition-colors ${selected.has(item.salesorder_id) ? 'bg-[var(--accent-light)]' : 'hover:bg-[var(--surface-2)]'}`}>
-                      <td onClick={e => e.stopPropagation()}>
-                        <input type="checkbox" className="w-3.5 h-3.5 rounded"
-                          checked={selected.has(item.salesorder_id)}
-                          onChange={() => setSelected(prev => { const n = new Set(prev); n.has(item.salesorder_id) ? n.delete(item.salesorder_id) : n.add(item.salesorder_id); return n; })} />
-                      </td>
+                    <tr className="transition-colors hover:bg-[var(--surface-2)]">
                       <td className="text-center text-[var(--text-4)] text-xs select-none cursor-pointer w-8"
                         onClick={() => toggleExpand(item.salesorder_id)}>{exp ? '▾' : '▸'}</td>
                       <td className="text-[var(--accent-text)] text-xs font-medium" style={mono}>{item.salesorder_number}</td>
@@ -294,7 +243,7 @@ function PendingApprovalSOTable({ onSummary }: { onSummary: (summary: TableSumma
                       <td className="text-right text-[var(--text-2)] text-xs" style={mono}>{formatRp(item.total)}</td>
                     </tr>
                     {exp && (
-                      <tr><td colSpan={9} className="p-0">
+                      <tr><td colSpan={8} className="p-0">
                         <div className="bg-[var(--surface-2)] px-6 py-4">
                           <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-2" style={mono}>Items</div>
                           {loadingLines.has(item.salesorder_id) ? <div className="text-[var(--text-4)] text-xs animate-pulse">Loading…</div>
@@ -333,7 +282,7 @@ function PendingApprovalSOTable({ onSummary }: { onSummary: (summary: TableSumma
             </tbody>
             <tfoot style={{ borderTop:'1px solid var(--border)', background:'var(--surface-2)' }}>
               <tr>
-                <td colSpan={8} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>Total Value</td>
+                <td colSpan={7} style={{ padding:'7px 12px', color:'var(--text-3)', fontSize:11, ...mono }}>Total Value</td>
                 <td style={{ padding:'7px 12px', textAlign:'right', ...mono, color:'var(--text)', fontWeight:700 }}>{formatRp(filtered.reduce((s,i)=>s+i.total,0))}</td>
               </tr>
             </tfoot>
@@ -548,8 +497,8 @@ function DraftSOTable({ onSummary }: { onSummary: (summary: TableSummary) => voi
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [approving, setApproving] = useState(false);
-  const [approveResults, setApproveResults] = useState<{number: string; success: boolean; error?: string}[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteResults, setDeleteResults] = useState<{salesorder_number: string; success: boolean; error?: string}[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [soLineItems, setSoLineItems] = useState<Record<string, Array<{name: string; quantity: number; unit: string; rate: number; item_total: number; location_name: string}>>>({});
   const [loadingLines, setLoadingLines] = useState<Set<string>>(new Set());
@@ -598,25 +547,27 @@ function DraftSOTable({ onSummary }: { onSummary: (summary: TableSummary) => voi
     return `Follow-Up SO Draft\n\n${lines.join('\n')}`;
   }
 
-  async function handleApprove() {
+  async function handleDelete() {
     if (!selected.size) return;
-    setApproving(true); setApproveResults([]);
-    const results: {number: string; success: boolean; error?: string}[] = [];
-    for (const soId of selected) {
-      const item = items.find(i => i.salesorder_id === soId);
-      try {
-        const res = await fetch(`/api/shipments?mode=approve_draft&id=${soId}`);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        results.push({ number: item?.salesorder_number || soId, success: true });
-      } catch(e) {
-        results.push({ number: item?.salesorder_number || soId, success: false, error: String(e) });
-      }
+    const selectedRows = items.filter(item => selected.has(item.salesorder_id));
+    const names = selectedRows.map(item => item.salesorder_number).join(', ');
+    if (!window.confirm(`Permanently delete ${selected.size} Draft Sales Order${selected.size > 1 ? 's' : ''} from Zoho Books?\n\n${names}\n\nThis cannot be undone.`)) return;
+    setDeleting(true); setDeleteResults([]);
+    try {
+      const res = await fetch('/api/shipments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salesorder_ids: Array.from(selected) }),
+      });
+      const data = await res.json();
+      setDeleteResults(data.results || [{ salesorder_number: '', success: false, error: data.error || 'Delete failed' }]);
+      setSelected(new Set());
+      await fetchData();
+    } catch (cause) {
+      setDeleteResults([{ salesorder_number: '', success: false, error: cause instanceof Error ? cause.message : 'Delete failed' }]);
+    } finally {
+      setDeleting(false);
     }
-    setApproveResults(results);
-    setSelected(new Set());
-    await fetchData();
-    setApproving(false);
   }
 
   const mono = { fontFamily: 'JetBrains Mono, monospace' };
@@ -627,9 +578,9 @@ function DraftSOTable({ onSummary }: { onSummary: (summary: TableSummary) => voi
       extra={selected.size > 0 ? (
         <div className="flex items-center gap-2">
           <CopyWAButton message={buildFollowUpMessage()} label={`Follow Up (${selected.size})`} />
-          <button onClick={handleApprove} disabled={approving}
-            className="px-4 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50">
-            {approving ? 'Approving…' : `✓ Approve (${selected.size})`}
+          <button onClick={handleDelete} disabled={deleting}
+            className="px-4 py-1.5 text-xs bg-[var(--danger)] hover:opacity-90 text-white rounded-lg font-medium transition-colors disabled:opacity-50">
+            {deleting ? 'Deleting…' : `Delete (${selected.size})`}
           </button>
         </div>
       ) : undefined}>
@@ -637,13 +588,13 @@ function DraftSOTable({ onSummary }: { onSummary: (summary: TableSummary) => voi
       {loading && <LoadingSkeleton />}
       {!loading && error && <div className="p-5 text-[var(--danger)] text-sm">{error}</div>}
 
-      {approveResults.length > 0 && (
+      {deleteResults.length > 0 && (
         <div className="px-5 py-3 border-b border-[var(--border)] space-y-1">
-          {approveResults.map((r, i) => (
+          {deleteResults.map((r, i) => (
             <div key={i} className={`text-xs flex gap-2 ${r.success ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
               <span>{r.success ? '✓' : '✗'}</span>
-              <span style={mono} className="font-medium">{r.number}</span>
-              <span>{r.success ? 'Approved' : r.error}</span>
+              <span style={mono} className="font-medium">{r.salesorder_number}</span>
+              <span>{r.success ? 'Deleted from Zoho Books' : r.error}</span>
             </div>
           ))}
         </div>
@@ -816,7 +767,7 @@ function NotReadyTable({ items, loading, error }: { items: ConfirmedNotReady[]; 
               <th className="w-8"></th>
               <th>SO Number</th>
               <th>Customer</th>
-              <th>SO Date</th>
+              <th>Date</th>
               <th className="text-right">Aging ↓</th>
               <th>Status</th>
               <th className="text-right">Qty</th>
@@ -1049,8 +1000,7 @@ function DeliveredTable({ items, loading, error, onConverted }: {
               <th>SO Number</th>
               <th>Customer</th>
               <th>Location</th>
-              <th>SO Date</th>
-              <th>Delivery Date</th>
+              <th>Date</th>
               <th className="text-right">Aging</th>
               <th>Shipments</th>
               <th>Invoice Status</th>
@@ -1083,11 +1033,6 @@ function DeliveredTable({ items, loading, error, onConverted }: {
                         ) : <span className="text-[var(--text-4)]">—</span>}
                       </td>
                       <td className="text-[var(--text-3)] text-xs">{item.date}</td>
-                      <td className="text-xs">
-                        {item.all_delivered
-                          ? <span className="text-[var(--text-2)]">{item.latest_delivery_date}</span>
-                          : <span className="text-[var(--warning)]">⚠ Partial</span>}
-                      </td>
                       <td className="text-right">
                         <AgingBadge
                           date={item.latest_delivery_date}
@@ -1106,7 +1051,7 @@ function DeliveredTable({ items, loading, error, onConverted }: {
                     </tr>
                     {exp && (
                       <tr key={item.salesorder_id + '_detail'}>
-                        <td colSpan={11} className="p-0">
+                        <td colSpan={10} className="p-0">
                           <div className="bg-[var(--surface-2)] px-6 py-4">
                             {/* Packages */}
                             <div className="text-[var(--text-4)] text-xs uppercase tracking-wider mb-2" style={{ fontFamily: 'JetBrains Mono, monospace' }}>

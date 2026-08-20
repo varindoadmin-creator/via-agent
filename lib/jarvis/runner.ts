@@ -1,7 +1,7 @@
 import { run, setTracingDisabled } from '@openai/agents';
 import { createJarvisAgent } from './agent';
 import type { JarvisRunContext } from './context';
-import { collectToolActivity, type JarvisToolActivity } from './activity';
+import { collectActionPreview, collectToolActivity } from './activity';
 
 export interface JarvisHistoryMessage {
   role: 'user' | 'assistant';
@@ -39,6 +39,7 @@ export async function runJarvis(input: RunJarvisInput) {
       ? result.finalOutput.trim()
       : 'I could not produce a verified answer. Please try again.',
     toolActivity: collectToolActivity(result.newItems),
+    actionPreview: collectActionPreview(result.newItems),
     responseId: result.lastResponseId,
   };
 }

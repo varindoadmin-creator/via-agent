@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import StatusPill, { PillTone } from '@/components/ui/StatusPill';
+import InvoicePrintSection from '@/components/InvoicePrintSection';
 
 const mono = { fontFamily: 'JetBrains Mono, monospace' };
 const formatRp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
@@ -430,6 +431,7 @@ export default function TaxInvoicesPage() {
             )}
           </table>
         </div>
+        <InvoicePrintSection />
       </div>
     </div>
   );

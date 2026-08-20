@@ -3,6 +3,28 @@ export interface JarvisToolActivity {
   status: 'completed' | 'failed';
 }
 
+export interface JarvisActionPreview {
+  kind: 'jarvis_so_preview';
+  approval_id: string;
+  preview: Record<string, unknown>;
+}
+
+export function collectActionPreview(items: Array<{ type?: string; output?: unknown }>): JarvisActionPreview | null {
+  for (const item of items) {
+    if (item.type !== 'tool_call_output_item' || !item.output) continue;
+    let candidate: unknown = item.output;
+    if (typeof candidate === 'string') {
+      try { candidate = JSON.parse(candidate); } catch { continue; }
+    }
+    if (!candidate || typeof candidate !== 'object') continue;
+    const output = candidate as Partial<JarvisActionPreview>;
+    if (output.kind === 'jarvis_so_preview' && typeof output.approval_id === 'string' && output.preview) {
+      return output as JarvisActionPreview;
+    }
+  }
+  return null;
+}
+
 const TOOL_LABELS: Record<string, string> = {
   find_via_feature: 'VIA feature lookup',
   search_customer: 'Customer lookup',
@@ -16,6 +38,15 @@ const TOOL_LABELS: Record<string, string> = {
   search_purchase_orders: 'Purchase Order lookup',
   get_purchase_order: 'Purchase Order details',
   get_open_purchase_orders_for_item: 'Open PO coverage',
+  assess_order_fulfillment: 'Order fulfilment analysis',
+  prepare_sales_order: 'Sales Order preview',
+  analyze_sales_periods: 'Sales performance analysis',
+  boardroom_sales_brief: 'Boardroom sales brief',
+  analyze_receivables: 'Receivables analysis',
+  get_operational_pipeline: 'Operational pipeline',
+  analyze_gross_profit: 'Gross profit analysis',
+  analyze_inventory_risk: 'Inventory risk analysis',
+  search_knowledge: 'Knowledge search',
 };
 
 export function collectToolActivity(items: Array<{ rawItem?: unknown }>): JarvisToolActivity[] {

@@ -28,7 +28,7 @@
     "test:greetings": "node --experimental-strip-types --test lib/ai/greetings.test.ts",
     "test:phonetic-matching": "node --experimental-strip-types --test lib/ai/phoneticMatching.test.ts",
     "test:sidekick-knowledge": "node --experimental-strip-types --test lib/ai/liveQuestions.test.ts",
-    "test:jarvis": "node --experimental-strip-types --test lib/jarvis/*.test.ts",
+    "test:jarvis": "node --experimental-strip-types --test lib/jarvis/*.test.ts lib/jarvis/intelligence/*.test.ts lib/jarvis/knowledge/*.test.ts lib/jarvis/proactive/*.test.ts",
     "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
     "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts"
   },

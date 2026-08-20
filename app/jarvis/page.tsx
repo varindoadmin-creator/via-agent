@@ -9,10 +9,10 @@ export default function JarvisPage() {
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">JARVIS</h1>
-            <p className="mt-1 text-sm text-[var(--text-3)]">Varindo intelligence · Read-only pilot</p>
+            <p className="mt-1 text-sm text-[var(--text-3)]">Varindo intelligence · Evidence, analytics, and controlled actions</p>
           </div>
           <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs text-[var(--text-3)]">
-            No write actions enabled
+            Zoho writes require approval
           </span>
         </div>
 

@@ -7,6 +7,7 @@ const GRACE_MS = 30 * 60 * 1000;
 
 const JOBS = [
   { name: 'customers-auto-repair', label: 'Repair Customer Data', hour: 9, minute: 5 },
+  { name: 'documents-npwp-repair', label: 'Fill Missing NPWP on Sales Documents', hour: 9, minute: 8 },
   { name: 'shipments-auto-invoice', label: 'Convert Ready Shipments', hour: 9, minute: 0 },
   { name: 'invoices-auto-send', label: 'Mark Ready Draft Invoices as Sent', hour: 9, minute: 10 },
   { name: 'inventory-price-list-sync', label: 'Synchronize Inventory Price Lists', hour: 9, minute: 15 },

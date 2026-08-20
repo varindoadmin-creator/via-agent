@@ -77,6 +77,7 @@ export interface DeliveredNotInvoiced {
   quantity: number;
   delivery_method: string;
   salesperson_name: string;
+  location_name: string;
   all_delivered: boolean; // true = can convert; false = partial, grayed out
   delivered_shipments: number;
   total_shipments: number;
@@ -118,6 +119,19 @@ async function fetchSoDetail(soId: string): Promise<Record<string, unknown> | nu
     const res = await zohoGet('/salesorders/' + soId);
     return res.salesorder || null;
   } catch { return null; }
+}
+
+async function hydrateSalesOrderLocations(rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const hydrated: Record<string, unknown>[] = [];
+  for (let index = 0; index < rows.length; index += 10) {
+    const batch = rows.slice(index, index + 10);
+    const details = await Promise.all(batch.map(row => fetchSoDetail(String(row.salesorder_id || ''))));
+    hydrated.push(...batch.map((row, offset) => ({
+      ...row,
+      location_name: details[offset] ? extractLineItemLocation(details[offset]!) : String(row.location_name || ''),
+    })));
+  }
+  return hydrated;
 }
 
 /**
@@ -219,7 +233,8 @@ export async function GET(request: NextRequest) {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
-      return NextResponse.json({ success: true, salesorders: data.salesorders || [] });
+      const rows = await hydrateSalesOrderLocations((data.salesorders || []) as Record<string, unknown>[]);
+      return NextResponse.json({ success: true, salesorders: rows });
     } catch (err) {
       return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
     }
@@ -235,7 +250,8 @@ export async function GET(request: NextRequest) {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
-      return NextResponse.json({ success: true, salesorders: data.salesorders || [] });
+      const rows = await hydrateSalesOrderLocations((data.salesorders || []) as Record<string, unknown>[]);
+      return NextResponse.json({ success: true, salesorders: rows });
     } catch (err) {
       return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
     }
@@ -272,7 +288,8 @@ export async function GET(request: NextRequest) {
         headers: { Authorization: `Zoho-oauthtoken ${token}` },
       });
       const data = await res.json();
-      return NextResponse.json({ success: true, salesorders: data.salesorders || [] });
+      const rows = await hydrateSalesOrderLocations((data.salesorders || []) as Record<string, unknown>[]);
+      return NextResponse.json({ success: true, salesorders: rows });
     } catch (err) {
       return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
     }
@@ -637,6 +654,55 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error('[Shipments] GET error:', err);
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+  }
+}
+
+// ─── DELETE: Delete a Draft SO ───────────────────────────────────────────────
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json() as { salesorder_ids?: string[] };
+    const ids = Array.from(new Set((body.salesorder_ids || []).map(String).filter(Boolean)));
+    if (!ids.length || ids.length > 100) {
+      return NextResponse.json({ success: false, error: 'Select 1-100 Draft Sales Orders.' }, { status: 400 });
+    }
+
+    const token = await getZohoAccessToken();
+    const base = getZohoApiBaseUrl();
+    const orgId = getZohoOrgId();
+    const results: Array<{ salesorder_id: string; salesorder_number: string; success: boolean; error?: string }> = [];
+
+    for (const id of ids) {
+      try {
+        const detail = await zohoGet(`/salesorders/${encodeURIComponent(id)}`);
+        const so = detail.salesorder as Record<string, unknown> | undefined;
+        if (!so) throw new Error('Sales Order not found');
+        const number = String(so.salesorder_number || id);
+        if (String(so.status || '').toLowerCase() !== 'draft') {
+          throw new Error(`Only Draft Sales Orders can be deleted (current: ${String(so.status || 'unknown')})`);
+        }
+        const response = await fetchWithRetry(`${base}/salesorders/${encodeURIComponent(id)}?organization_id=${orgId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Zoho-oauthtoken ${token}` },
+        });
+        const payload = await response.json();
+        if (!response.ok || (payload.code !== undefined && payload.code !== 0)) {
+          throw new Error(String(payload.message || `Zoho ${response.status}`));
+        }
+        results.push({ salesorder_id: id, salesorder_number: number, success: true });
+      } catch (error) {
+        results.push({ salesorder_id: id, salesorder_number: id, success: false, error: String(error) });
+      }
+    }
+
+    return NextResponse.json({
+      success: results.every(result => result.success),
+      deleted: results.filter(result => result.success).length,
+      failed: results.filter(result => !result.success).length,
+      results,
+    }, { status: results.some(result => result.success) ? 200 : 400 });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
   }
 }
 
