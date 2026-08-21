@@ -98,6 +98,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
         { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
         { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
+        { id: 'whatsapp-inbox', href: '/requests/whatsapp',   label: 'WhatsApp Inbox' },
       ],
     },
   },
