@@ -469,7 +469,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   }, [router]);
 
   // Login page renders its own full-screen layout — no sidebar chrome.
-  if (pathname === '/login') return <>{children}</>;
+  if (pathname === '/login' || pathname === '/privacy') return <>{children}</>;
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
   if (mode === 'mobile') {
