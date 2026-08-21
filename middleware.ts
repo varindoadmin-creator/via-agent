@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/ping'];
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/ping', '/api/webhooks/whatsapp', '/api/webhooks/whatsapp/health'];
 
 // Hit by external cron-job.org scheduled jobs (no browser session available),
 // so these bypass session auth via a shared secret header instead.

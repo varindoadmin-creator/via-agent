@@ -1,5 +1,14 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## WhatsApp Cloud API webhook
+
+Callback URL: `https://via-601025884976.asia-southeast2.run.app/api/webhooks/whatsapp`
+
+Before Meta verification, apply `supabase/webhook_events.sql` in Supabase and
+store `WHATSAPP_WEBHOOK_VERIFY_TOKEN` and `META_APP_SECRET` in Cloud Run Secret
+Manager. VIA records incoming events idempotently; it does not send WhatsApp
+messages or invoke Jarvis from the webhook.
+
 ## Getting Started
 
 First, run the development server:
