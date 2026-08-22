@@ -33,12 +33,15 @@ interface ChatInterfaceProps {
   apiEndpoint?: string;
   assistantName?: string;
   welcomeMessage?: string;
+  /** Fit the component into a persistent parent drawer rather than the viewport. */
+  embedded?: boolean;
 }
 
 export default function ChatInterface({
   apiEndpoint = '/api/chat',
   assistantName = 'VIA',
   welcomeMessage = WELCOME_MESSAGE.content,
+  embedded = false,
 }: ChatInterfaceProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -373,7 +376,7 @@ export default function ChatInterface({
   }, [activeConversationId, welcomeMessage]);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)", height: "100vh" }}>
+    <div className={`flex ${embedded ? 'h-full' : 'h-screen'} overflow-hidden`} style={{ background: "var(--bg)", height: embedded ? '100%' : '100vh' }}>
       {/* Sidebar */}
 
       {/* Main area */}

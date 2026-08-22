@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles, X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
+import ChatInterface from '@/components/ChatInterface';
 
 // Baked in at compile time — guarantees a unique client bundle hash on every deploy.
 const _BUILD = process.env.NEXT_PUBLIC_BUILD_TIME;
@@ -27,7 +28,6 @@ interface NavSection {
 
 const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hidden?: boolean } | { type: 'section'; section: NavSection; hidden?: boolean }> = [
   { type: 'standalone', item: { id: 'chat', href: '/dashboard', icon: LayoutDashboard, label: 'Home' }, hidden: true },
-  { type: 'standalone', item: { id: 'jarvis', href: '/jarvis', icon: Sparkles, label: 'JARVIS' } },
   { type: 'standalone', item: { id: 'leads', href: '/leads', icon: Target, label: 'Leads' }, hidden: true },
   {
     type: 'section',
@@ -98,7 +98,6 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
         { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
         { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
-        { id: 'whatsapp-inbox', href: '/requests/whatsapp',   label: 'WhatsApp Inbox' },
       ],
     },
   },
@@ -362,6 +361,99 @@ function Logo({ collapsed, onClick }: { collapsed: boolean; onClick: () => void 
   );
 }
 
+// Kept mounted inside AppShell so the conversation survives normal page navigation.
+// Closing this drawer only hides it; it deliberately does not reset JARVIS.
+function JarvisDrawer({
+  open,
+  onOpen,
+  onClose,
+  mobile,
+  sidebarWidth,
+}: {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  mobile: boolean;
+  sidebarWidth: number;
+}) {
+  const left = mobile ? 12 : sidebarWidth + 14;
+  const launcherStyle: React.CSSProperties = mobile
+    ? { left: 16, bottom: 16 }
+    : { left, bottom: 18 };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={open ? 'Close JARVIS' : 'Open JARVIS'}
+        aria-expanded={open}
+        title={open ? 'Close JARVIS' : 'Ask JARVIS'}
+        style={{
+          position: 'fixed', zIndex: 85, ...launcherStyle,
+          width: 50, height: 50, borderRadius: 16, border: '1px solid rgba(255,255,255,0.8)',
+          background: 'var(--surface)', boxShadow: '0 10px 28px rgba(25, 41, 77, 0.2)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+          opacity: open ? 0 : 1, pointerEvents: open ? 'none' : 'auto', transition: 'opacity 0.18s ease',
+        }}
+      >
+        <span style={{ position: 'relative', display: 'block' }}>
+          <LogoMark size={32} />
+          <span style={{
+            position: 'absolute', right: -8, bottom: -7, width: 17, height: 17, borderRadius: '50%',
+            background: '#7357ff', color: 'white', border: '2px solid var(--surface)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Sparkles size={9} strokeWidth={2.5} />
+          </span>
+        </span>
+      </button>
+
+      <aside
+        aria-label="JARVIS assistant"
+        aria-hidden={!open}
+        style={{
+          position: 'fixed', zIndex: 90, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          left: mobile ? 8 : left, right: mobile ? 8 : 'auto', bottom: mobile ? 8 : 18,
+          width: mobile ? 'auto' : 'min(460px, calc(100vw - ' + (left + 16) + 'px))',
+          height: mobile ? 'min(78dvh, 720px)' : 'min(720px, calc(100dvh - 36px))',
+          border: '1px solid var(--border)', borderRadius: 18, background: 'var(--panel)',
+          boxShadow: '0 20px 55px rgba(25, 41, 77, 0.25)',
+          transform: open ? 'translateY(0)' : 'translateY(calc(100% + 28px))',
+          opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none',
+          transition: 'transform 0.25s ease, opacity 0.2s ease',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          padding: '11px 12px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+            <LogoMark size={28} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: 'var(--text)', fontSize: 13, fontWeight: 700, fontFamily: 'Figtree, sans-serif' }}>JARVIS</div>
+              <div style={{ color: 'var(--text-3)', fontSize: 10.5, fontFamily: 'Figtree, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Varindo intelligence · writes need approval</div>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close JARVIS" title="Close JARVIS" style={{
+            border: 'none', background: 'transparent', color: 'var(--text-3)', cursor: 'pointer', padding: 6, borderRadius: 7, display: 'flex', flexShrink: 0,
+          }}>
+            <X size={18} />
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <ChatInterface
+            embedded
+            apiEndpoint="/api/jarvis/chat"
+            assistantName="JARVIS"
+            welcomeMessage="Hello, sir. I’m JARVIS. What would you like me to analyze or check?"
+          />
+        </div>
+      </aside>
+    </>
+  );
+}
+
 // ─── AppShell ─────────────────────────────────────────────────────────────────
 
 export default function AppShell({ children, role }: { children: React.ReactNode; role: Role | null }) {
@@ -371,6 +463,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   const [mode, setMode] = useState<Mode>('desktop');
   const [userCollapsed, setUserCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [jarvisOpen, setJarvisOpen] = useState(false);
   const [newCounts, setNewCounts] = useState<Record<string, number>>({});
 
   // Admin only sees the sections currently exposed for day-to-day approval work;
@@ -558,6 +651,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
         <main style={{ flex: 1, overflow: 'auto', paddingTop: 52, minHeight: 0 }}>
           {children}
         </main>
+        <JarvisDrawer open={jarvisOpen} onOpen={() => setJarvisOpen(true)} onClose={() => setJarvisOpen(false)} mobile sidebarWidth={0} />
       </div>
     );
   }
@@ -613,6 +707,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
       <main style={{ flex: 1, overflow: 'auto', minWidth: 0, background: 'var(--bg)' }}>
         {children}
       </main>
+      <JarvisDrawer open={jarvisOpen} onOpen={() => setJarvisOpen(true)} onClose={() => setJarvisOpen(false)} mobile={false} sidebarWidth={collapsed ? 56 : 232} />
     </div>
   );
 }
