@@ -9,7 +9,10 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_TIME: `${Date.now()}`,
   },
-  serverExternalPackages: ['pdfjs-dist', 'canvas'],
+  // `pdf-parse` uses Node-only module initialization that Webpack cannot safely
+  // transform for an App Router route. Keep it external so the reconciliation
+  // upload route loads the package directly at runtime.
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'canvas'],
   eslint: {
     ignoreDuringBuilds: true,
   },

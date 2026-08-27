@@ -730,6 +730,48 @@ function findMultiInvoiceCombinations(
   return results;
 }
 
+/**
+ * A transfer may be sent from a director's or staff member's personal account,
+ * so its sender name need not resemble the Zoho customer name.  In that case we
+ * still show an exact two-invoice total as a possible match for review. It is
+ * deliberately not treated as a strong/automatic match.
+ */
+function findExactTwoInvoiceCombinations(
+  bankAmount: number,
+  invoices: ZohoInvoice[],
+): Array<{ invoices: ZohoInvoice[]; total: number; difference: number }> {
+  const maxDiff = Math.max(1000, bankAmount * 0.001);
+  const candidates = invoices.filter((invoice) => hasPositiveBalance(invoice));
+  const results: Array<{
+    invoices: ZohoInvoice[];
+    total: number;
+    difference: number;
+  }> = [];
+
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      const total = candidates[i].balance + candidates[j].balance;
+      const difference = total - bankAmount;
+      if (Math.abs(difference) <= maxDiff) {
+        results.push({
+          invoices: [candidates[i], candidates[j]],
+          total,
+          difference,
+        });
+        if (results.length >= 3) return results;
+      }
+    }
+  }
+  return results;
+}
+
+function statementNameScore(transaction: BankTransaction, customerName: string): number {
+  return Math.max(
+    nameMatchScore(transaction.name_in_statement, customerName),
+    nameMatchScore(transaction.description, customerName),
+  );
+}
+
 function matchTransactions(
   transactions: BankTransaction[],
   allInvoices: ZohoInvoice[],
@@ -754,14 +796,10 @@ function matchTransactions(
   for (const txn of transactions) {
     const matches: InvoiceMatch[] = [];
     for (const inv of openInvoices) {
-      const rawNameScore = nameMatchScore(
-        txn.name_in_statement || txn.description,
-        inv.customer_name,
-      );
-      const knownBankName = isKnownBankName(
-        inv.customer_id,
-        txn.name_in_statement,
-      );
+      const rawNameScore = statementNameScore(txn, inv.customer_name);
+      const knownBankName =
+        isKnownBankName(inv.customer_id, txn.name_in_statement) ||
+        isKnownBankName(inv.customer_id, txn.description);
       // A bank account name we've seen pay this exact customer before is a stronger
       // signal than string similarity to the Zoho customer name (e.g. "Jully Agatta"
       // paying invoices for customer "JDESIGN").
@@ -804,16 +842,19 @@ function matchTransactions(
     for (const [customerId, custInvoices] of byCustomer) {
       if (custInvoices.length < 2) continue;
       const customerName = custInvoices[0].customer_name;
-      const knownBankName = isKnownBankName(customerId, txn.name_in_statement);
+      const knownBankName =
+        isKnownBankName(customerId, txn.name_in_statement) ||
+        isKnownBankName(customerId, txn.description);
       const nameScore = knownBankName
         ? 1.0
-        : nameMatchScore(txn.name_in_statement || txn.description, customerName);
-      if (nameScore < 0.3) continue;
-      for (const combo of findMultiInvoiceCombinations(
-        txn.amount,
-        custInvoices,
-      )) {
-        const matchScore = nameScore * 0.4 + 0.6;
+        : statementNameScore(txn, customerName);
+      const combos =
+        nameScore >= 0.3
+          ? findMultiInvoiceCombinations(txn.amount, custInvoices)
+          : findExactTwoInvoiceCombinations(txn.amount, custInvoices);
+      for (const combo of combos) {
+        const exactAmountWithoutName = nameScore < 0.3;
+        const matchScore = exactAmountWithoutName ? 0.72 : nameScore * 0.4 + 0.6;
         matches.push({
           type: "multi",
           customer_name: customerName,
@@ -830,7 +871,9 @@ function matchTransactions(
           match_score: Math.round(matchScore * 100) / 100,
           match_reason: knownBankName
             ? `known bank account for this customer, ${combo.invoices.length} invoices sum to payment amount`
-            : `${combo.invoices.length} invoices sum to payment amount`,
+            : exactAmountWithoutName
+              ? `${combo.invoices.length} invoices sum exactly to payment amount; sender name differs/unclear`
+              : `${combo.invoices.length} invoices sum to payment amount`,
         });
       }
     }
