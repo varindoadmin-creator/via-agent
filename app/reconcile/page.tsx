@@ -184,6 +184,27 @@ export default function ReconcilePage() {
 
   useEffect(() => { fetchRecordedStatements(); }, []);
 
+  async function readReconcileResponse(res: Response) {
+    const body = await res.text();
+    if (!body.trim()) {
+      throw new Error(
+        `The reconciliation server returned an empty response (${res.status}). Please retry the upload.`,
+      );
+    }
+    try {
+      return JSON.parse(body) as {
+        success?: boolean;
+        error?: string;
+        summary?: Record<string, number>;
+        results?: ReconcileResult[];
+      };
+    } catch {
+      throw new Error(
+        `The reconciliation server returned an invalid response (${res.status}). Please retry the upload.`,
+      );
+    }
+  }
+
   async function runMatchFromStatement() {
     const file = fileInputRef.current?.files?.[0];
     if (!file) {
@@ -206,11 +227,11 @@ export default function ReconcilePage() {
       form.append("file", file);
 
       const res = await fetch("/api/reconcile", { method: "POST", body: form });
-      const data = await res.json();
+      const data = await readReconcileResponse(res);
       if (!data.success)
         throw new Error(data.error || "Bank reconciliation failed.");
-      setSummary(data.summary);
-      setResults(data.results);
+      setSummary(data.summary || null);
+      setResults(data.results || []);
     } catch (err) {
       setError(String(err));
     } finally {

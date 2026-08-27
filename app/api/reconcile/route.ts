@@ -7,6 +7,11 @@ import { compareInvoiceMatches } from "@/lib/reconciliation/matchRanking";
 import { parseBcaStatementPdfText } from "@/lib/reconciliation/bcaPdf";
 import { PDFParse } from "pdf-parse";
 
+// A PDF statement can contain many transactions and matching it requires loading
+// the open-invoice list from Zoho. Keep the route alive long enough for that work
+// instead of allowing the platform to end the response mid-upload.
+export const maxDuration = 300;
+
 const ORG_ID = () => process.env.ZOHO_ORGANIZATION_ID || "";
 
 async function zohoGet(path: string) {
@@ -688,9 +693,20 @@ function findMultiInvoiceCombinations(
   }> = [];
   const maxInvoices = 6;
   const maxDiff = Math.max(1000, bankAmount * tolerance);
-  const sorted = invoices.filter((i) => hasPositiveBalance(i)).sort((a, b) => a.balance - b.balance);
+  const maxCombinationsToInspect = 5_000;
+  let inspectedCombinations = 0;
+  // Work from the larger candidate balances first.  The previous ascending order
+  // explored a very large number of small-invoice combinations before it could
+  // reach a statement amount, especially for long BCA PDF statements.  Descending
+  // order finds useful combinations sooner and prevents the request timing out.
+  const sorted = invoices
+    .filter((i) => hasPositiveBalance(i) && i.balance <= bankAmount + maxDiff)
+    .sort((a, b) => b.balance - a.balance);
 
   function search(start: number, current: ZohoInvoice[], currentTotal: number) {
+    // A sender name can occasionally match a customer with many old open invoices.
+    // Keep that one transaction from consuming the entire upload request.
+    if (++inspectedCombinations > maxCombinationsToInspect) return;
     const diff = Math.abs(currentTotal - bankAmount);
     if (current.length > 1 && diff <= maxDiff) {
       results.push({
