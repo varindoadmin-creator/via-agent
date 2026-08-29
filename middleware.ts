@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
-const PUBLIC_PATHS = ['/login', '/privacy', '/api/auth/login', '/api/auth/logout', '/api/ping', '/api/webhooks/whatsapp', '/api/webhooks/whatsapp/health', '/api/integrations/wati/webhook'];
+const PUBLIC_PATHS = ['/login', '/privacy', '/api/auth/login', '/api/auth/logout', '/api/ping', '/api/jarvis/health', '/api/webhooks/whatsapp', '/api/webhooks/whatsapp/health', '/api/integrations/wati/webhook'];
 
 // Hit by external cron-job.org scheduled jobs (no browser session available),
 // so these bypass session auth via a shared secret header instead.
-const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/customers/duplicates/scan', '/api/leads/auto-repair', '/api/invoices-page/auto-send', '/api/inventory/price-lists/sync', '/api/salesperson-map/sync', '/api/salesorders/purchase-gap-check', '/api/shipments/aging-check', '/api/data-quality', '/api/documents/npwp-repair'];
+const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/customers/duplicates/scan', '/api/leads/auto-repair', '/api/invoices-page/auto-send', '/api/inventory/price-lists/sync', '/api/salesperson-map/sync', '/api/salesorders/purchase-gap-check', '/api/shipments/aging-check', '/api/data-quality', '/api/documents/npwp-repair', '/api/jarvis/recovery'];
 
 function isCronAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

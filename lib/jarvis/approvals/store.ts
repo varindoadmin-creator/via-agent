@@ -50,6 +50,11 @@ export async function savePendingSalesOrder(input: {
       payload: input.payload,
       preview: input.preview,
       expires_at: expiresAt,
+      // Kept behind the schema flag so existing deployments remain compatible
+      // until supabase/jarvis_reliability.sql has been applied.
+      ...(process.env.JARVIS_RELIABILITY_SCHEMA_ENABLED === 'true'
+        ? { idempotency_key: `jarvis:create_sales_order:${id}`, workflow_version: 1 }
+        : {}),
     }),
   });
   if (!response.ok) throw new Error(`Unable to save JARVIS approval preview (${response.status}).`);
@@ -80,9 +85,27 @@ export async function finishPendingAction(id: string, result: {
   error?: string;
 }): Promise<void> {
   const db = database();
-  await fetch(`${db.url}?id=eq.${encodeURIComponent(id)}&status=eq.executing`, {
+  const response = await fetch(`${db.url}?id=eq.${encodeURIComponent(id)}&status=eq.executing`, {
     method: 'PATCH',
     headers: db.headers,
-    body: JSON.stringify({ ...result, completed_at: new Date().toISOString() }),
+    body: JSON.stringify({ ...result, completed_at: new Date().toISOString(), ...(process.env.JARVIS_RELIABILITY_SCHEMA_ENABLED === 'true' ? { updated_at: new Date().toISOString() } : {}) }),
   });
+  if (!response.ok) throw new Error(`Unable to finalize JARVIS approval (${response.status}).`);
+}
+
+/** Reads only stuck executions. Recovery must reconcile externally; it never repeats a Zoho write. */
+export async function listStaleExecutingActions(staleBefore: string): Promise<PendingJarvisAction[]> {
+  const db = database();
+  const response = await fetch(`${db.url}?status=eq.executing&approved_at=lt.${encodeURIComponent(staleBefore)}&select=id,conversation_id,requested_by,action_type,status,payload,preview,expires_at`, { headers: db.headers });
+  if (!response.ok) throw new Error(`Unable to inspect JARVIS action recovery queue (${response.status}).`);
+  return response.json() as Promise<PendingJarvisAction[]>;
+}
+
+export async function markActionForManualReconciliation(id: string): Promise<void> {
+  const db = database();
+  const response = await fetch(`${db.url}?id=eq.${encodeURIComponent(id)}&status=eq.executing`, {
+    method: 'PATCH', headers: db.headers,
+    body: JSON.stringify({ status: 'failed', error: 'Execution outcome unknown; check Zoho Books before preparing a replacement.', completed_at: new Date().toISOString() }),
+  });
+  if (!response.ok) throw new Error(`Unable to mark stale JARVIS action (${response.status}).`);
 }

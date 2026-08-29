@@ -10,6 +10,8 @@ export interface ZohoRequestOptions {
   queryParams?: Record<string, string | number | boolean>;
   /** Set to 0 for non-idempotent writes where an automatic retry could duplicate data. */
   retries?: number;
+  /** Explicit per-request deadline. Defaults to 20 seconds. */
+  timeoutMs?: number;
 }
 
 /**
@@ -19,7 +21,7 @@ export async function zohoRequest<T>(
   path: string,
   options: ZohoRequestOptions = {}
 ): Promise<T> {
-  const { method = 'GET', body, queryParams = {}, retries } = options;
+  const { method = 'GET', body, queryParams = {}, retries, timeoutMs = 20_000 } = options;
 
   const accessToken = await getZohoAccessToken();
   const orgId = getZohoOrgId();
@@ -38,16 +40,27 @@ export async function zohoRequest<T>(
     'Content-Type': 'application/json',
   };
 
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), Math.max(1_000, timeoutMs));
   const fetchOptions: RequestInit = {
     method,
     headers,
+    signal: abort.signal,
   };
 
   if (body && method !== 'GET') {
     fetchOptions.body = JSON.stringify(body);
   }
 
-  const response = await fetchWithRetry(url.toString(), fetchOptions, retries == null ? {} : { retries });
+  // GET calls are safe to retry. Mutations must opt in explicitly only when a
+  // caller has durable idempotency/reconciliation guarantees.
+  const safeRetries = retries ?? (method === 'GET' ? 2 : 0);
+  let response: Response;
+  try {
+    response = await fetchWithRetry(url.toString(), fetchOptions, { retries: safeRetries });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

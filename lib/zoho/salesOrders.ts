@@ -160,6 +160,9 @@ export async function createDraftSalesOrder(
 
   const response = await zohoRequest<ZohoSOResponse>('/salesorders', {
     method: 'POST',
+    // A timed-out create has an unknown outcome. The approval workflow leaves
+    // it for reconciliation instead of issuing a duplicate POST.
+    retries: 0,
     body: {
       ...payload,
       // Always create as draft first

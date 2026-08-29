@@ -1,0 +1,38 @@
+name: JARVIS evaluations
+
+on:
+  pull_request:
+    paths:
+      - "app/api/jarvis/**"
+      - "app/jarvis/**"
+      - "components/**"
+      - "lib/jarvis/**"
+      - "scripts/eval-jarvis.ts"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches: [main]
+    paths:
+      - "app/api/jarvis/**"
+      - "app/jarvis/**"
+      - "components/**"
+      - "lib/jarvis/**"
+      - "scripts/eval-jarvis.ts"
+      - "package.json"
+      - "package-lock.json"
+
+jobs:
+  offline-contract-and-safety:
+    name: Offline JARVIS contract and safety checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:jarvis
+      - run: npm run eval:jarvis -- --suite=golden
+      - run: npm run eval:jarvis -- --suite=safety

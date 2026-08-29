@@ -1,3 +1,5 @@
+import { JARVIS_TOOL_LABELS } from './tools/catalog.ts';
+
 export interface JarvisToolActivity {
   name: string;
   status: 'completed' | 'failed';
@@ -25,30 +27,6 @@ export function collectActionPreview(items: Array<{ type?: string; output?: unkn
   return null;
 }
 
-const TOOL_LABELS: Record<string, string> = {
-  find_via_feature: 'VIA feature lookup',
-  search_customer: 'Customer lookup',
-  search_item: 'Item lookup',
-  get_item_stock: 'System stock lookup',
-  get_customer: 'Customer details',
-  get_item: 'Item details',
-  get_customer_price: 'Customer price lookup',
-  search_sales_orders: 'Sales Order lookup',
-  get_sales_order: 'Sales Order details',
-  search_purchase_orders: 'Purchase Order lookup',
-  get_purchase_order: 'Purchase Order details',
-  get_open_purchase_orders_for_item: 'Open PO coverage',
-  assess_order_fulfillment: 'Order fulfilment analysis',
-  prepare_sales_order: 'Sales Order preview',
-  analyze_sales_periods: 'Sales performance analysis',
-  boardroom_sales_brief: 'Boardroom sales brief',
-  analyze_receivables: 'Receivables analysis',
-  get_operational_pipeline: 'Operational pipeline',
-  analyze_gross_profit: 'Gross profit analysis',
-  analyze_inventory_risk: 'Inventory risk analysis',
-  search_knowledge: 'Knowledge search',
-};
-
 export function collectToolActivity(items: Array<{ rawItem?: unknown }>): JarvisToolActivity[] {
   const names = new Set<string>();
   for (const item of items) {
@@ -56,7 +34,7 @@ export function collectToolActivity(items: Array<{ rawItem?: unknown }>): Jarvis
     if (raw?.type === 'function_call' && raw.name) names.add(raw.name);
   }
   return [...names].map(name => ({
-    name: TOOL_LABELS[name] || name,
+    name: JARVIS_TOOL_LABELS[name] || name,
     status: 'completed',
   }));
 }
