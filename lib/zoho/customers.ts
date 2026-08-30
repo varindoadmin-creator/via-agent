@@ -1,6 +1,6 @@
 // ─── Zoho Books Customers ─────────────────────────────────────────────────────
 
-import type { ZohoContact, ZohoContactListResponse } from '../../types/zoho.ts';
+import type { ZohoContact, ZohoContactListResponse, ZohoAddress } from '../../types/zoho.ts';
 import { zohoRequest, isMockMode } from './client.ts';
 import { fuzzyNameSimilarity } from '../ai/phoneticMatching.ts';
 
@@ -171,6 +171,99 @@ export async function getCustomerById(contactId: string): Promise<ZohoContact | 
   } catch {
     return null;
   }
+}
+
+/**
+ * Candidate shipping/delivery addresses for a customer (brief sections
+ * 23-30). Combines the contact's primary shipping_address with any
+ * additional addresses on file, deduplicated by address_id/address text.
+ * Never returns another customer's addresses — always scoped by contactId.
+ */
+export async function getCustomerAddresses(contactId: string): Promise<ZohoAddress[]> {
+  if (isMockMode()) {
+    const customer = MOCK_CUSTOMERS.find((c) => c.contact_id === contactId);
+    return customer?.shipping_address ? [customer.shipping_address] : [];
+  }
+  const customer = await getCustomerById(contactId);
+  const addresses: ZohoAddress[] = [];
+  if (customer?.shipping_address) addresses.push(customer.shipping_address);
+  try {
+    const response = await zohoRequest<{ addresses?: ZohoAddress[] }>(`/contacts/${contactId}/address`);
+    for (const addr of response.addresses || []) {
+      const isDuplicate = addresses.some(a => a.address_id ? a.address_id === addr.address_id : a.address === addr.address);
+      if (!isDuplicate) addresses.push(addr);
+    }
+  } catch {
+    // Additional-address sub-resource unavailable — fall back to just the primary shipping address.
+  }
+  return addresses;
+}
+
+/**
+ * Create a new Zoho Customer.
+ *
+ * VIA Customer Operations Phase 6, brief section 13: this is the ONLY code
+ * path that creates Zoho master-data customers. It must only ever be called
+ * after: a duplicate check has run, an internal admin/director has approved
+ * an unexpired, version/hash-matched CustomerDraft, and required fields (incl.
+ * the NPWP rule — only present when needsFakturPajak) have been validated.
+ * Callers (lib/commercialApprovals/executeCustomerCreation.ts) are
+ * responsible for that revalidation immediately before calling this —
+ * this function does not re-run the duplicate check itself, since it has no
+ * visibility into which approval authorized the call.
+ */
+export async function createApprovedCustomer(input: {
+  companyName: string;
+  contactPersonName?: string | null;
+  email?: string | null;
+  needsFakturPajak: boolean;
+  npwp?: string | null;
+  billingAddress?: { address: string; city?: string; state?: string; zip?: string; country?: string } | null;
+  shippingAddress?: { address: string; city?: string; state?: string; zip?: string; country?: string } | null;
+}): Promise<ZohoContact> {
+  if (isMockMode()) {
+    const mock: ZohoContact = {
+      contact_id: `MOCK-CUST-${Date.now()}`,
+      contact_name: input.companyName,
+      company_name: input.companyName,
+      status: 'active',
+      contact_type: 'customer',
+      currency_code: 'IDR',
+      cf_needs_faktur_pajak: input.needsFakturPajak,
+      cf_npwp: input.needsFakturPajak ? (input.npwp ?? undefined) : undefined,
+    };
+    MOCK_CUSTOMERS.push(mock);
+    return mock;
+  }
+
+  const toZohoAddress = (a: NonNullable<typeof input.billingAddress>) => ({
+    address: a.address, city: a.city || '', state: a.state || '', zip: a.zip || '', country: a.country || 'Indonesia',
+  });
+
+  const payload: Record<string, unknown> = {
+    contact_name: input.companyName,
+    company_name: input.companyName,
+    contact_type: 'customer',
+    currency_code: 'IDR',
+  };
+  if (input.needsFakturPajak && input.npwp) payload.cf_npwp = input.npwp;
+  payload.cf_needs_faktur_pajak = input.needsFakturPajak;
+  if (input.contactPersonName) {
+    payload.contact_persons = [{ first_name: input.contactPersonName, email: input.email || undefined, is_primary_contact: true }];
+  }
+  if (input.billingAddress) payload.billing_address = toZohoAddress(input.billingAddress);
+  if (input.shippingAddress) payload.shipping_address = toZohoAddress(input.shippingAddress);
+
+  const response = await zohoRequest<{ contact: ZohoContact }>('/contacts', {
+    method: 'POST',
+    // A timed-out create has an unknown outcome. The approval workflow leaves
+    // it for manual reconciliation instead of issuing a duplicate POST.
+    retries: 0,
+    body: payload,
+  });
+  if (!response.contact) throw new Error('Zoho did not return a contact after customer creation.');
+  customerCache = []; // invalidate the read cache so the new customer is immediately findable
+  return response.contact;
 }
 
 // ─── Mock Implementation ──────────────────────────────────────────────────────

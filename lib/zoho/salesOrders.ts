@@ -1,12 +1,12 @@
 // ─── Zoho Books Sales Orders ──────────────────────────────────────────────────
 
-import {
+import type {
   ZohoSalesOrder,
   ZohoSOListResponse,
   ZohoSOResponse,
   ZohoCreateSOPayload,
-} from '@/types/zoho';
-import { zohoRequest, isMockMode } from './client';
+} from '../../types/zoho.ts';
+import { zohoRequest, isMockMode } from './client.ts';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

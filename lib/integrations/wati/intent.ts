@@ -30,6 +30,20 @@ export type WatiIntent =
   | 'ORDER_STATUS_INQUIRY'
   | 'GENERAL_INQUIRY'
   | 'HUMAN_REQUEST'
+  // Phase 6 (brief section 2) — commercial-intent classification. Context-
+  // dependent cases (ORDER_CONFIRMATION/MODIFICATION, CUSTOMER_IDENTITY_SELECTION,
+  // DELIVERY_ADDRESS_SELECTION, NEW_CUSTOMER_ONBOARDING) are mostly resolved by
+  // an active commercial/customer draft's own workflow state (checked in
+  // pipeline.ts before generic intent detection, same pattern as the existing
+  // quantity-follow-up short-circuit) rather than guessed from bare text alone.
+  | 'ORDER_INTENT'
+  | 'QUOTATION_REQUEST'
+  | 'ORDER_CONFIRMATION'
+  | 'ORDER_MODIFICATION'
+  | 'ORDER_CANCELLATION_REQUEST'
+  | 'NEW_CUSTOMER_ONBOARDING'
+  | 'CUSTOMER_IDENTITY_SELECTION'
+  | 'DELIVERY_ADDRESS_SELECTION'
   | 'UNKNOWN';
 
 export interface IntentDetectionResult {
@@ -101,6 +115,19 @@ const PRICE_KEYWORD_PATTERN = /\bharga\w*\b/i;
 const PRODUCT_MENTION_PATTERN = /\b(produk|barang|motif|jenis|item)\b/i;
 const GREETING_PATTERN = /^(halo+|hai+|hi+|hello+|selamat\s+(pagi|siang|sore|malam))[.!\s]*$/i;
 
+// ─── Phase 6: commercial intent (brief section 2) ───────────────────────────
+// QUOTATION_REQUEST is checked before ORDER_INTENT — "quote"/"quotation"/
+// "penawaran" is an explicit, unambiguous signal that must win even when a
+// commit-shaped verb like "ambil" also appears in the same message.
+const QUOTATION_REQUEST_PATTERN = /\b(quotation|quote|penawaran)\b/i;
+// A commit-shaped verb ("ambil", "pesan", "order") is required — this must
+// never fire on a bare price/stock question (brief section 2: "do not
+// confuse a price inquiry with a confirmed order").
+const ORDER_COMMIT_VERB_PATTERN = /\b(ambil|pesan|order|beli)\b/i;
+const QUANTITY_PATTERN = /\b\d+([.,]\d+)?\s*(lembar|pcs|pc|unit|dus|box|roll|meter|m|kg)?\b/i;
+const ORDER_CANCELLATION_PATTERN = /\bbatal(kan)?\b.*\b(pesanan|order|so)\b|\b(pesanan|order|so)\b.*\bbatal(kan)?\b/i;
+const ORDER_MODIFICATION_PATTERN = /\b(tambah|ubah|ganti|kurangi)\w*\s+(jadi|menjadi)\b/i;
+
 function extractProductCodeCandidate(text: string): string | null {
   const match = text.match(ITEM_CODE_PATTERN);
   return match ? match[0].trim() : null;
@@ -122,6 +149,16 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
     return { intent: 'HUMAN_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
   }
 
+  // Phase 6 sections 52-54: cancellation/modification are checked early since
+  // they're specific action words that would otherwise be masked by the
+  // broader order/quotation checks below.
+  if (ORDER_CANCELLATION_PATTERN.test(trimmed)) {
+    return { intent: 'ORDER_CANCELLATION_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+  }
+  if (ORDER_MODIFICATION_PATTERN.test(trimmed)) {
+    return { intent: 'ORDER_MODIFICATION', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+  }
+
   if (COMPANY_ENTITY_PATTERN.test(trimmed) && ENTITY_CONTEXT_PATTERN.test(trimmed)) {
     return { intent: 'OTHER_CUSTOMER_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: extractMentionedEntity(trimmed) };
   }
@@ -140,6 +177,19 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
 
   if (parseWebsiteStructuredProduct(trimmed)) {
     return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand, productCodeCandidate, source: 'WEBSITE', mentionedEntity: null };
+  }
+
+  // Phase 6 section 2/33: explicit "quote"/"quotation"/"penawaran" wins over a
+  // commit verb in the same message ("Quote ATP11358M 50 lembar, jika oke saya
+  // ambil" is still a QUOTATION_REQUEST first). A genuine commit verb +
+  // quantity is ORDER_INTENT — never inferred from a bare price/stock
+  // question with no commit verb (brief: "do not confuse a price inquiry
+  // with a confirmed order").
+  if (QUOTATION_REQUEST_PATTERN.test(trimmed) && (productCodeCandidate || brand)) {
+    return { intent: 'QUOTATION_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+  }
+  if (ORDER_COMMIT_VERB_PATTERN.test(trimmed) && QUANTITY_PATTERN.test(trimmed) && (productCodeCandidate || brand)) {
+    return { intent: 'ORDER_INTENT', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
   }
 
   // Brief section 21: recognize a combined stock+price question in one pass

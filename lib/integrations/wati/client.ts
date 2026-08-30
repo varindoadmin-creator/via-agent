@@ -40,3 +40,37 @@ export async function sendWatiText(whatsappNumber: string, text: string): Promis
     return 'failed';
   }
 }
+
+/**
+ * Sync customer-safe contact attributes to WATI (VIA Customer Operations
+ * Phase 6, brief section 59). Uses WATI's documented
+ * addUpdateContactAttributes endpoint — same inert-until-configured
+ * convention as sendWatiText, and same "verify against your real
+ * account/docs" caveat. WATI is never authoritative (brief section 16): this
+ * is a one-way push, never read back to update Zoho/VIA.
+ */
+export async function updateWatiContactAttributes(whatsappNumber: string, attributes: Record<string, string>): Promise<WatiSendResult> {
+  const config = watiConfig();
+  if (!config) {
+    console.info('[wati.client]', JSON.stringify({ event: 'contact_sync_skipped_not_configured', to: whatsappNumber }));
+    return 'disabled';
+  }
+  try {
+    const url = `${config.baseUrl}/api/v1/addUpdateContactAttributes/${encodeURIComponent(whatsappNumber)}`;
+    const customParams = Object.entries(attributes).map(([name, value]) => ({ name, value }));
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customParams }),
+    });
+    if (!response.ok) {
+      console.error('[wati.client]', JSON.stringify({ event: 'contact_sync_failed', status: response.status }));
+      return 'failed';
+    }
+    console.info('[wati.client]', JSON.stringify({ event: 'contact_sync_ok', to: whatsappNumber, fields: Object.keys(attributes) }));
+    return 'sent';
+  } catch (error) {
+    console.error('[wati.client]', JSON.stringify({ event: 'contact_sync_error', error: error instanceof Error ? error.message : 'unknown' }));
+    return 'failed';
+  }
+}

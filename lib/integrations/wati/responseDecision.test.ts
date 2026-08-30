@@ -125,3 +125,35 @@ test('a suppressed conversation also blocks price and discount intents', () => {
   assert.equal(priceDecision.case, 'SUPPRESSED');
   assert.equal(discountDecision.case, 'SUPPRESSED');
 });
+
+// ─── Phase 6: commercial-intent cases ───────────────────────────────────────
+
+test('Test 77 — ORDER_INTENT with a resolved product defers to the pipeline workflow, never confirms a Zoho write here', () => {
+  const decision = decideResponse({ intent: 'ORDER_INTENT', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
+  assert.equal(decision.case, 'K_COMMERCIAL_WORKFLOW');
+  assert.equal(decision.text, null);
+});
+
+test('QUOTATION_REQUEST with an unresolved product asks for clarification, never starts a draft blind', () => {
+  const decision = decideResponse({ intent: 'QUOTATION_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'E_CLARIFICATION');
+});
+
+test('ORDER_MODIFICATION and ORDER_CANCELLATION_REQUEST both defer to the pipeline workflow', () => {
+  const mod = decideResponse({ intent: 'ORDER_MODIFICATION', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  const cancel = decideResponse({ intent: 'ORDER_CANCELLATION_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(mod.case, 'K_COMMERCIAL_WORKFLOW');
+  assert.equal(cancel.case, 'K_COMMERCIAL_WORKFLOW');
+});
+
+test('a suppressed conversation also blocks commercial-intent cases', () => {
+  const decision = decideResponse({ intent: 'ORDER_INTENT', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: true });
+  assert.equal(decision.case, 'SUPPRESSED');
+});
+
+test('Section 80 — when COMMERCIAL_DRAFT_ENABLED is off, commercial intents fall back to the pre-Phase-6 ack/route handoff instead of starting a draft', () => {
+  const order = decideResponse({ intent: 'ORDER_INTENT', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false, commercialDraftEnabled: false });
+  const cancel = decideResponse({ intent: 'ORDER_CANCELLATION_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, commercialDraftEnabled: false });
+  assert.equal(order.case, 'G_ACK_ROUTE');
+  assert.equal(cancel.case, 'G_ACK_ROUTE');
+});

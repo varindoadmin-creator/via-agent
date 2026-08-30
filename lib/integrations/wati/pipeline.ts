@@ -32,6 +32,9 @@ import { getCustomerSafePrice } from './pricing/customerSafePrice.ts';
 import { formatIDR } from '../../zoho/tax.ts';
 import { priceOnly, priceWithStockAck, priceWithNeedQuantity, priceNotFound } from './pricing/responses.ts';
 import { checkWebsitePriceMismatch, logWebsitePriceMismatch } from './pricing/websiteMismatch.ts';
+import { matchCommercialFollowUp } from './commercial/followUp.ts';
+import { continueOnboarding, resumeCustomerSelection, resumeAddressSelection, runCommercialWorkflow } from './commercial/workflow.ts';
+import { isCommercialDraftEnabled, isCustomerIdentityMappingEnabled } from '../../customerIdentity/featureFlags.ts';
 
 const MAX_MESSAGES_PER_MINUTE = 20;
 
@@ -100,6 +103,17 @@ async function runResolutionAndResponse(
     return await continueStockWorkflowFromQuantity(id, message, followUp);
   }
 
+  // Phase 6: a reply to VIA's own onboarding/identity/address question is not
+  // a classifiable intent on its own — same short-circuit shape as the
+  // quantity follow-up above, checked before generic intent detection.
+  const earlyConversationId = customerPhoneNormalized || message.providerConversationId || message.providerMessageId;
+  const commercialFollowUp = isCustomerIdentityMappingEnabled()
+    ? await matchCommercialFollowUp(customerPhoneNormalized, earlyConversationId).catch(() => null)
+    : null;
+  if (commercialFollowUp) {
+    return await continueCommercialFollowUp(id, message, text, commercialFollowUp);
+  }
+
   const [customerResult, conversationState, intentResult] = await Promise.all([
     message.customerPhoneRaw ? resolveCustomerByPhone(message.customerPhoneRaw) : Promise.resolve({ status: 'UNMATCHED' as const, customer: null, candidates: [] }),
     customerPhoneNormalized ? getConversationState(customerPhoneNormalized) : Promise.resolve('AUTO' as const),
@@ -133,6 +147,7 @@ async function runResolutionAndResponse(
     productCodeCandidate: productCandidate,
     conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ACTIVE',
     audience,
+    commercialDraftEnabled: isCommercialDraftEnabled(),
   });
 
   if (decision.case === 'H_DISCLOSURE_DENIED') {
@@ -173,6 +188,20 @@ async function runResolutionAndResponse(
     if (priceResult) {
       outboundText = priceResult.responseText;
       responseCase = priceResult.responseCase;
+    }
+  }
+
+  if (decision.case === 'K_COMMERCIAL_WORKFLOW' && (intentResult.intent === 'ORDER_INTENT' || intentResult.intent === 'QUOTATION_REQUEST' || intentResult.intent === 'ORDER_MODIFICATION' || intentResult.intent === 'ORDER_CANCELLATION_REQUEST')) {
+    const commercialResult = await runCommercialWorkflow({
+      inboundMessageId: id, message, conversationId, customerPhoneNormalized,
+      intent: intentResult.intent, product: productResult.item, quantity, effectiveBrand, text,
+    }).catch(error => {
+      console.error('[wati.pipeline]', JSON.stringify({ event: 'commercial_workflow_failed', error: error instanceof Error ? error.message : 'unknown' }));
+      return null;
+    });
+    if (commercialResult) {
+      outboundText = commercialResult.responseText;
+      responseCase = commercialResult.responseCase;
     }
   }
 
@@ -370,4 +399,37 @@ async function continueStockWorkflowFromQuantity(
   }
 
   return { status: 'processed', intent: 'STOCK_CHECK', responseCase: `STOCK_${started.state}`, sent };
+}
+
+/** Handles a reply to VIA's own onboarding/identity/address question — Phase 6's equivalent of continueStockWorkflowFromQuantity. */
+async function continueCommercialFollowUp(
+  inboundMessageId: string,
+  message: ReturnType<typeof normalizeWatiMessage>,
+  text: string,
+  followUp: NonNullable<Awaited<ReturnType<typeof matchCommercialFollowUp>>>,
+): Promise<PipelineOutcome> {
+  let result;
+  let intentLabel: string;
+
+  if (followUp.kind === 'ONBOARDING') {
+    result = await continueOnboarding(followUp.customerDraftId, text);
+    intentLabel = 'NEW_CUSTOMER_ONBOARDING';
+  } else if (followUp.kind === 'CUSTOMER_SELECTION') {
+    const phoneKey = followUp.draft.conversation_id ?? '';
+    result = await resumeCustomerSelection(followUp.draft, phoneKey, text, message);
+    intentLabel = 'CUSTOMER_IDENTITY_SELECTION';
+  } else {
+    result = await resumeAddressSelection(followUp.draft, text, message);
+    intentLabel = 'DELIVERY_ADDRESS_SELECTION';
+  }
+
+  await updateWatiMessageResolution(inboundMessageId, { processingStatus: 'PROCESSED', intent: intentLabel, responseType: result.responseCase });
+
+  let sent = false;
+  if (result.responseText && message.customerPhoneRaw) {
+    const sendResult = await sendWatiTextGated(message.customerPhoneRaw, result.responseText, { conversationId: followUp.kind === 'ONBOARDING' ? followUp.customerDraftId : followUp.draft.id, category: intentLabel });
+    sent = sendResult === 'sent';
+  }
+
+  return { status: 'processed', intent: intentLabel, responseCase: result.responseCase, sent };
 }

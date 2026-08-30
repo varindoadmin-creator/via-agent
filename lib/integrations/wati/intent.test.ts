@@ -105,7 +105,12 @@ test('Test 19 — "PT ABC biasa beli berapa banyak?" is OTHER_CUSTOMER_INQUIRY',
 
 test('a bare purchase-intent stock message ("mau beli") is never misclassified as ORDER_STATUS_INQUIRY', () => {
   const result = detectIntentDeterministic('ATP11358M ada stock, mau beli 20');
-  assert.equal(result?.intent, 'STOCK_CHECK');
+  // Phase 6 adds real order-intent handling — "mau beli 20" (commit verb +
+  // quantity) is now correctly ORDER_INTENT, not a plain stock check. The
+  // one invariant this test still protects is the "never ORDER_STATUS_INQUIRY"
+  // part of its name (a purchase-intent message is not a status-of-my-existing-order question).
+  assert.equal(result?.intent, 'ORDER_INTENT');
+  assert.notEqual(result?.intent, 'ORDER_STATUS_INQUIRY');
 });
 
 test('Test 9 — prompt injection framing does not prevent correct classification/denial; the request is still about company sales', () => {
@@ -166,4 +171,37 @@ test('Test 58 — "ATP11358M bisa kurang?" is DISCOUNT_REQUEST', () => {
 test('Section 38 — "Kalau ambil 500 lembar ada harga proyek?" is DISCOUNT_REQUEST, not a plain stock question', () => {
   const result = detectIntentDeterministic('Kalau ambil 500 lembar ada harga proyek?');
   assert.equal(result?.intent, 'DISCOUNT_REQUEST');
+});
+
+// ─── Phase 6: commercial intent ──────────────────────────────────────────────
+
+test('Brief example — "Saya ambil ATP11358M 20 lembar." is ORDER_INTENT', () => {
+  const result = detectIntentDeterministic('Saya ambil ATP11358M 20 lembar.');
+  assert.equal(result?.intent, 'ORDER_INTENT');
+  assert.equal(result?.productCodeCandidate, 'ATP11358M');
+});
+
+test('Brief example — "Tolong buatkan quotation 50 lembar ATP11358M." is QUOTATION_REQUEST', () => {
+  const result = detectIntentDeterministic('Tolong buatkan quotation 50 lembar ATP11358M.');
+  assert.equal(result?.intent, 'QUOTATION_REQUEST');
+});
+
+test('a bare price question with a commit verb absent stays PRICE_INQUIRY, never inferred as an order', () => {
+  const result = detectIntentDeterministic('ATP11358M harganya berapa?');
+  assert.equal(result?.intent, 'PRICE_INQUIRY');
+});
+
+test('Brief example — "Tambah jadi 30." is ORDER_MODIFICATION', () => {
+  const result = detectIntentDeterministic('Tambah jadi 30.');
+  assert.equal(result?.intent, 'ORDER_MODIFICATION');
+});
+
+test('"Batalkan pesanan saya" is ORDER_CANCELLATION_REQUEST', () => {
+  const result = detectIntentDeterministic('Batalkan pesanan saya');
+  assert.equal(result?.intent, 'ORDER_CANCELLATION_REQUEST');
+});
+
+test('an order-shaped message with no product code/brand does not fire ORDER_INTENT (nothing to resolve)', () => {
+  const result = detectIntentDeterministic('saya mau ambil 20 lembar');
+  assert.notEqual(result?.intent, 'ORDER_INTENT');
 });

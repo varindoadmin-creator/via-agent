@@ -23,17 +23,51 @@ export interface ZohoContact {
   outstanding_receivable_amount?: number;
   pricebook_id?: string;
   cf_tier?: string;
+  cf_npwp?: string; // custom field: Indonesian tax ID (only set when Faktur Pajak is required)
+  cf_needs_faktur_pajak?: boolean; // custom field
+  contact_persons?: ZohoContactPerson[];
+  salesperson_id?: string;
+  salesperson_name?: string;
+  payment_terms?: number;
+  payment_terms_label?: string;
+  billing_address?: ZohoAddress;
+  shipping_address?: ZohoAddress;
+}
+
+export interface ZohoContactPerson {
+  contact_person_id?: string;
+  first_name: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  is_primary_contact?: boolean;
+}
+
+export interface ZohoCreateContactPayload {
+  contact_name: string;
+  company_name: string;
+  contact_type: 'customer';
+  currency_code?: string;
+  cf_npwp?: string;
+  cf_needs_faktur_pajak?: boolean;
+  contact_persons?: Array<{ first_name: string; last_name?: string; email?: string; phone?: string; is_primary_contact?: boolean }>;
   billing_address?: ZohoAddress;
   shipping_address?: ZohoAddress;
 }
 
 export interface ZohoAddress {
+  address_id?: string;
+  attention?: string;
   address: string;
   city: string;
   state: string;
   zip: string;
   country: string;
   fax?: string;
+}
+
+export interface ZohoContactAddressListResponse {
+  addresses: ZohoAddress[];
 }
 
 export interface ZohoContactListResponse {
@@ -174,6 +208,58 @@ export interface ZohoSOListResponse {
 
 export interface ZohoSOResponse {
   salesorder: ZohoSalesOrder;
+}
+
+// ─── Estimate (Quotation) ───────────────────────────────────────────────────────
+
+export type ZohoEstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'invoiced' | 'expired';
+
+export interface ZohoEstimate {
+  estimate_id: string;
+  estimate_number: string;
+  reference_number?: string;
+  date: string;
+  status: ZohoEstimateStatus;
+  customer_id: string;
+  customer_name: string;
+  currency_code: string;
+  line_items: ZohoSOLineItem[];
+  sub_total: number;
+  total: number;
+  tax_total?: number;
+  notes?: string;
+  terms?: string;
+  billing_address?: ZohoAddress;
+  shipping_address?: ZohoAddress;
+  expiry_date?: string;
+  created_time?: string;
+  last_modified_time?: string;
+  is_inclusive_tax?: boolean;
+}
+
+export interface ZohoCreateEstimatePayload {
+  customer_id: string;
+  date: string;
+  reference_number?: string;
+  line_items: Array<{
+    item_id: string;
+    quantity: number;
+    rate: number;
+    unit?: string;
+    description?: string;
+  }>;
+  notes?: string;
+  shipping_address?: ZohoAddress;
+  expiry_date?: string;
+}
+
+export interface ZohoEstimateListResponse {
+  estimates: ZohoEstimate[];
+  page_context?: ZohoPageContext;
+}
+
+export interface ZohoEstimateResponse {
+  estimate: ZohoEstimate;
 }
 
 // ─── Purchase Order ───────────────────────────────────────────────────────────

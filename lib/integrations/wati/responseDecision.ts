@@ -12,7 +12,7 @@ import { evaluateDisclosure, type DisclosureReasonCode } from '../../security/di
 import { responseForReasonCode } from '../../security/disclosure/responses.ts';
 import { broadBrandPriceClarification, discountHandoff } from './pricing/responses.ts';
 
-export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF' | 'SUPPRESSED';
+export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF' | 'K_COMMERCIAL_WORKFLOW' | 'SUPPRESSED';
 
 export interface ResponseDecisionInput {
   intent: WatiIntent;
@@ -23,6 +23,8 @@ export interface ResponseDecisionInput {
   conversationSuppressed: boolean; // true when conversation state is NEEDS_HUMAN/HUMAN_ACTIVE
   /** Required for the Phase 4 disclosure-gated intents (INTERNAL_METRIC/OTHER_CUSTOMER/ORDER_STATUS). */
   audience?: AudienceContext;
+  /** Phase 6 feature flag (brief section 80) — defaults to enabled so existing tests/callers that don't pass it keep today's behavior; pipeline.ts passes the real flag value in production. */
+  commercialDraftEnabled?: boolean;
 }
 
 export interface ResponseDecision {
@@ -119,6 +121,26 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
       return { case: 'J_BROAD_BRAND_PRICE', text: broadBrandPriceClarification(), createStockInquiry: false, markHumanRequest: false };
     }
     return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  // Phase 6 sections 2/33: commercial-intent cases all defer their actual
+  // text to the async pipeline workflow (lib/integrations/wati/commercial/workflow.ts)
+  // — same "text: null, not SUPPRESSED" pattern as I_PRICE_LOOKUP, since
+  // resolving identity/address/price/stock requires I/O this pure function
+  // can't do. ORDER_INTENT/QUOTATION_REQUEST without a resolved product falls
+  // to Case E clarification below instead — never starts a draft for an
+  // unresolvable product (brief section 35).
+  const commercialDraftEnabled = input.commercialDraftEnabled !== false;
+  if (input.intent === 'ORDER_INTENT' || input.intent === 'QUOTATION_REQUEST') {
+    if (!commercialDraftEnabled) return { case: 'G_ACK_ROUTE', text: ackRoute(), createStockInquiry: false, markHumanRequest: false };
+    if (input.productResolution === 'EXACT' && input.product) {
+      return { case: 'K_COMMERCIAL_WORKFLOW', text: null, createStockInquiry: false, markHumanRequest: false };
+    }
+    return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
+  }
+  if (input.intent === 'ORDER_MODIFICATION' || input.intent === 'ORDER_CANCELLATION_REQUEST') {
+    if (!commercialDraftEnabled) return { case: 'G_ACK_ROUTE', text: ackRoute(), createStockInquiry: false, markHumanRequest: false };
+    return { case: 'K_COMMERCIAL_WORKFLOW', text: null, createStockInquiry: false, markHumanRequest: false };
   }
 
   if (input.intent === 'DISCOUNT_REQUEST') {
