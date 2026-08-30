@@ -42,6 +42,36 @@ export async function sendWatiText(whatsappNumber: string, text: string): Promis
 }
 
 /**
+ * Sends a document (e.g. an invoice PDF) as a session file. Uses WATI's
+ * documented sendSessionFile endpoint — same inert-until-configured
+ * convention as sendWatiText, and same "verify against your real account's
+ * docs" caveat before relying on it in production (VIA Customer Operations
+ * Phase 7, brief section 17).
+ */
+export async function sendWatiDocument(whatsappNumber: string, fileBuffer: Buffer, fileName: string, caption?: string): Promise<WatiSendResult> {
+  const config = watiConfig();
+  if (!config) {
+    console.info('[wati.client]', JSON.stringify({ event: 'document_send_skipped_not_configured', to: whatsappNumber }));
+    return 'disabled';
+  }
+  try {
+    const url = `${config.baseUrl}/api/v1/sendSessionFile/${encodeURIComponent(whatsappNumber)}${caption ? `?caption=${encodeURIComponent(caption)}` : ''}`;
+    const form = new FormData();
+    form.append('file', new Blob([new Uint8Array(fileBuffer)], { type: 'application/pdf' }), fileName);
+    const response = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${config.token}` }, body: form });
+    if (!response.ok) {
+      console.error('[wati.client]', JSON.stringify({ event: 'document_send_failed', status: response.status }));
+      return 'failed';
+    }
+    console.info('[wati.client]', JSON.stringify({ event: 'document_send_ok', to: whatsappNumber, fileName }));
+    return 'sent';
+  } catch (error) {
+    console.error('[wati.client]', JSON.stringify({ event: 'document_send_error', error: error instanceof Error ? error.message : 'unknown' }));
+    return 'failed';
+  }
+}
+
+/**
  * Sync customer-safe contact attributes to WATI (VIA Customer Operations
  * Phase 6, brief section 59). Uses WATI's documented
  * addUpdateContactAttributes endpoint — same inert-until-configured

@@ -34,7 +34,14 @@ import { priceOnly, priceWithStockAck, priceWithNeedQuantity, priceNotFound } fr
 import { checkWebsitePriceMismatch, logWebsitePriceMismatch } from './pricing/websiteMismatch.ts';
 import { matchCommercialFollowUp } from './commercial/followUp.ts';
 import { continueOnboarding, resumeCustomerSelection, resumeAddressSelection, runCommercialWorkflow } from './commercial/workflow.ts';
-import { isCommercialDraftEnabled, isCustomerIdentityMappingEnabled } from '../../customerIdentity/featureFlags.ts';
+import {
+  isCommercialDraftEnabled, isCustomerIdentityMappingEnabled,
+  isCustomerOrderStatusEnabled, isCustomerInvoiceStatusEnabled, isCustomerInvoiceDocumentEnabled,
+  isCustomerPaymentStatusEnabled, isCustomerReceivableSummaryEnabled, isCustomerDeliveryStatusEnabled,
+} from '../../customerIdentity/featureFlags.ts';
+import { resolveCustomerIdentities } from '../../customerIdentity/channelIdentity.ts';
+import { runCustomerSelfService, resumeSelfServiceAfterSelection } from './selfService/orchestrator.ts';
+import { getPendingSelfService } from './conversationState.ts';
 
 const MAX_MESSAGES_PER_MINUTE = 20;
 
@@ -114,10 +121,29 @@ async function runResolutionAndResponse(
     return await continueCommercialFollowUp(id, message, text, commercialFollowUp);
   }
 
-  const [customerResult, conversationState, intentResult] = await Promise.all([
+  // Phase 7: a reply to VIA's own "which account?"/"which order?" self-service
+  // prompt is not a classifiable intent on its own — same short-circuit shape.
+  const selfServicePending = isCustomerIdentityMappingEnabled() && customerPhoneNormalized
+    ? await getPendingSelfService(customerPhoneNormalized).catch(() => null)
+    : null;
+  if (selfServicePending && message.customerPhoneRaw) {
+    const resumed = await resumeSelfServiceAfterSelection({ normalizedPhone: customerPhoneNormalized!, text, conversationId: customerPhoneNormalized!, customerPhoneRaw: message.customerPhoneRaw, watiMessageId: id }).catch(() => null);
+    if (resumed) {
+      await updateWatiMessageResolution(id, { processingStatus: 'PROCESSED', intent: selfServicePending.intent, responseType: resumed.responseCase });
+      let sent = false;
+      if (resumed.responseText) {
+        const result = await sendWatiTextGated(message.customerPhoneRaw, resumed.responseText, { conversationId: customerPhoneNormalized!, category: selfServicePending.intent });
+        sent = result === 'sent';
+      }
+      return { status: 'processed', intent: selfServicePending.intent, responseCase: resumed.responseCase, sent };
+    }
+  }
+
+  const [customerResult, conversationState, intentResult, channelMapping] = await Promise.all([
     message.customerPhoneRaw ? resolveCustomerByPhone(message.customerPhoneRaw) : Promise.resolve({ status: 'UNMATCHED' as const, customer: null, candidates: [] }),
     customerPhoneNormalized ? getConversationState(customerPhoneNormalized) : Promise.resolve('AUTO' as const),
     detectIntent(text),
+    customerPhoneNormalized && isCustomerIdentityMappingEnabled() ? resolveCustomerIdentities(customerPhoneNormalized).catch(() => ({ status: 'NONE' as const })) : Promise.resolve({ status: 'NONE' as const }),
   ]);
 
   const websiteProduct = parseWebsiteStructuredProduct(text);
@@ -135,9 +161,15 @@ async function runResolutionAndResponse(
 
   const effectiveBrand = productResult.brand || intentResult.brand || context.carriedBrand;
   const conversationId = customerPhoneNormalized || message.providerConversationId || message.providerMessageId;
-  // Brief section 3: built entirely from Phase 2's own server-side customer
+  // Brief section 3: built entirely from Phase 2/6's own server-side customer
   // resolution — never from message text, so nothing in `text` can change it.
-  const audience = externalWatiAudience({ customerResolution: customerResult, externalPhone: message.customerPhoneRaw, conversationId });
+  // Phase 6's mapping (channelMapping) takes priority over Phase 2's older
+  // ad-hoc phone match when it resolves to exactly one customer (see
+  // lib/security/disclosure/audience.ts's identity ladder).
+  const channelIdentity = channelMapping.status === 'ONE'
+    ? { customerId: channelMapping.mapping.customer_id, relationshipStatus: channelMapping.mapping.relationship_status === 'VERIFIED' ? 'VERIFIED' as const : 'UNVERIFIED' as const }
+    : null;
+  const audience = externalWatiAudience({ customerResolution: customerResult, externalPhone: message.customerPhoneRaw, conversationId, channelIdentity });
 
   const decision = decideResponse({
     intent: intentResult.intent,
@@ -148,6 +180,14 @@ async function runResolutionAndResponse(
     conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ACTIVE',
     audience,
     commercialDraftEnabled: isCommercialDraftEnabled(),
+    selfServiceFlags: {
+      orderStatus: isCustomerOrderStatusEnabled(),
+      invoiceStatus: isCustomerInvoiceStatusEnabled(),
+      invoiceDocument: isCustomerInvoiceDocumentEnabled(),
+      paymentStatus: isCustomerPaymentStatusEnabled(),
+      receivableSummary: isCustomerReceivableSummaryEnabled(),
+      deliveryStatus: isCustomerDeliveryStatusEnabled(),
+    },
   });
 
   if (decision.case === 'H_DISCLOSURE_DENIED') {
@@ -202,6 +242,21 @@ async function runResolutionAndResponse(
     if (commercialResult) {
       outboundText = commercialResult.responseText;
       responseCase = commercialResult.responseCase;
+    }
+  }
+
+  if (decision.case === 'L_CUSTOMER_SELF_SERVICE' && customerPhoneNormalized && message.customerPhoneRaw) {
+    const selfServiceResult = await runCustomerSelfService({
+      intent: intentResult.intent, normalizedPhone: customerPhoneNormalized, conversationId,
+      customerPhoneRaw: message.customerPhoneRaw, soNumberCandidate: intentResult.soNumberCandidate,
+      invoiceNumberCandidate: intentResult.invoiceNumberCandidate, watiMessageId: id,
+    }).catch(error => {
+      console.error('[wati.pipeline]', JSON.stringify({ event: 'self_service_failed', error: error instanceof Error ? error.message : 'unknown' }));
+      return null;
+    });
+    if (selfServiceResult) {
+      outboundText = selfServiceResult.responseText;
+      responseCase = selfServiceResult.responseCase;
     }
   }
 

@@ -40,21 +40,49 @@ export function internalAudience(role: Role, userId?: string): AudienceContext {
 }
 
 /**
- * For every WATI inbound message. Built entirely from Phase 2's own
- * server-side customer resolution (lib/customers/phoneResolution.ts) and the
- * webhook's own conversation bookkeeping — never from the message text.
+ * For every WATI inbound message. Built primarily from Phase 6's
+ * authoritative CustomerChannelIdentity mapping — never from the message
+ * text. Phase 2's older ad-hoc phone-field search
+ * (lib/customers/phoneResolution.ts) still supplies the weaker
+ * PHONE_MATCHED signal when Phase 6 has no mapping yet, and the customer
+ * resolved that way (if any) is still exposed as `customerId` so read-only
+ * Phases 2-5 behavior (product/price/stock answers) is unaffected.
+ *
+ * Identity ladder (brief section 16, Phase 7 audit):
+ *   no Phase 6 mapping, no Phase 2 phone match -> ANONYMOUS
+ *   no Phase 6 mapping, Phase 2 finds a Zoho contact by raw phone -> PHONE_MATCHED
+ *   Phase 6 mapping resolves (ONE), relationship_status UNVERIFIED -> CUSTOMER_MATCHED
+ *   Phase 6 mapping resolves (ONE), relationship_status VERIFIED -> VERIFIED_CUSTOMER
+ * (MANY is resolved to ONE by the pipeline asking which account first, per
+ * Phase 6 — this function is only ever called with the already-resolved
+ * single mapping, if any.)
  */
 export function externalWatiAudience(input: {
   customerResolution: Pick<CustomerResolutionResult, 'status' | 'customer'>;
   externalPhone: string | null;
   conversationId: string | null;
+  /** Phase 6's resolved mapping for this phone, if any — takes priority over customerResolution for both customerId and identityLevel. */
+  channelIdentity?: { customerId: string; relationshipStatus: 'VERIFIED' | 'UNVERIFIED' } | null;
 }): AudienceContext {
-  const identityLevel: IdentityLevel = input.customerResolution.status === 'MATCHED' ? 'CUSTOMER_MATCHED' : 'ANONYMOUS';
+  let identityLevel: IdentityLevel;
+  let customerId: string | undefined;
+
+  if (input.channelIdentity) {
+    identityLevel = input.channelIdentity.relationshipStatus === 'VERIFIED' ? 'VERIFIED_CUSTOMER' : 'CUSTOMER_MATCHED';
+    customerId = input.channelIdentity.customerId;
+  } else if (input.customerResolution.status === 'MATCHED') {
+    identityLevel = 'PHONE_MATCHED';
+    customerId = input.customerResolution.customer?.contact_id;
+  } else {
+    identityLevel = 'ANONYMOUS';
+    customerId = undefined;
+  }
+
   return {
     organizationId: organizationId(),
     actorType: 'EXTERNAL_CUSTOMER',
     channel: 'WATI',
-    customerId: input.customerResolution.customer?.contact_id,
+    customerId,
     externalPhone: input.externalPhone ?? undefined,
     conversationId: input.conversationId ?? undefined,
     identityLevel,

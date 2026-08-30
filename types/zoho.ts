@@ -210,6 +210,68 @@ export interface ZohoSOResponse {
   salesorder: ZohoSalesOrder;
 }
 
+// ─── Invoice ──────────────────────────────────────────────────────────────────
+
+export type ZohoInvoiceStatus = 'draft' | 'sent' | 'viewed' | 'unpaid' | 'partially_paid' | 'paid' | 'overdue' | 'void';
+
+export interface ZohoInvoice {
+  invoice_id: string;
+  invoice_number: string;
+  reference_number?: string;
+  date: string;
+  due_date?: string;
+  status: ZohoInvoiceStatus;
+  customer_id: string;
+  customer_name: string;
+  currency_code: string;
+  total: number;
+  balance: number;
+  salesorder_id?: string;
+  has_attachment?: boolean;
+}
+
+export interface ZohoInvoiceListResponse {
+  invoices: ZohoInvoice[];
+  page_context?: ZohoPageContext;
+}
+
+export interface ZohoInvoiceResponse {
+  invoice: ZohoInvoice;
+}
+
+// ─── Packages / Shipment Orders ─────────────────────────────────────────────────
+
+export interface ZohoPackage {
+  package_id: string;
+  package_number: string;
+  salesorder_id: string;
+  shipment_id?: string;
+  shipment_number?: string;
+  status: string; // 'not_shipped' | 'shipped' (real values, org-specific beyond this)
+  date?: string;
+}
+
+export interface ZohoShipmentOrder {
+  shipment_id: string;
+  shipment_number: string;
+  salesorder_id?: string;
+  status: string; // 'shipped' | 'delivered' (real values, org-specific beyond this)
+  shipment_date?: string;
+  delivery_date?: string;
+  carrier?: string;
+  tracking_number?: string;
+}
+
+export interface ZohoPackageListResponse {
+  packages: ZohoPackage[];
+  page_context?: ZohoPageContext;
+}
+
+export interface ZohoShipmentOrderListResponse {
+  shipmentorders: ZohoShipmentOrder[];
+  page_context?: ZohoPageContext;
+}
+
 // ─── Estimate (Quotation) ───────────────────────────────────────────────────────
 
 export type ZohoEstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'invoiced' | 'expired';

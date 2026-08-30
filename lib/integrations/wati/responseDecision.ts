@@ -7,12 +7,13 @@
 import type { WatiIntent } from './intent.ts';
 import type { ProductResolutionStatus } from './productResolution.ts';
 import type { ZohoItem } from '../../../types/zoho.ts';
-import type { AudienceContext } from '../../security/disclosure/audience.ts';
+import type { AudienceContext, IdentityLevel } from '../../security/disclosure/audience.ts';
 import { evaluateDisclosure, type DisclosureReasonCode } from '../../security/disclosure/policy.ts';
+import type { DataCategory } from '../../security/disclosure/classification.ts';
 import { responseForReasonCode } from '../../security/disclosure/responses.ts';
 import { broadBrandPriceClarification, discountHandoff } from './pricing/responses.ts';
 
-export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF' | 'K_COMMERCIAL_WORKFLOW' | 'SUPPRESSED';
+export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF' | 'K_COMMERCIAL_WORKFLOW' | 'L_CUSTOMER_SELF_SERVICE' | 'SUPPRESSED';
 
 export interface ResponseDecisionInput {
   intent: WatiIntent;
@@ -25,6 +26,15 @@ export interface ResponseDecisionInput {
   audience?: AudienceContext;
   /** Phase 6 feature flag (brief section 80) — defaults to enabled so existing tests/callers that don't pass it keep today's behavior; pipeline.ts passes the real flag value in production. */
   commercialDraftEnabled?: boolean;
+  /** Phase 7 feature flags (brief section 76), one per self-service capability — each defaults to enabled so existing tests/callers keep today's behavior; pipeline.ts passes the real flag values in production. */
+  selfServiceFlags?: {
+    orderStatus?: boolean;
+    invoiceStatus?: boolean;
+    invoiceDocument?: boolean;
+    paymentStatus?: boolean;
+    receivableSummary?: boolean;
+    deliveryStatus?: boolean;
+  };
 }
 
 export interface ResponseDecision {
@@ -148,25 +158,57 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
     return { case: 'M_DISCOUNT_HANDOFF', text: discountHandoff(), createStockInquiry: false, markHumanRequest: true };
   }
 
-  // Phase 4: internal-metric, other-customer, and own-order-status questions
-  // all go through the same disclosure check — no lookup is ever attempted
-  // for any of them (brief section 14's "the system should preferably NOT
-  // call the tool"). ORDER_STATUS_INQUIRY has no ownerCustomerId to check
-  // (no real order-lookup service exists yet) — evaluateDisclosure's
-  // CUSTOMER_SCOPED branch with no owner known correctly yields the same
-  // "we need to verify/hand this to Admin" text, without inventing a
-  // capability that isn't built (brief section 11).
-  if (input.intent === 'INTERNAL_METRIC_INQUIRY' || input.intent === 'OTHER_CUSTOMER_INQUIRY' || input.intent === 'ORDER_STATUS_INQUIRY') {
-    const category = input.intent === 'INTERNAL_METRIC_INQUIRY' ? 'BRAND_SALES' : input.intent === 'OTHER_CUSTOMER_INQUIRY' ? 'OTHER_CUSTOMER_DATA' : 'OWN_ORDER_STATUS';
+  // Phase 4: internal-metric and other-customer questions go through the
+  // disclosure check with no lookup ever attempted (brief section 14's "the
+  // system should preferably NOT call the tool").
+  if (input.intent === 'INTERNAL_METRIC_INQUIRY' || input.intent === 'OTHER_CUSTOMER_INQUIRY') {
+    const category = input.intent === 'INTERNAL_METRIC_INQUIRY' ? 'BRAND_SALES' : 'OTHER_CUSTOMER_DATA';
     const result = input.audience
       ? evaluateDisclosure({ audience: input.audience, category })
       : { decision: 'DENY' as const, reasonCode: 'POLICY_EVALUATION_FAILED' as const };
-    // These three intents are never actually grantable from WATI (no audience
+    // Neither intent is ever actually grantable from WATI (no audience
     // constructed there is ever INTERNAL_USER) — an unexpected ALLOW falls
     // back to the safe generic ack rather than the empty string
     // responseForReasonCode returns for allow-shaped reason codes.
     const text = result.decision === 'ALLOW' ? ackRoute() : responseForReasonCode(result.reasonCode);
     return { case: 'H_DISCLOSURE_DENIED', text, createStockInquiry: false, markHumanRequest: false, disclosureReasonCode: result.reasonCode };
+  }
+
+  // Phase 7 (brief sections 3, 15-16, 32-34): customer self-service. Every
+  // one of these intents defers its actual lookup to the async pipeline
+  // (lib/customerSelfService/*, ownership-scoped by construction) — this
+  // pure function only decides whether the audience's identity level even
+  // clears the bar to ATTEMPT that lookup at all. Reuses evaluateDisclosure's
+  // existing CUSTOMER_SCOPED check by passing `ownerCustomerId:
+  // audience.customerId` — a deliberate self-reference, since at this
+  // pre-lookup stage the only "owner" candidate is whichever customer Phase
+  // 6 already resolved for this phone; the real record-level ownership
+  // check happens again once the pipeline has an actual Zoho record (brief
+  // section 38 defense-in-depth), where a genuine cross-customer mismatch is
+  // structurally impossible because the lookup functions themselves only
+  // ever query by that same customerId.
+  const SELF_SERVICE_INTENTS: Partial<Record<WatiIntent, { category: DataCategory; requiredIdentityLevel?: IdentityLevel; enabled: boolean }>> = {
+    ORDER_STATUS_INQUIRY: { category: 'OWN_ORDER_STATUS', enabled: input.selfServiceFlags?.orderStatus !== false },
+    ORDER_HISTORY: { category: 'OWN_ORDER_STATUS', enabled: input.selfServiceFlags?.orderStatus !== false },
+    LAST_ORDER: { category: 'OWN_ORDER_STATUS', enabled: input.selfServiceFlags?.orderStatus !== false },
+    DELIVERY_STATUS: { category: 'OWN_ORDER_STATUS', enabled: input.selfServiceFlags?.deliveryStatus !== false },
+    INVOICE_STATUS: { category: 'OWN_INVOICE', enabled: input.selfServiceFlags?.invoiceStatus !== false },
+    OUTSTANDING_INVOICES: { category: 'OWN_INVOICE', enabled: input.selfServiceFlags?.invoiceStatus !== false },
+    RECEIVABLE_SUMMARY: { category: 'OWN_INVOICE', enabled: input.selfServiceFlags?.receivableSummary !== false },
+    INVOICE_DOCUMENT_REQUEST: { category: 'OWN_INVOICE', requiredIdentityLevel: 'VERIFIED_CUSTOMER', enabled: input.selfServiceFlags?.invoiceDocument !== false },
+    PAYMENT_STATUS: { category: 'OWN_PAYMENT_STATUS', enabled: input.selfServiceFlags?.paymentStatus !== false },
+  };
+  const selfService = SELF_SERVICE_INTENTS[input.intent];
+  if (selfService) {
+    if (!selfService.enabled) return { case: 'G_ACK_ROUTE', text: ackRoute(), createStockInquiry: false, markHumanRequest: false };
+    const ownerCustomerId = input.audience?.customerId;
+    const result = input.audience
+      ? evaluateDisclosure({ audience: input.audience, category: selfService.category, ownerCustomerId, requiredIdentityLevel: selfService.requiredIdentityLevel })
+      : { decision: 'DENY' as const, reasonCode: 'POLICY_EVALUATION_FAILED' as const };
+    if (result.decision === 'ALLOW') {
+      return { case: 'L_CUSTOMER_SELF_SERVICE', text: null, createStockInquiry: false, markHumanRequest: false };
+    }
+    return { case: 'H_DISCLOSURE_DENIED', text: responseForReasonCode(result.reasonCode), createStockInquiry: false, markHumanRequest: false, disclosureReasonCode: result.reasonCode };
   }
 
   // GENERAL_INQUIRY / UNKNOWN — safe default, makes no claims, offers the menu.

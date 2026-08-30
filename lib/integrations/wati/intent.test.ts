@@ -205,3 +205,74 @@ test('an order-shaped message with no product code/brand does not fire ORDER_INT
   const result = detectIntentDeterministic('saya mau ambil 20 lembar');
   assert.notEqual(result?.intent, 'ORDER_INTENT');
 });
+
+// ─── Phase 7: customer self-service ──────────────────────────────────────────
+
+test('Brief section 6 — "Pesanan saya sudah diproses?" is ORDER_STATUS_INQUIRY (reused, not duplicated)', () => {
+  const result = detectIntentDeterministic('Pesanan saya sudah diproses?');
+  assert.equal(result?.intent, 'ORDER_STATUS_INQUIRY');
+});
+
+test('Brief section 7 — "SO-123 statusnya apa?" is ORDER_STATUS_INQUIRY even with no "saya", and extracts the SO number', () => {
+  const result = detectIntentDeterministic('SO-123 statusnya apa?');
+  assert.equal(result?.intent, 'ORDER_STATUS_INQUIRY');
+  assert.equal(result?.soNumberCandidate, 'SO-123');
+});
+
+test('Brief section 28 — "Barang ATP11358M sudah dikirim?" is DELIVERY_STATUS with the product code captured', () => {
+  const result = detectIntentDeterministic('Barang ATP11358M sudah dikirim?');
+  assert.equal(result?.intent, 'DELIVERY_STATUS');
+  assert.equal(result?.productCodeCandidate, 'ATP11358M');
+});
+
+test('Brief section 10 — "Pesanan terakhir saya apa?" is LAST_ORDER', () => {
+  const result = detectIntentDeterministic('Pesanan terakhir saya apa?');
+  assert.equal(result?.intent, 'LAST_ORDER');
+});
+
+test('Brief section 17 — "Tolong kirim invoice saya." is INVOICE_DOCUMENT_REQUEST', () => {
+  const result = detectIntentDeterministic('Tolong kirim invoice saya.');
+  assert.equal(result?.intent, 'INVOICE_DOCUMENT_REQUEST');
+});
+
+test('Brief section 12 — "Invoice INV-123 sudah lunas?" is INVOICE_STATUS with the invoice number captured', () => {
+  const result = detectIntentDeterministic('Invoice INV-123 sudah lunas?');
+  assert.equal(result?.intent, 'INVOICE_STATUS');
+  assert.equal(result?.invoiceNumberCandidate, 'INV-123');
+});
+
+test('Brief section 14 — "Berapa invoice saya yang belum dibayar?" is OUTSTANDING_INVOICES, not a generic order-status catch-all', () => {
+  const result = detectIntentDeterministic('Berapa invoice saya yang belum dibayar?');
+  assert.equal(result?.intent, 'OUTSTANDING_INVOICES');
+});
+
+test('Brief section 6 — "Ada tagihan jatuh tempo?" is OUTSTANDING_INVOICES', () => {
+  const result = detectIntentDeterministic('Ada tagihan jatuh tempo?');
+  assert.equal(result?.intent, 'OUTSTANDING_INVOICES');
+});
+
+test('Brief section 20 — "Pembayaran INV-123 sudah masuk?" is PAYMENT_STATUS', () => {
+  const result = detectIntentDeterministic('Pembayaran INV-123 sudah masuk?');
+  assert.equal(result?.intent, 'PAYMENT_STATUS');
+  assert.equal(result?.invoiceNumberCandidate, 'INV-123');
+});
+
+test('Brief section 21 — "Saya sudah transfer kemarin." is PAYMENT_STATUS (a claim, never auto-marked paid downstream)', () => {
+  const result = detectIntentDeterministic('Saya sudah transfer kemarin.');
+  assert.equal(result?.intent, 'PAYMENT_STATUS');
+});
+
+test('Brief section 23 — "Total yang belum lunas berapa?" is RECEIVABLE_SUMMARY, not a per-invoice list', () => {
+  const result = detectIntentDeterministic('Total yang belum lunas berapa?');
+  assert.equal(result?.intent, 'RECEIVABLE_SUMMARY');
+});
+
+test('Test 61/62 — a cross-customer reference still wins over any self-service pattern', () => {
+  const result = detectIntentDeterministic('Invoice PT XYZ berapa?');
+  assert.equal(result?.intent, 'OTHER_CUSTOMER_INQUIRY');
+});
+
+test('Test 60 — "Berapa total penjualan Varindo?" remains INTERNAL_METRIC_INQUIRY, unaffected by new self-service patterns', () => {
+  const result = detectIntentDeterministic('Berapa total penjualan Varindo?');
+  assert.equal(result?.intent, 'INTERNAL_METRIC_INQUIRY');
+});

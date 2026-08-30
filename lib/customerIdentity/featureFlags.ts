@@ -18,3 +18,11 @@ export const isZohoCustomerCreationEnabled = () => flag('ZOHO_CUSTOMER_CREATION_
 export const isWatiContactSyncEnabled = () => flag('WATI_CONTACT_SYNC_ENABLED');
 export const isCommercialDraftEnabled = () => flag('COMMERCIAL_DRAFT_ENABLED');
 export const isSalesOrderExecutionEnabled = () => flag('SALES_ORDER_EXECUTION_ENABLED');
+
+// Phase 7 (brief section 76) — customer self-service, staged rollout, all off by default.
+export const isCustomerOrderStatusEnabled = () => flag('CUSTOMER_ORDER_STATUS_ENABLED');
+export const isCustomerInvoiceStatusEnabled = () => flag('CUSTOMER_INVOICE_STATUS_ENABLED');
+export const isCustomerInvoiceDocumentEnabled = () => flag('CUSTOMER_INVOICE_DOCUMENT_ENABLED');
+export const isCustomerPaymentStatusEnabled = () => flag('CUSTOMER_PAYMENT_STATUS_ENABLED');
+export const isCustomerReceivableSummaryEnabled = () => flag('CUSTOMER_RECEIVABLE_SUMMARY_ENABLED');
+export const isCustomerDeliveryStatusEnabled = () => flag('CUSTOMER_DELIVERY_STATUS_ENABLED');

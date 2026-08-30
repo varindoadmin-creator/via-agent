@@ -44,6 +44,18 @@ export type WatiIntent =
   | 'NEW_CUSTOMER_ONBOARDING'
   | 'CUSTOMER_IDENTITY_SELECTION'
   | 'DELIVERY_ADDRESS_SELECTION'
+  // Phase 7 (brief section 6) — customer self-service. ORDER_STATUS_INQUIRY
+  // (Phase 4) is reused, not duplicated, for the brief's "ORDER_STATUS" — it
+  // already detects "my own order" phrasing; this phase gives it real
+  // behavior instead of a denial/hand-off.
+  | 'ORDER_HISTORY'
+  | 'LAST_ORDER'
+  | 'INVOICE_STATUS'
+  | 'INVOICE_DOCUMENT_REQUEST'
+  | 'OUTSTANDING_INVOICES'
+  | 'PAYMENT_STATUS'
+  | 'DELIVERY_STATUS'
+  | 'RECEIVABLE_SUMMARY'
   | 'UNKNOWN';
 
 export interface IntentDetectionResult {
@@ -51,6 +63,10 @@ export interface IntentDetectionResult {
   deterministic: boolean;
   brand: string | null;
   productCodeCandidate: string | null;
+  /** Phase 7 — a "SO-123"/"SO123"-shaped candidate, for order/delivery status lookups. Never trusted as an owned resource until scoped by activeCustomerId server-side. */
+  soNumberCandidate: string | null;
+  /** Phase 7 — an "INV-123"-shaped candidate, for invoice/payment lookups. Same ownership caveat as soNumberCandidate. */
+  invoiceNumberCandidate: string | null;
   source: 'WEBSITE' | 'UNKNOWN';
   /** Only set for OTHER_CUSTOMER_INQUIRY — the company name mentioned, for audit logging only (never used to fetch anything). */
   mentionedEntity: string | null;
@@ -128,9 +144,38 @@ const QUANTITY_PATTERN = /\b\d+([.,]\d+)?\s*(lembar|pcs|pc|unit|dus|box|roll|met
 const ORDER_CANCELLATION_PATTERN = /\bbatal(kan)?\b.*\b(pesanan|order|so)\b|\b(pesanan|order|so)\b.*\bbatal(kan)?\b/i;
 const ORDER_MODIFICATION_PATTERN = /\b(tambah|ubah|ganti|kurangi)\w*\s+(jadi|menjadi)\b/i;
 
+// ─── Phase 7: customer self-service (brief section 6) ───────────────────────
+const SO_NUMBER_PATTERN = /\bSO[-\s]?\d{2,10}\b/i;
+const INVOICE_NUMBER_PATTERN = /\bINV[-\s]?\d{2,10}\b/i;
+// Checked before the invoice/payment status questions below — an action
+// request ("kirim invoice") must win over a question shape that happens to
+// share the word "invoice".
+const INVOICE_DOCUMENT_REQUEST_PATTERN = /\bkirim(kan)?\s+(saya\s+)?invoice\b|\btolong\s+(kirim(kan)?\s+)?invoice\b|\binvoice\b.*\bkirim(kan)?\b/i;
+// "Total ... berapa?" (a sum) is RECEIVED_SUMMARY; "... apa saja?" (a list)
+// is OUTSTANDING_INVOICES — checked in that order since "total tagihan yang
+// belum lunas apa saja" would otherwise ambiguously match both.
+const UNPAID_PHRASE_PATTERN = /\bbelum\s+(lunas|(di)?bayar)\b/i;
+const RECEIVABLE_SUMMARY_PATTERN = /\btotal\b.*\b(belum\s+(lunas|(di)?bayar)|piutang|tagihan|outstanding)\b.*\bberapa\b|\bberapa\b.*\btotal\b.*\b(belum\s+(lunas|(di)?bayar)|piutang|tagihan)\b/i;
+const OUTSTANDING_INVOICES_PATTERN = new RegExp(`\\b(invoice|tagihan)\\b.*${UNPAID_PHRASE_PATTERN.source}|${UNPAID_PHRASE_PATTERN.source}.*\\bapa\\s+saja\\b|\\bada\\s+tagihan\\s+jatuh\\s+tempo\\b`, 'i');
+const PAYMENT_STATUS_PATTERN = /\bpembayaran\b.*\b(masuk|tercatat|sudah)\b|\b(sudah|udah)\s+(transfer|bayar)\b|\bsaya\s+(sudah|udah)\s+transfer\b/i;
+const INVOICE_STATUS_PATTERN = /\blunas\b/i;
+const DELIVERY_STATUS_PATTERN = /\b(sudah\s+)?(di\s?kirim|dikirim)\b|\bpengiriman\b|\bbarang\s+saya\b/i;
+const LAST_ORDER_PATTERN = /\bpesanan\s+terakhir\b|\border\s+terakhir\b/i;
+const ORDER_HISTORY_PATTERN = /\briwayat\s+pesanan\b|\bhistori\s+pesanan\b|\bpesanan\s+(saya\s+)?(sebelumnya|yang\s+lalu)\b/i;
+
 function extractProductCodeCandidate(text: string): string | null {
   const match = text.match(ITEM_CODE_PATTERN);
   return match ? match[0].trim() : null;
+}
+
+function extractSoNumberCandidate(text: string): string | null {
+  const match = text.match(SO_NUMBER_PATTERN);
+  return match ? match[0].trim().toUpperCase().replace(/\s+/, '-') : null;
+}
+
+function extractInvoiceNumberCandidate(text: string): string | null {
+  const match = text.match(INVOICE_NUMBER_PATTERN);
+  return match ? match[0].trim().toUpperCase().replace(/\s+/, '-') : null;
 }
 
 function extractMentionedEntity(text: string): string | null {
@@ -144,39 +189,77 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
   const source: 'WEBSITE' | 'UNKNOWN' = isWebsiteGeneratedMessage(trimmed) ? 'WEBSITE' : 'UNKNOWN';
   const brand = detectBrandMention(trimmed);
   const productCodeCandidate = extractProductCodeCandidate(trimmed);
+  const soNumberCandidate = extractSoNumberCandidate(trimmed);
+  const invoiceNumberCandidate = extractInvoiceNumberCandidate(trimmed);
 
   if (HUMAN_REQUEST_PATTERN.test(trimmed)) {
-    return { intent: 'HUMAN_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'HUMAN_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   // Phase 6 sections 52-54: cancellation/modification are checked early since
   // they're specific action words that would otherwise be masked by the
   // broader order/quotation checks below.
   if (ORDER_CANCELLATION_PATTERN.test(trimmed)) {
-    return { intent: 'ORDER_CANCELLATION_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'ORDER_CANCELLATION_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
   if (ORDER_MODIFICATION_PATTERN.test(trimmed)) {
-    return { intent: 'ORDER_MODIFICATION', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'ORDER_MODIFICATION', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   if (COMPANY_ENTITY_PATTERN.test(trimmed) && ENTITY_CONTEXT_PATTERN.test(trimmed)) {
-    return { intent: 'OTHER_CUSTOMER_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: extractMentionedEntity(trimmed) };
+    return { intent: 'OTHER_CUSTOMER_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: extractMentionedEntity(trimmed) };
   }
 
   if (INTERNAL_METRIC_PATTERN.test(trimmed)) {
-    return { intent: 'INTERNAL_METRIC_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'INTERNAL_METRIC_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+
+  // Phase 7 sections 6, 12-14, 17, 20, 23, 25: customer self-service intents,
+  // checked before the broad OWN_TRANSACTION+OWN_REFERENCE fallback below —
+  // otherwise "invoice saya yang belum lunas apa saja?" (contains "invoice" +
+  // "saya") would be swallowed as a bare ORDER_STATUS_INQUIRY.
+  if (INVOICE_DOCUMENT_REQUEST_PATTERN.test(trimmed)) {
+    return { intent: 'INVOICE_DOCUMENT_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (RECEIVABLE_SUMMARY_PATTERN.test(trimmed)) {
+    return { intent: 'RECEIVABLE_SUMMARY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (OUTSTANDING_INVOICES_PATTERN.test(trimmed)) {
+    return { intent: 'OUTSTANDING_INVOICES', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (PAYMENT_STATUS_PATTERN.test(trimmed)) {
+    return { intent: 'PAYMENT_STATUS', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (INVOICE_STATUS_PATTERN.test(trimmed)) {
+    return { intent: 'INVOICE_STATUS', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (LAST_ORDER_PATTERN.test(trimmed)) {
+    return { intent: 'LAST_ORDER', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (ORDER_HISTORY_PATTERN.test(trimmed)) {
+    return { intent: 'ORDER_HISTORY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+  if (DELIVERY_STATUS_PATTERN.test(trimmed)) {
+    return { intent: 'DELIVERY_STATUS', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
+  }
+
+  // Brief section 7's own example ("SO-123 statusnya apa?") has no "saya" —
+  // an SO-number-shaped mention with no company entity (already ruled out
+  // above) is safe to treat as the customer's own order.
+  if (soNumberCandidate && OWN_TRANSACTION_PATTERN.test(trimmed)) {
+    return { intent: 'ORDER_STATUS_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   if (OWN_TRANSACTION_PATTERN.test(trimmed) && OWN_REFERENCE_PATTERN.test(trimmed)) {
-    return { intent: 'ORDER_STATUS_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'ORDER_STATUS_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   if (DISCOUNT_REQUEST_PATTERN.test(trimmed)) {
-    return { intent: 'DISCOUNT_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'DISCOUNT_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   if (parseWebsiteStructuredProduct(trimmed)) {
-    return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand, productCodeCandidate, source: 'WEBSITE', mentionedEntity: null };
+    return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source: 'WEBSITE', mentionedEntity: null };
   }
 
   // Phase 6 section 2/33: explicit "quote"/"quotation"/"penawaran" wins over a
@@ -186,10 +269,10 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
   // question with no commit verb (brief: "do not confuse a price inquiry
   // with a confirmed order").
   if (QUOTATION_REQUEST_PATTERN.test(trimmed) && (productCodeCandidate || brand)) {
-    return { intent: 'QUOTATION_REQUEST', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'QUOTATION_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
   if (ORDER_COMMIT_VERB_PATTERN.test(trimmed) && QUANTITY_PATTERN.test(trimmed) && (productCodeCandidate || brand)) {
-    return { intent: 'ORDER_INTENT', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'ORDER_INTENT', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   // Brief section 21: recognize a combined stock+price question in one pass
@@ -197,25 +280,25 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
   const hasStockSignal = STOCK_KEYWORD_PATTERN.test(trimmed);
   const hasPriceSignal = PRICE_KEYWORD_PATTERN.test(trimmed);
   if (hasStockSignal && hasPriceSignal) {
-    return { intent: 'STOCK_AND_PRICE_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'STOCK_AND_PRICE_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
   if (hasPriceSignal) {
-    return { intent: 'PRICE_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'PRICE_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
   if (hasStockSignal) {
-    return { intent: 'STOCK_CHECK', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'STOCK_CHECK', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   if (brand || productCodeCandidate) {
-    return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   }
 
   if (GREETING_PATTERN.test(trimmed)) {
-    return { intent: 'GREETING', deterministic: true, brand: null, productCodeCandidate: null, source, mentionedEntity: null };
+    return { intent: 'GREETING', deterministic: true, brand: null, productCodeCandidate: null, soNumberCandidate: null, invoiceNumberCandidate: null, source, mentionedEntity: null };
   }
 
   if (PRODUCT_MENTION_PATTERN.test(trimmed)) {
-    return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand: null, productCodeCandidate: null, source, mentionedEntity: null };
+    return { intent: 'PRODUCT_INQUIRY', deterministic: true, brand: null, productCodeCandidate: null, soNumberCandidate: null, invoiceNumberCandidate: null, source, mentionedEntity: null };
   }
 
   return null;
@@ -234,7 +317,9 @@ export async function classifyIntentWithModel(text: string): Promise<IntentDetec
   const source: 'WEBSITE' | 'UNKNOWN' = isWebsiteGeneratedMessage(text) ? 'WEBSITE' : 'UNKNOWN';
   const brand = detectBrandMention(text);
   const productCodeCandidate = extractProductCodeCandidate(text);
-  const fallback: IntentDetectionResult = { intent: 'GENERAL_INQUIRY', deterministic: false, brand, productCodeCandidate, source, mentionedEntity: null };
+  const soNumberCandidate = extractSoNumberCandidate(text);
+  const invoiceNumberCandidate = extractInvoiceNumberCandidate(text);
+  const fallback: IntentDetectionResult = { intent: 'GENERAL_INQUIRY', deterministic: false, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
 
   const injection = detectPromptInjection(text);
   if (injection.detected) {
@@ -249,7 +334,7 @@ export async function classifyIntentWithModel(text: string): Promise<IntentDetec
     ], { maxTokens: 64, temperature: 0 });
     const parsed = JSON.parse(result.content.trim()) as { intent?: string };
     const intent = VALID_INTENTS.includes(parsed.intent as WatiIntent) ? (parsed.intent as WatiIntent) : 'GENERAL_INQUIRY';
-    return { intent, deterministic: false, brand, productCodeCandidate, source, mentionedEntity: null };
+    return { intent, deterministic: false, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null };
   } catch (error) {
     console.warn('[wati.intent]', JSON.stringify({ event: 'model_classification_failed', error: error instanceof Error ? error.message : 'unknown' }));
     return fallback;

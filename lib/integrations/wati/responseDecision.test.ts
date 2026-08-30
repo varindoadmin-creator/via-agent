@@ -157,3 +157,45 @@ test('Section 80 — when COMMERCIAL_DRAFT_ENABLED is off, commercial intents fa
   assert.equal(order.case, 'G_ACK_ROUTE');
   assert.equal(cancel.case, 'G_ACK_ROUTE');
 });
+
+// ─── Phase 7: customer self-service ──────────────────────────────────────────
+
+const MATCHED_AUDIENCE: AudienceContext = { ...ANONYMOUS_AUDIENCE, customerId: 'CUST-1', identityLevel: 'CUSTOMER_MATCHED' };
+const VERIFIED_AUDIENCE: AudienceContext = { ...ANONYMOUS_AUDIENCE, customerId: 'CUST-1', identityLevel: 'VERIFIED_CUSTOMER' };
+
+test('Test 65 — a CUSTOMER_MATCHED audience clears the bar for order-status self-service', () => {
+  const decision = decideResponse({ intent: 'ORDER_STATUS_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: MATCHED_AUDIENCE });
+  assert.equal(decision.case, 'L_CUSTOMER_SELF_SERVICE');
+  assert.equal(decision.text, null);
+});
+
+test('an ANONYMOUS audience (no Phase 6 mapping at all) is denied self-service, never exposes any order data', () => {
+  const decision = decideResponse({ intent: 'ORDER_STATUS_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: ANONYMOUS_AUDIENCE });
+  assert.equal(decision.case, 'H_DISCLOSURE_DENIED');
+});
+
+test('Test 15/16 — invoice document requires VERIFIED_CUSTOMER; CUSTOMER_MATCHED alone is insufficient and asks to verify', () => {
+  const matchedOnly = decideResponse({ intent: 'INVOICE_DOCUMENT_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: MATCHED_AUDIENCE });
+  assert.equal(matchedOnly.case, 'H_DISCLOSURE_DENIED');
+  assert.match(matchedOnly.text ?? '', /verifikasi/i);
+
+  const verified = decideResponse({ intent: 'INVOICE_DOCUMENT_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: VERIFIED_AUDIENCE });
+  assert.equal(verified.case, 'L_CUSTOMER_SELF_SERVICE');
+});
+
+test('Section 76 — a disabled self-service flag falls back to a generic ack, never an error', () => {
+  const decision = decideResponse({ intent: 'PAYMENT_STATUS', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: MATCHED_AUDIENCE, selfServiceFlags: { paymentStatus: false } });
+  assert.equal(decision.case, 'G_ACK_ROUTE');
+});
+
+test('all remaining self-service intents (history, last order, delivery, invoice status, outstanding, receivable summary) clear the same CUSTOMER_MATCHED bar', () => {
+  for (const intent of ['ORDER_HISTORY', 'LAST_ORDER', 'DELIVERY_STATUS', 'INVOICE_STATUS', 'OUTSTANDING_INVOICES', 'RECEIVABLE_SUMMARY'] as const) {
+    const decision = decideResponse({ intent, brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: MATCHED_AUDIENCE });
+    assert.equal(decision.case, 'L_CUSTOMER_SELF_SERVICE', `expected ${intent} to clear the bar`);
+  }
+});
+
+test('a suppressed conversation also blocks every self-service intent', () => {
+  const decision = decideResponse({ intent: 'ORDER_STATUS_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true, audience: MATCHED_AUDIENCE });
+  assert.equal(decision.case, 'SUPPRESSED');
+});
