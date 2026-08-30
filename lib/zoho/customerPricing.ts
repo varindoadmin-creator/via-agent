@@ -1,7 +1,7 @@
-import { getCustomerById } from './customers';
-import { getItemDetail } from './items';
-import { getItemPricebookEntry } from './pricebooks';
-import { getPricebookIdByTier } from './pricebookConfig';
+import { getCustomerById } from './customers.ts';
+import { getItemDetail } from './items.ts';
+import { getItemPricebookEntry } from './pricebooks.ts';
+import { getPricebookIdByTier } from './pricebookConfig.ts';
 
 export interface CustomerItemPrice {
   customer_id: string;

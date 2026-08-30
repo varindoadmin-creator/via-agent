@@ -1,8 +1,8 @@
 // ─── Zoho Books Customers ─────────────────────────────────────────────────────
 
-import { ZohoContact, ZohoContactListResponse } from '@/types/zoho';
-import { zohoRequest, isMockMode } from './client';
-import { fuzzyNameSimilarity } from '@/lib/ai/phoneticMatching';
+import type { ZohoContact, ZohoContactListResponse } from '../../types/zoho.ts';
+import { zohoRequest, isMockMode } from './client.ts';
+import { fuzzyNameSimilarity } from '../ai/phoneticMatching.ts';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

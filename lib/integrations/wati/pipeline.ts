@@ -28,6 +28,10 @@ import { classifyQuantityInquiry } from './stock/quantityInquiryType.ts';
 import { startVendorCheck } from './stock/service.ts';
 import { updateStockInquiry } from './stock/store.ts';
 import { needQuantityPrompt } from './stock/responses.ts';
+import { getCustomerSafePrice } from './pricing/customerSafePrice.ts';
+import { formatIDR } from '../../zoho/tax.ts';
+import { priceOnly, priceWithStockAck, priceWithNeedQuantity, priceNotFound } from './pricing/responses.ts';
+import { checkWebsitePriceMismatch, logWebsitePriceMismatch } from './pricing/websiteMismatch.ts';
 
 const MAX_MESSAGES_PER_MINUTE = 20;
 
@@ -160,6 +164,25 @@ async function runResolutionAndResponse(
     }
   }
 
+  if (decision.case === 'I_PRICE_LOOKUP' && productResult.item) {
+    const priceResult = await startPriceInquiry(id, message, conversationId, customerPhoneNormalized, customerResult.customer?.contact_id ?? null, productResult.item, effectiveBrand, intentResult.intent, text)
+      .catch(error => {
+        console.error('[wati.pipeline]', JSON.stringify({ event: 'price_lookup_failed', error: error instanceof Error ? error.message : 'unknown' }));
+        return null;
+      });
+    if (priceResult) {
+      outboundText = priceResult.responseText;
+      responseCase = priceResult.responseCase;
+    }
+  }
+
+  // Brief section 13/42: website-mismatch telemetry runs whenever a structured
+  // website message carried a displayed price, independent of which intent
+  // fired — internal-only, never changes what the customer is told.
+  if (websiteProduct?.displayedPrice != null && productResult.status === 'EXACT' && productResult.item) {
+    void checkAndLogWebsiteMismatch(productResult.item.item_id, productResult.item.sku ?? null, websiteProduct.displayedPrice, customerResult.customer?.contact_id ?? null);
+  }
+
   let sent = false;
   if (outboundText && message.customerPhoneRaw) {
     const result = await sendWatiTextGated(message.customerPhoneRaw, outboundText, { conversationId, category: intentResult.intent });
@@ -239,6 +262,71 @@ async function startStockInquiry(
 
   const started = await startVendorCheck(created, product, effectiveBrand, classification.quantity?.quantity ?? null, classification.quantity?.unit ?? null);
   return { responseText: started.responseText, responseCase: `STOCK_${started.state}` };
+}
+
+/**
+ * PRICE_INQUIRY: verified price only. STOCK_AND_PRICE_INQUIRY (brief section
+ * 21): also runs the same vendor-first stock workflow as startStockInquiry,
+ * combined into one message so the customer never has to ask twice — never
+ * discloses a stock count either way (Phase 3 protection unchanged).
+ */
+async function startPriceInquiry(
+  inboundMessageId: string,
+  message: ReturnType<typeof normalizeWatiMessage>,
+  conversationId: string,
+  customerPhoneNormalized: string | null,
+  customerId: string | null,
+  product: NonNullable<Awaited<ReturnType<typeof resolveProduct>>['item']>,
+  effectiveBrand: string | null,
+  intent: string,
+  text: string,
+): Promise<{ responseText: string | null; responseCase: string }> {
+  const price = await getCustomerSafePrice(product.item_id, customerId);
+  if (price.sourceStatus !== 'VERIFIED') {
+    if (customerPhoneNormalized) await touchConversationState(customerPhoneNormalized, 'NEEDS_HUMAN').catch(() => {});
+    return { responseText: priceNotFound(), responseCase: 'PRICE_NOT_FOUND' };
+  }
+  const formattedPrice = formatIDR(price.amount);
+
+  if (intent !== 'STOCK_AND_PRICE_INQUIRY') {
+    return { responseText: priceOnly(product.sku ?? null, product.name, formattedPrice), responseCase: 'PRICE_VERIFIED' };
+  }
+
+  const classification = classifyQuantityInquiry(text);
+  if (classification.type === 'COUNT_INQUIRY') {
+    await createStockInquiry({
+      customerId, conversationId, customerPhoneRaw: message.customerPhoneRaw, inboundMessageId,
+      itemId: product.item_id, itemCode: product.sku ?? null, brand: effectiveBrand,
+      requestedQuantity: null, requestedUnit: null, status: 'NEEDS_QUANTITY', stockInquiryType: 'COUNT_INQUIRY',
+    });
+    return { responseText: priceWithNeedQuantity(product.sku ?? null, product.name, formattedPrice), responseCase: 'PRICE_VERIFIED_STOCK_NEEDS_QUANTITY' };
+  }
+
+  const created = await createStockInquiry({
+    customerId, conversationId, customerPhoneRaw: message.customerPhoneRaw, inboundMessageId,
+    itemId: product.item_id, itemCode: product.sku ?? null, brand: effectiveBrand,
+    requestedQuantity: classification.quantity?.quantity ?? null, requestedUnit: classification.quantity?.unit ?? null,
+    stockInquiryType: classification.type,
+  });
+  const started = await startVendorCheck(created, product, effectiveBrand, classification.quantity?.quantity ?? null, classification.quantity?.unit ?? null);
+
+  const responseText = started.state === 'WAITING_FOR_VENDOR'
+    ? priceWithStockAck(product.sku ?? null, product.name, formattedPrice)
+    : started.responseText
+      ? `${priceOnly(product.sku ?? null, product.name, formattedPrice)}\n\n${started.responseText}`
+      : priceOnly(product.sku ?? null, product.name, formattedPrice);
+  return { responseText, responseCase: `PRICE_VERIFIED_STOCK_${started.state}` };
+}
+
+async function checkAndLogWebsiteMismatch(itemId: string, itemCode: string | null, websiteDisplayedPrice: number, customerId: string | null): Promise<void> {
+  try {
+    const price = await getCustomerSafePrice(itemId, customerId);
+    if (price.sourceStatus !== 'VERIFIED') return;
+    const result = checkWebsitePriceMismatch(websiteDisplayedPrice, price.amount);
+    if (result) logWebsitePriceMismatch(itemCode, result);
+  } catch (error) {
+    console.warn('[wati.pricing]', JSON.stringify({ event: 'website_mismatch_check_failed', error: error instanceof Error ? error.message : 'unknown' }));
+  }
 }
 
 /** Handles a bare quantity reply to VIA's own "berapa yang dibutuhkan?" question. */

@@ -1,8 +1,8 @@
 // ─── Zoho Books HTTP Client ───────────────────────────────────────────────────
 // Server-side only.
 
-import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from './auth';
-import { fetchWithRetry } from './retry';
+import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from './auth.ts';
+import { fetchWithRetry } from './retry.ts';
 
 export interface ZohoRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';

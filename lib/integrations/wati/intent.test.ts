@@ -118,3 +118,52 @@ test('Test 10 — a fake identity claim alone carries no special intent (still j
   assert.notEqual(result?.intent, 'INTERNAL_METRIC_INQUIRY');
   assert.notEqual(result?.intent, 'ORDER_STATUS_INQUIRY');
 });
+
+// ─── Phase 5: price intent + two Phase 4 audit fixes ────────────────────────
+
+test('Test 48 (Phase 4 fix) — "ATP11358M modalnya berapa?" is now caught as INTERNAL_METRIC_INQUIRY', () => {
+  const result = detectIntentDeterministic('ATP11358M modalnya berapa?');
+  assert.equal(result?.intent, 'INTERNAL_METRIC_INQUIRY');
+});
+
+test('Test 53 (Phase 4 fix) — "PT ABC dapat ATP11358M harga berapa?" is now caught as OTHER_CUSTOMER_INQUIRY', () => {
+  const result = detectIntentDeterministic('PT ABC dapat ATP11358M harga berapa?');
+  assert.equal(result?.intent, 'OTHER_CUSTOMER_INQUIRY');
+});
+
+test('a bare own-price question ("saya mau tanya harga produk") is not misfired as ORDER_STATUS_INQUIRY by the broadened entity pattern', () => {
+  const result = detectIntentDeterministic('Saya mau tanya harga produk ini');
+  assert.notEqual(result?.intent, 'ORDER_STATUS_INQUIRY');
+  assert.notEqual(result?.intent, 'OTHER_CUSTOMER_INQUIRY');
+});
+
+test('Test 49 — "ATP11358M harganya berapa?" is PRICE_INQUIRY', () => {
+  const result = detectIntentDeterministic('ATP11358M harganya berapa?');
+  assert.equal(result?.intent, 'PRICE_INQUIRY');
+  assert.equal(result?.productCodeCandidate, 'ATP11358M');
+});
+
+test('Test 51/52 — "ATP11358M harga dan stock?" is STOCK_AND_PRICE_INQUIRY', () => {
+  const result = detectIntentDeterministic('ATP11358M harga dan stock?');
+  assert.equal(result?.intent, 'STOCK_AND_PRICE_INQUIRY');
+});
+
+test('"ATP11358M harga berapa dan stok kalian ada berapa lembar?" is also STOCK_AND_PRICE_INQUIRY', () => {
+  const result = detectIntentDeterministic('ATP11358M harga berapa dan stok kalian ada berapa lembar?');
+  assert.equal(result?.intent, 'STOCK_AND_PRICE_INQUIRY');
+});
+
+test('a bare stock question without "harga" stays plain STOCK_CHECK (no price signal to combine)', () => {
+  const result = detectIntentDeterministic('ATP11358M ada stock?');
+  assert.equal(result?.intent, 'STOCK_CHECK');
+});
+
+test('Test 58 — "ATP11358M bisa kurang?" is DISCOUNT_REQUEST', () => {
+  const result = detectIntentDeterministic('ATP11358M bisa kurang?');
+  assert.equal(result?.intent, 'DISCOUNT_REQUEST');
+});
+
+test('Section 38 — "Kalau ambil 500 lembar ada harga proyek?" is DISCOUNT_REQUEST, not a plain stock question', () => {
+  const result = detectIntentDeterministic('Kalau ambil 500 lembar ada harga proyek?');
+  assert.equal(result?.intent, 'DISCOUNT_REQUEST');
+});

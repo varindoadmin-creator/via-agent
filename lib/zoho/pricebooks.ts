@@ -1,12 +1,12 @@
-import { zohoRequest } from './client';
+import { zohoRequest } from './client.ts';
 import {
   filterItemsByActiveIds,
   getPricebookIdByTier,
   PRICE_LIST_TIERS,
   type PriceListTier,
-} from './pricebookConfig';
+} from './pricebookConfig.ts';
 
-export { getPricebookIdByTier, PRICE_LIST_TIERS, type PriceListTier } from './pricebookConfig';
+export { getPricebookIdByTier, PRICE_LIST_TIERS, type PriceListTier } from './pricebookConfig.ts';
 
 interface PricebookItem {
   item_id: string;

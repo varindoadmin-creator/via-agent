@@ -47,13 +47,16 @@ test('Suppressed conversation sends no automated reply once a human has taken ov
   assert.equal(decision.createStockInquiry, false);
 });
 
-test('Price/order inquiries never quote a price or confirm an order', () => {
-  const priceDecision = decideResponse({ intent: 'PRICE_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+test('Order inquiries never confirm an order (no order-creation capability exists)', () => {
   const orderDecision = decideResponse({ intent: 'ORDER_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
-  for (const decision of [priceDecision, orderDecision]) {
-    assert.equal(decision.case, 'G_ACK_ROUTE');
-    assert.doesNotMatch(decision.text ?? '', /Rp\.?\s*\d|disetujui|dikonfirmasi/i);
-  }
+  assert.equal(orderDecision.case, 'G_ACK_ROUTE');
+  assert.doesNotMatch(orderDecision.text ?? '', /Rp\.?\s*\d|disetujui|dikonfirmasi/i);
+});
+
+test('a price inquiry with no resolvable product or brand asks for clarification, never quotes a price', () => {
+  const decision = decideResponse({ intent: 'PRICE_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'E_CLARIFICATION');
+  assert.doesNotMatch(decision.text ?? '', /Rp\.?\s*\d/i);
 });
 
 // ─── Phase 4: disclosure-gated intents ──────────────────────────────────────
@@ -87,4 +90,38 @@ test('missing audience for a disclosure-gated intent fails closed rather than th
 test('a suppressed conversation (human takeover) still blocks the disclosure-gated intents, same as every other intent', () => {
   const decision = decideResponse({ intent: 'INTERNAL_METRIC_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true, audience: ANONYMOUS_AUDIENCE });
   assert.equal(decision.case, 'SUPPRESSED');
+});
+
+// ─── Phase 5: price intents ──────────────────────────────────────────────────
+
+test('Test 49 — a resolved product with a price inquiry defers the actual text to the async pipeline lookup', () => {
+  const decision = decideResponse({ intent: 'PRICE_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
+  assert.equal(decision.case, 'I_PRICE_LOOKUP');
+  assert.equal(decision.text, null);
+  assert.equal(decision.createStockInquiry, false);
+});
+
+test('Test 51/52 — STOCK_AND_PRICE_INQUIRY with a resolved product also defers to the pipeline (price+stock combined there)', () => {
+  const decision = decideResponse({ intent: 'STOCK_AND_PRICE_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
+  assert.equal(decision.case, 'I_PRICE_LOOKUP');
+});
+
+test('Test 23 — a bare brand price question never invents a single brand-wide price', () => {
+  const decision = decideResponse({ intent: 'PRICE_INQUIRY', brand: 'LAMITAK', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'J_BROAD_BRAND_PRICE');
+  assert.doesNotMatch(decision.text ?? '', /Rp\.?\s*\d/);
+});
+
+test('Test 37/58 — a discount request always routes to human/Sales handoff and marks the conversation', () => {
+  const decision = decideResponse({ intent: 'DISCOUNT_REQUEST', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
+  assert.equal(decision.case, 'M_DISCOUNT_HANDOFF');
+  assert.equal(decision.markHumanRequest, true);
+  assert.doesNotMatch(decision.text ?? '', /\d/);
+});
+
+test('a suppressed conversation also blocks price and discount intents', () => {
+  const priceDecision = decideResponse({ intent: 'PRICE_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: true });
+  const discountDecision = decideResponse({ intent: 'DISCOUNT_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true });
+  assert.equal(priceDecision.case, 'SUPPRESSED');
+  assert.equal(discountDecision.case, 'SUPPRESSED');
 });

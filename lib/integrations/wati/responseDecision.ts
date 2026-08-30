@@ -10,8 +10,9 @@ import type { ZohoItem } from '../../../types/zoho.ts';
 import type { AudienceContext } from '../../security/disclosure/audience.ts';
 import { evaluateDisclosure, type DisclosureReasonCode } from '../../security/disclosure/policy.ts';
 import { responseForReasonCode } from '../../security/disclosure/responses.ts';
+import { broadBrandPriceClarification, discountHandoff } from './pricing/responses.ts';
 
-export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'SUPPRESSED';
+export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF' | 'SUPPRESSED';
 
 export interface ResponseDecisionInput {
   intent: WatiIntent;
@@ -101,9 +102,28 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
     return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
   }
 
-  if (input.intent === 'PRICE_INQUIRY' || input.intent === 'ORDER_INQUIRY') {
-    // Sections 19-20: never quote price/confirm orders automatically — acknowledge and route.
+  if (input.intent === 'ORDER_INQUIRY') {
+    // No order-creation capability exists yet (Phase 6+) — acknowledge and route.
     return { case: 'G_ACK_ROUTE', text: ackRoute(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'PRICE_INQUIRY' || input.intent === 'STOCK_AND_PRICE_INQUIRY') {
+    if (input.productResolution === 'EXACT' && input.product) {
+      // The actual price text requires an async, verified lookup (lib/zoho/pricing.ts) —
+      // resolved by the pipeline after this decision, same pattern as Phase 3's
+      // D_STOCK_ACK. `text: null` here is intentional, not SUPPRESSED.
+      return { case: 'I_PRICE_LOOKUP', text: null, createStockInquiry: false, markHumanRequest: false };
+    }
+    if (input.brand) {
+      // "Lamitak harganya berapa?" — too broad, never invent a single brand-wide price.
+      return { case: 'J_BROAD_BRAND_PRICE', text: broadBrandPriceClarification(), createStockInquiry: false, markHumanRequest: false };
+    }
+    return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'DISCOUNT_REQUEST') {
+    // Brief section 37: no approved automatic-discount policy exists — human/Sales handoff, no threshold disclosed.
+    return { case: 'M_DISCOUNT_HANDOFF', text: discountHandoff(), createStockInquiry: false, markHumanRequest: true };
   }
 
   // Phase 4: internal-metric, other-customer, and own-order-status questions
