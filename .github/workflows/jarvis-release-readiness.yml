@@ -1,0 +1,28 @@
+name: Jarvis release readiness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app/api/chat/**'
+      - 'app/api/jarvis/**'
+      - 'lib/ai/**'
+      - 'lib/jarvis/**'
+      - 'components/ChatInterface.tsx'
+      - 'package.json'
+      - 'supabase/jarvis_*.sql'
+      - '.github/workflows/jarvis-release-readiness.yml'
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run build
