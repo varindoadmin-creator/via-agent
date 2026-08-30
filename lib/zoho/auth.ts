@@ -1,8 +1,8 @@
 // ─── Zoho Books Authentication ────────────────────────────────────────────────
 // Server-side only. Never import this in client components.
 
-import { ZohoTokenResponse } from '@/types/zoho';
-import { fetchWithRetry } from './retry';
+import type { ZohoTokenResponse } from '../../types/zoho.ts';
+import { fetchWithRetry } from './retry.ts';
 
 // In-memory token cache (per server process)
 let cachedToken: string | null = null;

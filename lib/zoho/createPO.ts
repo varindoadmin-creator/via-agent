@@ -10,6 +10,10 @@
 
 import { zohoRequest } from '@/lib/zoho/client';
 import { computeApprovalData, type UncoveredDemand } from '@/lib/zoho/poApprovalEngine';
+import { BRAND_VENDORS, type BrandVendor } from '@/lib/zoho/brands';
+
+export type { BrandVendor };
+export { BRAND_VENDORS };
 
 function s(value: unknown): string {
   return value == null ? '' : String(value);
@@ -27,21 +31,6 @@ async function mapBatched<T, R>(items: T[], batchSize: number, fn: (item: T) => 
   }
   return results;
 }
-
-// Brand -> Vendor, exactly as Admin defined it. Deliberately not derived from
-// the item's own vendor_name in Zoho: several brands (EDL, TACO) have items
-// split across more than one vendor_name in Zoho's item records, but Admin
-// wants every PO for a given brand routed to one specific vendor.
-export interface BrandVendor { brand: string; vendor_name: string }
-export const BRAND_VENDORS: BrandVendor[] = [
-  { brand: 'EDL',        vendor_name: 'EDL DESIGN INDONESIA, PT' },
-  { brand: 'LAMITAK',    vendor_name: 'TAK PRODUCTS AND SERVICES, PT' },
-  { brand: 'AICA',       vendor_name: 'MARGA BHARATA, PT' },
-  { brand: 'TACO',       vendor_name: 'WIRYA INDAH NUGRAHA, PT' },
-  { brand: 'CARTA',      vendor_name: 'LOGAM MAS INTERNASIONAL, PT' },
-  { brand: 'GRASMERINO', vendor_name: 'GRASINDO ANUGRAH PRATAMA, PT' },
-  { brand: 'GREENLAM',   vendor_name: 'MATT GLOSS MATTER, PT' },
-];
 
 function getLocationIds(): Record<string, string> {
   return {

@@ -88,7 +88,7 @@ let customerCache: ZohoContact[] = [];
 let customerCacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function getAllCustomers(): Promise<ZohoContact[]> {
+export async function getAllCustomers(): Promise<ZohoContact[]> {
   const now = Date.now();
   if (customerCache.length > 0 && now - customerCacheTime < CACHE_TTL) {
     return customerCache;

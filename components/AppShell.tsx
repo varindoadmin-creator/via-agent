@@ -98,6 +98,8 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
         { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
         { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
+        { id: 'req-wati',       href: '/requests/wati',       label: 'WATI Inquiries' },
+        { id: 'req-wati-stock', href: '/requests/wati/stock', label: 'Stock Inquiries' },
       ],
     },
   },
@@ -368,18 +370,15 @@ function JarvisDrawer({
   onOpen,
   onClose,
   mobile,
-  sidebarWidth,
 }: {
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
   mobile: boolean;
-  sidebarWidth: number;
 }) {
-  const left = mobile ? 12 : sidebarWidth + 14;
   const launcherStyle: React.CSSProperties = mobile
-    ? { left: 16, bottom: 16 }
-    : { left, bottom: 18 };
+    ? { right: 16, bottom: 16 }
+    : { right: 18, bottom: 18 };
 
   return (
     <>
@@ -414,8 +413,8 @@ function JarvisDrawer({
         aria-hidden={!open}
         style={{
           position: 'fixed', zIndex: 90, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          left: mobile ? 8 : left, right: mobile ? 8 : 'auto', bottom: mobile ? 8 : 18,
-          width: mobile ? 'auto' : 'min(460px, calc(100vw - ' + (left + 16) + 'px))',
+          left: mobile ? 8 : 'auto', right: mobile ? 8 : 18, bottom: mobile ? 8 : 18,
+          width: mobile ? 'auto' : 'min(460px, calc(100vw - 36px))',
           height: mobile ? 'min(78dvh, 720px)' : 'min(720px, calc(100dvh - 36px))',
           border: '1px solid var(--border)', borderRadius: 18, background: 'var(--panel)',
           boxShadow: '0 20px 55px rgba(25, 41, 77, 0.25)',
@@ -651,7 +650,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
         <main style={{ flex: 1, overflow: 'auto', paddingTop: 52, minHeight: 0 }}>
           {children}
         </main>
-        <JarvisDrawer open={jarvisOpen} onOpen={() => setJarvisOpen(true)} onClose={() => setJarvisOpen(false)} mobile sidebarWidth={0} />
+        <JarvisDrawer open={jarvisOpen} onOpen={() => setJarvisOpen(true)} onClose={() => setJarvisOpen(false)} mobile />
       </div>
     );
   }
@@ -707,7 +706,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
       <main style={{ flex: 1, overflow: 'auto', minWidth: 0, background: 'var(--bg)' }}>
         {children}
       </main>
-      <JarvisDrawer open={jarvisOpen} onOpen={() => setJarvisOpen(true)} onClose={() => setJarvisOpen(false)} mobile={false} sidebarWidth={collapsed ? 56 : 232} />
+      <JarvisDrawer open={jarvisOpen} onOpen={() => setJarvisOpen(true)} onClose={() => setJarvisOpen(false)} mobile={false} />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 // ─── Zoho Books Items + Stock ─────────────────────────────────────────────────
 // Server-side only. Never import in client components.
 
-import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from './auth';
-import { fetchWithRetry } from './retry';
-import { ZohoItem } from '@/types/zoho';
+import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from './auth.ts';
+import { fetchWithRetry } from './retry.ts';
+import type { ZohoItem } from '../../types/zoho.ts';
 
 function getLocationLabels(): Record<string, string> {
   return {

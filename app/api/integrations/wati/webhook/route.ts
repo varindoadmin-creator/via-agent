@@ -1,14 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { acceptsJsonContentType, exceedsWatiWebhookLimit, isAuthorizedWatiWebhook, parseWatiWebhookPayload } from '@/lib/integrations/wati/webhook';
+import { processInboundWatiMessage } from '@/lib/integrations/wati/pipeline';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 10;
+export const maxDuration = 30;
 
 /**
- * Public WATI callback acknowledgement only. It intentionally does not store,
- * route, classify, or reply to messages; those are separate milestones.
+ * Public WATI callback. Normalizes, persists idempotently, resolves the
+ * customer/product/intent, and sends a safe deterministic acknowledgement —
+ * see lib/integrations/wati/pipeline.ts. Always acknowledges with HTTP 200
+ * once the payload itself is valid: an internal processing failure must never
+ * make WATI think the webhook itself is broken (brief section 30).
  */
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
@@ -41,7 +45,17 @@ export async function POST(request: NextRequest) {
       status: 200,
       durationMs: Date.now() - startedAt,
     }));
-    return NextResponse.json({ ok: true, integration: 'wati' });
+
+    let outcome: { status: string } = { status: 'skipped_storage_not_configured' };
+    try {
+      outcome = await processInboundWatiMessage(parsed.payload);
+    } catch (error) {
+      // Never fail the webhook contract over internal processing — e.g. Supabase
+      // env vars missing in an environment WATI is already configured against.
+      console.error('[wati.webhook]', JSON.stringify({ event: 'pipeline_error', requestId, error: error instanceof Error ? error.message : 'unknown' }));
+    }
+
+    return NextResponse.json({ ok: true, integration: 'wati', status: outcome.status });
   } catch (error) {
     console.error('[wati.webhook]', JSON.stringify({
       event: 'wati.webhook.failed',

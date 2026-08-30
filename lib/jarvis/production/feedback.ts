@@ -1,4 +1,5 @@
-import { getJarvisRuntimeConfig } from './config';
+import { getJarvisRuntimeConfig } from './config.ts';
+import { redact } from '../../redact.ts';
 
 export const JARVIS_FEEDBACK_TYPES = ['helpful', 'not_helpful', 'correction', 'failure'] as const;
 export type JarvisFeedbackType = typeof JARVIS_FEEDBACK_TYPES[number];
@@ -9,15 +10,6 @@ export interface JarvisFeedbackInput {
   actorRole: string;
   type: JarvisFeedbackType;
   note?: string;
-}
-
-function redact(value: string): string {
-  return value
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
-    .replace(/\+?\d[\d\s().-]{7,}\d/g, '[redacted-phone]')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 1_000);
 }
 
 export function normalizeJarvisFeedback(input: JarvisFeedbackInput) {

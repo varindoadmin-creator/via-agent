@@ -8,6 +8,8 @@
 // same conservative posture as rules.ts: never guess, only flag what's
 // actually the same underlying value written differently.
 
+import { normalizePhoneKey } from '../customers/phoneKey.ts';
+
 export interface DuplicateCandidate {
   contact_id: string;
   contact_name: string;
@@ -39,14 +41,6 @@ function normalizeNameKey(raw: string | undefined | null): string {
     .filter(Boolean)
     .filter((w) => !LEGAL_SUFFIX_WORDS.has(w));
   return words.join(' ');
-}
-
-/** Last 9 digits — absorbs 0/62/+62 country-code prefix differences. */
-function normalizePhoneKey(raw: string | undefined | null): string | null {
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length < 8) return null;
-  return digits.slice(-9);
 }
 
 /** Strips non-digits; rejects short values and dummy all-same-digit placeholders (e.g. "0000000000000"). */
