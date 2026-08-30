@@ -7,8 +7,11 @@
 import type { WatiIntent } from './intent.ts';
 import type { ProductResolutionStatus } from './productResolution.ts';
 import type { ZohoItem } from '../../../types/zoho.ts';
+import type { AudienceContext } from '../../security/disclosure/audience.ts';
+import { evaluateDisclosure, type DisclosureReasonCode } from '../../security/disclosure/policy.ts';
+import { responseForReasonCode } from '../../security/disclosure/responses.ts';
 
-export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'SUPPRESSED';
+export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'SUPPRESSED';
 
 export interface ResponseDecisionInput {
   intent: WatiIntent;
@@ -17,6 +20,8 @@ export interface ResponseDecisionInput {
   product: ZohoItem | null;
   productCodeCandidate: string | null;
   conversationSuppressed: boolean; // true when conversation state is NEEDS_HUMAN/HUMAN_ACTIVE
+  /** Required for the Phase 4 disclosure-gated intents (INTERNAL_METRIC/OTHER_CUSTOMER/ORDER_STATUS). */
+  audience?: AudienceContext;
 }
 
 export interface ResponseDecision {
@@ -24,6 +29,8 @@ export interface ResponseDecision {
   text: string | null; // null when SUPPRESSED — no automated reply is sent
   createStockInquiry: boolean;
   markHumanRequest: boolean;
+  /** Set only for H_DISCLOSURE_DENIED — for security-event logging, never for a second lookup attempt. */
+  disclosureReasonCode?: DisclosureReasonCode;
 }
 
 const OPTIONS_MENU = '1. Cek Stok\n2. Informasi Produk\n3. Hubungi Admin';
@@ -97,6 +104,27 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
   if (input.intent === 'PRICE_INQUIRY' || input.intent === 'ORDER_INQUIRY') {
     // Sections 19-20: never quote price/confirm orders automatically — acknowledge and route.
     return { case: 'G_ACK_ROUTE', text: ackRoute(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  // Phase 4: internal-metric, other-customer, and own-order-status questions
+  // all go through the same disclosure check — no lookup is ever attempted
+  // for any of them (brief section 14's "the system should preferably NOT
+  // call the tool"). ORDER_STATUS_INQUIRY has no ownerCustomerId to check
+  // (no real order-lookup service exists yet) — evaluateDisclosure's
+  // CUSTOMER_SCOPED branch with no owner known correctly yields the same
+  // "we need to verify/hand this to Admin" text, without inventing a
+  // capability that isn't built (brief section 11).
+  if (input.intent === 'INTERNAL_METRIC_INQUIRY' || input.intent === 'OTHER_CUSTOMER_INQUIRY' || input.intent === 'ORDER_STATUS_INQUIRY') {
+    const category = input.intent === 'INTERNAL_METRIC_INQUIRY' ? 'BRAND_SALES' : input.intent === 'OTHER_CUSTOMER_INQUIRY' ? 'OTHER_CUSTOMER_DATA' : 'OWN_ORDER_STATUS';
+    const result = input.audience
+      ? evaluateDisclosure({ audience: input.audience, category })
+      : { decision: 'DENY' as const, reasonCode: 'POLICY_EVALUATION_FAILED' as const };
+    // These three intents are never actually grantable from WATI (no audience
+    // constructed there is ever INTERNAL_USER) — an unexpected ALLOW falls
+    // back to the safe generic ack rather than the empty string
+    // responseForReasonCode returns for allow-shaped reason codes.
+    const text = result.decision === 'ALLOW' ? ackRoute() : responseForReasonCode(result.reasonCode);
+    return { case: 'H_DISCLOSURE_DENIED', text, createStockInquiry: false, markHumanRequest: false, disclosureReasonCode: result.reasonCode };
   }
 
   // GENERAL_INQUIRY / UNKNOWN — safe default, makes no claims, offers the menu.

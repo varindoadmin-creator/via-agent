@@ -100,6 +100,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
         { id: 'req-wati',       href: '/requests/wati',       label: 'WATI Inquiries' },
         { id: 'req-wati-stock', href: '/requests/wati/stock', label: 'Stock Inquiries' },
+        { id: 'req-wati-policy', href: '/requests/wati/policy', label: 'Customer Data Policy' },
       ],
     },
   },

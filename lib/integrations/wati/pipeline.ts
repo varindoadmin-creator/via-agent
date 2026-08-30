@@ -18,8 +18,10 @@ import { resolveProduct } from './productResolution.ts';
 import { resolveConversationContext } from './context.ts';
 import { decideResponse } from './responseDecision.ts';
 import { createStockInquiry } from './stockInquiries.ts';
-import { sendWatiText } from './client.ts';
 import { redact } from '../../redact.ts';
+import { externalWatiAudience } from '../../security/disclosure/audience.ts';
+import { sendWatiTextGated } from '../../security/disclosure/disclosureGate.ts';
+import { recordCustomerSecurityEvent } from '../../security/disclosure/securityEvents.ts';
 import { getItemDetail } from '../../zoho/items.ts';
 import { matchQuantityFollowUp } from './stock/quantityFollowUp.ts';
 import { classifyQuantityInquiry } from './stock/quantityInquiryType.ts';
@@ -114,6 +116,10 @@ async function runResolutionAndResponse(
     : { status: 'NOT_FOUND' as const, item: null, brand: null, candidates: [] };
 
   const effectiveBrand = productResult.brand || intentResult.brand || context.carriedBrand;
+  const conversationId = customerPhoneNormalized || message.providerConversationId || message.providerMessageId;
+  // Brief section 3: built entirely from Phase 2's own server-side customer
+  // resolution — never from message text, so nothing in `text` can change it.
+  const audience = externalWatiAudience({ customerResolution: customerResult, externalPhone: message.customerPhoneRaw, conversationId });
 
   const decision = decideResponse({
     intent: intentResult.intent,
@@ -122,13 +128,23 @@ async function runResolutionAndResponse(
     product: productResult.item,
     productCodeCandidate: productCandidate,
     conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ACTIVE',
+    audience,
   });
+
+  if (decision.case === 'H_DISCLOSURE_DENIED') {
+    recordCustomerSecurityEvent({
+      event: 'disclosure_decision',
+      conversationId,
+      category: intentResult.intent,
+      decision: 'DENY',
+      reasonCode: decision.disclosureReasonCode ?? 'UNKNOWN',
+    });
+  }
 
   if (customerPhoneNormalized) {
     await touchConversationState(customerPhoneNormalized, decision.markHumanRequest ? 'NEEDS_HUMAN' : undefined);
   }
 
-  const conversationId = customerPhoneNormalized || message.providerConversationId || message.providerMessageId;
   let outboundText = decision.text;
   let responseCase: string = decision.case;
 
@@ -146,7 +162,7 @@ async function runResolutionAndResponse(
 
   let sent = false;
   if (outboundText && message.customerPhoneRaw) {
-    const result = await sendWatiText(message.customerPhoneRaw, outboundText);
+    const result = await sendWatiTextGated(message.customerPhoneRaw, outboundText, { conversationId, category: intentResult.intent });
     sent = result === 'sent';
   }
 
@@ -261,7 +277,7 @@ async function continueStockWorkflowFromQuantity(
 
   let sent = false;
   if (started.responseText && message.customerPhoneRaw) {
-    const result = await sendWatiText(message.customerPhoneRaw, started.responseText);
+    const result = await sendWatiTextGated(message.customerPhoneRaw, started.responseText, { conversationId: inquiry.conversation_id, category: 'STOCK_CHECK' });
     sent = result === 'sent';
   }
 

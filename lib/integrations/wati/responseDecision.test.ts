@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { decideResponse } from './responseDecision.ts';
 import type { ZohoItem } from '../../../types/zoho.ts';
+import { externalWatiAudience, type AudienceContext } from '../../security/disclosure/audience.ts';
 
 const ITEM: ZohoItem = { item_id: '1', name: 'LAMITAK HPL MARMO CLASSICO PRO', sku: 'ATP11358M', rate: 0, status: 'active' };
+
+const ANONYMOUS_AUDIENCE: AudienceContext = externalWatiAudience({ customerResolution: { status: 'UNMATCHED', customer: null }, externalPhone: '628123', conversationId: '628123' });
 
 test('Case A: greeting gets the generic menu', () => {
   const decision = decideResponse({ intent: 'GREETING', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
@@ -51,4 +54,37 @@ test('Price/order inquiries never quote a price or confirm an order', () => {
     assert.equal(decision.case, 'G_ACK_ROUTE');
     assert.doesNotMatch(decision.text ?? '', /Rp\.?\s*\d|disetujui|dikonfirmasi/i);
   }
+});
+
+// ─── Phase 4: disclosure-gated intents ──────────────────────────────────────
+
+test('Test 2/14/16 — INTERNAL_METRIC_INQUIRY is denied with the internal-data template, no lookup attempted', () => {
+  const decision = decideResponse({ intent: 'INTERNAL_METRIC_INQUIRY', brand: 'LAMITAK', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: ANONYMOUS_AUDIENCE });
+  assert.equal(decision.case, 'H_DISCLOSURE_DENIED');
+  assert.match(decision.text ?? '', /Mohon maaf/);
+  assert.equal(decision.disclosureReasonCode, 'INTERNAL_DATA_EXTERNAL_DENIED');
+  assert.equal(decision.createStockInquiry, false);
+});
+
+test('Test 8/19 — OTHER_CUSTOMER_INQUIRY is denied with the other-customer template', () => {
+  const decision = decideResponse({ intent: 'OTHER_CUSTOMER_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: ANONYMOUS_AUDIENCE });
+  assert.equal(decision.case, 'H_DISCLOSURE_DENIED');
+  assert.match(decision.text ?? '', /pelanggan lain/);
+});
+
+test('Test 6/18 — ORDER_STATUS_INQUIRY with no real lookup capability hands off rather than denying flatly', () => {
+  const decision = decideResponse({ intent: 'ORDER_STATUS_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, audience: ANONYMOUS_AUDIENCE });
+  assert.equal(decision.case, 'H_DISCLOSURE_DENIED');
+  assert.match(decision.text ?? '', /verifikasi|Admin/i);
+});
+
+test('missing audience for a disclosure-gated intent fails closed rather than throwing', () => {
+  const decision = decideResponse({ intent: 'INTERNAL_METRIC_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'H_DISCLOSURE_DENIED');
+  assert.ok(decision.text && decision.text.length > 0);
+});
+
+test('a suppressed conversation (human takeover) still blocks the disclosure-gated intents, same as every other intent', () => {
+  const decision = decideResponse({ intent: 'INTERNAL_METRIC_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true, audience: ANONYMOUS_AUDIENCE });
+  assert.equal(decision.case, 'SUPPRESSED');
 });

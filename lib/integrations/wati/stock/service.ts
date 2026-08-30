@@ -19,7 +19,7 @@ import {
   getLinkedInquiries, updateStockCheckRequest, updateStockInquiry, getStockInquiry,
   type StockCheckRequestRow, type StockInquiryRow,
 } from './store.ts';
-import { sendWatiText } from '../client.ts';
+import { sendWatiTextGated } from '../../../security/disclosure/disclosureGate.ts';
 import { getConversationState } from '../conversationState.ts';
 import { stockAck } from '../responseDecision.ts';
 
@@ -224,7 +224,7 @@ export async function sendPreparedResponse(inquiryId: string, sentBy: string): P
     console.error('[wati.stock]', JSON.stringify({ event: 'stock.response.send_failed', inquiryId, reason: 'missing_customer_phone_raw' }));
     return false;
   }
-  const result = await sendWatiText(inquiry.customer_phone_raw, inquiry.prepared_response_text);
+  const result = await sendWatiTextGated(inquiry.customer_phone_raw, inquiry.prepared_response_text, { conversationId: inquiry.conversation_id, category: 'STOCK_RESULT' });
 
   await updateStockInquiry(inquiry.id, {
     status: 'CLOSED',

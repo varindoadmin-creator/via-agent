@@ -26,6 +26,7 @@
     "test:wati-webhook": "node --experimental-strip-types --test lib/integrations/wati/webhook.test.ts",
     "test:wati-inquiry": "node --experimental-strip-types --test lib/integrations/wati/intent.test.ts lib/integrations/wati/websiteParser.test.ts lib/integrations/wati/responseDecision.test.ts lib/integrations/wati/store.test.ts lib/integrations/wati/context.test.ts lib/customers/phoneKey.test.ts",
     "test:wati-stock": "node --experimental-strip-types --test lib/integrations/wati/stock/*.test.ts",
+    "test:security-disclosure": "node --experimental-strip-types --test lib/security/disclosure/*.test.ts",
     "test:google-ads": "node --experimental-strip-types --test lib/googleAds/report.test.ts",
     "test:voice-commands": "node --experimental-strip-types --test lib/ai/voiceCommands.test.ts",
     "test:speech": "node --experimental-strip-types --test lib/ai/speech.test.ts",
