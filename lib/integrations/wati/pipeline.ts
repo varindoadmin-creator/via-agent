@@ -38,7 +38,11 @@ import {
   isCommercialDraftEnabled, isCustomerIdentityMappingEnabled,
   isCustomerOrderStatusEnabled, isCustomerInvoiceStatusEnabled, isCustomerInvoiceDocumentEnabled,
   isCustomerPaymentStatusEnabled, isCustomerReceivableSummaryEnabled, isCustomerDeliveryStatusEnabled,
+  isCustomerServiceHandoffEnabled,
 } from '../../customerIdentity/featureFlags.ts';
+import { triggerHandoff } from '../../customerService/handoff.ts';
+import type { HandoffReason } from '../../customerService/handoffReasons.ts';
+import { getServiceCase } from './conversationState.ts';
 import { resolveCustomerIdentities } from '../../customerIdentity/channelIdentity.ts';
 import { runCustomerSelfService, resumeSelfServiceAfterSelection } from './selfService/orchestrator.ts';
 import { getPendingSelfService } from './conversationState.ts';
@@ -177,7 +181,7 @@ async function runResolutionAndResponse(
     productResolution: productCandidate ? productResult.status : null,
     product: productResult.item,
     productCodeCandidate: productCandidate,
-    conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ACTIVE',
+    conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ASSIGNED' || conversationState === 'HUMAN_ACTIVE',
     audience,
     commercialDraftEnabled: isCommercialDraftEnabled(),
     selfServiceFlags: {
@@ -200,8 +204,25 @@ async function runResolutionAndResponse(
     });
   }
 
+  // Tracks whether THIS pipeline invocation is itself the one triggering a
+  // handoff this turn (here, or later via startPriceInquiry's PRICE_NOT_FOUND
+  // path) — the race-condition recheck before the final send must not
+  // suppress a turn's own hand-off acknowledgement, only a genuinely
+  // concurrent admin action (brief sections 76-77).
+  let handoffTriggeredThisTurn = false;
+
   if (customerPhoneNormalized) {
-    await touchConversationState(customerPhoneNormalized, decision.markHumanRequest ? 'NEEDS_HUMAN' : undefined);
+    if (decision.markHumanRequest && isCustomerServiceHandoffEnabled()) {
+      const reason: HandoffReason = decision.case === 'F_HUMAN' ? 'CUSTOMER_REQUESTED_HUMAN'
+        : decision.case === 'M_DISCOUNT_HANDOFF' ? 'DISCOUNT_REQUEST'
+        : 'OTHER_EXCEPTION';
+      await triggerHandoff(customerPhoneNormalized, reason, { customerMessageText: text }).catch(error => {
+        console.error('[wati.pipeline]', JSON.stringify({ event: 'handoff_trigger_failed', error: error instanceof Error ? error.message : 'unknown' }));
+      });
+      handoffTriggeredThisTurn = true;
+    } else {
+      await touchConversationState(customerPhoneNormalized, decision.markHumanRequest ? 'NEEDS_HUMAN' : undefined);
+    }
   }
 
   let outboundText = decision.text;
@@ -228,6 +249,7 @@ async function runResolutionAndResponse(
     if (priceResult) {
       outboundText = priceResult.responseText;
       responseCase = priceResult.responseCase;
+      if (priceResult.responseCase === 'PRICE_NOT_FOUND') handoffTriggeredThisTurn = true;
     }
   }
 
@@ -267,10 +289,29 @@ async function runResolutionAndResponse(
     void checkAndLogWebsiteMismatch(productResult.item.item_id, productResult.item.sku ?? null, websiteProduct.displayedPrice, customerResult.customer?.contact_id ?? null);
   }
 
+  // Brief sections 76-77: a human may take over between the decision above
+  // and this send — re-check the live conversation state immediately before
+  // sending and suppress a now-stale automated reply rather than racing the
+  // admin's own message. Only relevant once handoff is actually enabled;
+  // with the flag off, conversation state never advances past NEEDS_HUMAN
+  // via this pipeline, so the pre-decision suppression check already covers it.
   let sent = false;
   if (outboundText && message.customerPhoneRaw) {
-    const result = await sendWatiTextGated(message.customerPhoneRaw, outboundText, { conversationId, category: intentResult.intent });
-    sent = result === 'sent';
+    // Skip the recheck when this exact turn is itself what triggered the
+    // handoff — that acknowledgement is expected to send even though it's
+    // the very thing transitioning the conversation to NEEDS_HUMAN, not a
+    // race with a concurrent admin action.
+    const staleSend = isCustomerServiceHandoffEnabled() && customerPhoneNormalized && !handoffTriggeredThisTurn
+      ? await isNowHumanOwned(customerPhoneNormalized).catch(() => false)
+      : false;
+    if (staleSend) {
+      console.warn('[wati.pipeline]', JSON.stringify({ event: 'auto_send_suppressed_race', conversationId }));
+      outboundText = null;
+      responseCase = 'SUPPRESSED_RACE';
+    } else {
+      const result = await sendWatiTextGated(message.customerPhoneRaw, outboundText, { conversationId, category: intentResult.intent });
+      sent = result === 'sent';
+    }
   }
 
   await updateWatiMessageResolution(id, {
@@ -367,7 +408,13 @@ async function startPriceInquiry(
 ): Promise<{ responseText: string | null; responseCase: string }> {
   const price = await getCustomerSafePrice(product.item_id, customerId);
   if (price.sourceStatus !== 'VERIFIED') {
-    if (customerPhoneNormalized) await touchConversationState(customerPhoneNormalized, 'NEEDS_HUMAN').catch(() => {});
+    if (customerPhoneNormalized) {
+      if (isCustomerServiceHandoffEnabled()) {
+        await triggerHandoff(customerPhoneNormalized, 'PRICE_NOT_FOUND').catch(() => {});
+      } else {
+        await touchConversationState(customerPhoneNormalized, 'NEEDS_HUMAN').catch(() => {});
+      }
+    }
     return { responseText: priceNotFound(), responseCase: 'PRICE_NOT_FOUND' };
   }
   const formattedPrice = formatIDR(price.amount);
@@ -487,4 +534,11 @@ async function continueCommercialFollowUp(
   }
 
   return { status: 'processed', intent: intentLabel, responseCase: result.responseCase, sent };
+}
+
+/** Brief sections 76-77's race-condition recheck: has this conversation become human-owned since the response decision was made? */
+async function isNowHumanOwned(customerPhoneNormalized: string): Promise<boolean> {
+  const current = await getServiceCase(customerPhoneNormalized);
+  if (!current) return false;
+  return current.state === 'NEEDS_HUMAN' || current.state === 'HUMAN_ASSIGNED' || current.state === 'HUMAN_ACTIVE';
 }

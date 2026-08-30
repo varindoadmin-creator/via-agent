@@ -26,3 +26,14 @@ export const isCustomerInvoiceDocumentEnabled = () => flag('CUSTOMER_INVOICE_DOC
 export const isCustomerPaymentStatusEnabled = () => flag('CUSTOMER_PAYMENT_STATUS_ENABLED');
 export const isCustomerReceivableSummaryEnabled = () => flag('CUSTOMER_RECEIVABLE_SUMMARY_ENABLED');
 export const isCustomerDeliveryStatusEnabled = () => flag('CUSTOMER_DELIVERY_STATUS_ENABLED');
+
+// Phase 8 (brief section 78) — human handoff / customer service operations, staged rollout, all off by default.
+export const isCustomerServiceHandoffEnabled = () => flag('CUSTOMER_SERVICE_HANDOFF_ENABLED');
+export const isAutoAssignmentEnabled = () => flag('AUTO_ASSIGNMENT_ENABLED');
+export const isCustomerServiceSlaEnabled = () => flag('CUSTOMER_SERVICE_SLA_ENABLED');
+export const isSlaEscalationEnabled = () => flag('SLA_ESCALATION_ENABLED');
+export const isJarvisAdminCopilotEnabled = () => flag('JARVIS_ADMIN_COPILOT_ENABLED');
+export const isSuggestedRepliesEnabled = () => flag('SUGGESTED_REPLIES_ENABLED');
+export const isAutoReturnToViaEnabled = () => flag('AUTO_RETURN_TO_VIA_ENABLED');
+/** Declared per the brief's own flag list, but its code path is a documented no-op — no verified WATI operator/assignment API exists in this codebase (see docs/customer-service-operations.md). */
+export const isWatiAssignmentSyncEnabled = () => flag('WATI_ASSIGNMENT_SYNC_ENABLED');

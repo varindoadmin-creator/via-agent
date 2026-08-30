@@ -32,6 +32,7 @@
     "test:wati-commercial": "node --experimental-strip-types --test lib/integrations/wati/commercial/*.test.ts",
     "test:commercial-approvals": "node --experimental-strip-types --test lib/commercialApprovals/*.test.ts",
     "test:customer-self-service": "node --experimental-strip-types --test lib/customerSelfService/*.test.ts lib/integrations/wati/conversationState.test.ts lib/integrations/wati/selfService/*.test.ts",
+    "test:customer-service": "node --experimental-strip-types --test lib/customerService/*.test.ts",
     "test:google-ads": "node --experimental-strip-types --test lib/googleAds/report.test.ts",
     "test:voice-commands": "node --experimental-strip-types --test lib/ai/voiceCommands.test.ts",
     "test:speech": "node --experimental-strip-types --test lib/ai/speech.test.ts",
