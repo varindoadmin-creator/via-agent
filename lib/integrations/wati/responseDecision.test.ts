@@ -15,11 +15,19 @@ test('Case A: greeting invites an open-ended request rather than a numbered menu
   assert.doesNotMatch(decision.text ?? '', /Hubungi Admin/i);
 });
 
-test('Case B: brand inquiry without a resolved product does not ask which brand again', () => {
+test('Case B: brand inquiry without a resolved product does not ask which brand again, and never nudges straight to "Hubungi Admin"', () => {
   const decision = decideResponse({ intent: 'PRODUCT_INQUIRY', brand: 'LAMITAK', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
   assert.equal(decision.case, 'B_BRAND_INQUIRY');
   assert.match(decision.text ?? '', /LAMITAK/);
   assert.doesNotMatch(decision.text ?? '', /brand mana|merek mana/i);
+  assert.doesNotMatch(decision.text ?? '', /Hubungi Admin/i);
+});
+
+test('Case C: a resolved product inquiry invites an open-ended request, never a numbered menu ending in "Hubungi Admin"', () => {
+  const decision = decideResponse({ intent: 'PRODUCT_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
+  assert.equal(decision.case, 'C_PRODUCT_RESOLVED');
+  assert.match(decision.text ?? '', new RegExp(ITEM.sku!));
+  assert.doesNotMatch(decision.text ?? '', /Hubungi Admin/i);
 });
 
 test('Case D: stock check acknowledgement never states a stock quantity and always opens a stock inquiry', () => {

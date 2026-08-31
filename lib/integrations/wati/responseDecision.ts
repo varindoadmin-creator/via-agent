@@ -63,19 +63,19 @@ export interface ResponseDecision {
   disclosureReasonCode?: DisclosureReasonCode;
 }
 
-const OPTIONS_MENU = '1. Cek Stok\n2. Informasi Produk\n3. Hubungi Admin';
-
 function greeting(): string {
   return 'Halo, selamat datang di Varindo. Terima kasih telah menghubungi kami.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
 }
 
+// Open-ended, same principle as greeting() — never a numbered menu ending in
+// "Hubungi Admin", since most initial questions can be answered directly.
 function brandInquiry(brand: string): string {
-  return `Halo Pak/Bu, terima kasih telah menghubungi Varindo. Dengan senang hati kami bantu terkait produk ${brand}. Informasi apa yang Bapak/Ibu perlukan?\n\n${OPTIONS_MENU}`;
+  return `Halo Pak/Bu, terima kasih telah menghubungi Varindo. Dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
 }
 
 function productResolved(item: ZohoItem): string {
   const label = item.sku ? `${item.sku} - ${item.name}` : item.name;
-  return `Halo Pak/Bu, terima kasih telah menghubungi Varindo terkait ${label}. Ada yang dapat kami bantu terkait produk tersebut?\n\n${OPTIONS_MENU}`;
+  return `Halo Pak/Bu, terima kasih telah menghubungi Varindo terkait ${label}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
 }
 
 /** Exported for reuse by the Phase 3 stock workflow (lib/integrations/wati/stock/service.ts) — same immediate acknowledgement, now followed by an actual vendor-first check instead of nothing. */
