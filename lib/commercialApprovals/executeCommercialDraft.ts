@@ -11,6 +11,8 @@ import { getCustomerSafePrice } from '../integrations/wati/pricing/customerSafeP
 import { createDraftSalesOrder } from '../zoho/salesOrders.ts';
 import { createDraftEstimate } from '../zoho/estimates.ts';
 import type { CommercialDraft, CommercialDraftLine } from '../integrations/wati/commercial/draft.ts';
+import { recordAnalyticsEvent } from '../analytics/events.ts';
+import { isAnalyticsEventPipelineEnabled } from '../customerIdentity/featureFlags.ts';
 
 export function commercialDraftMaterialFields(draft: CommercialDraft, lines: CommercialDraftLine[]): Record<string, unknown> {
   return {
@@ -73,12 +75,18 @@ export async function approveAndCreateCommercialDraft(approvalId: string): Promi
       createdId = estimate.estimate_id;
       await updateCommercialDraft(draft.id, draft.version, { status: 'COMPLETED', zoho_object_type: 'ESTIMATE', zoho_object_id: estimate.estimate_id, zoho_object_number: estimate.estimate_number });
       await finishApproval(action.id, { status: 'COMPLETED', zohoObjectId: estimate.estimate_id, zohoObjectNumber: estimate.estimate_number });
+      if (isAnalyticsEventPipelineEnabled()) {
+        void recordAnalyticsEvent({ eventType: 'quotation.created', sourceId: draft.id, conversationId: draft.conversation_id, customerId: draft.customer_id, draftId: draft.id, orderId: estimate.estimate_id, source: draft.source });
+      }
       return { objectId: estimate.estimate_id, objectNumber: estimate.estimate_number, type: 'ESTIMATE' };
     }
     const salesOrder = await createDraftSalesOrder({ customer_id: draft.customer_id, date: new Date().toISOString().slice(0, 10), line_items: lineItems, shipping_address: shippingAddress });
     createdId = salesOrder.salesorder_id;
     await updateCommercialDraft(draft.id, draft.version, { status: 'COMPLETED', zoho_object_type: 'SALES_ORDER', zoho_object_id: salesOrder.salesorder_id, zoho_object_number: salesOrder.salesorder_number });
     await finishApproval(action.id, { status: 'COMPLETED', zohoObjectId: salesOrder.salesorder_id, zohoObjectNumber: salesOrder.salesorder_number });
+    if (isAnalyticsEventPipelineEnabled()) {
+      void recordAnalyticsEvent({ eventType: 'order.created', sourceId: draft.id, conversationId: draft.conversation_id, customerId: draft.customer_id, draftId: draft.id, orderId: salesOrder.salesorder_id, source: draft.source, properties: { total: draft.total ?? 0 } });
+    }
     return { objectId: salesOrder.salesorder_id, objectNumber: salesOrder.salesorder_number, type: 'SALES_ORDER' };
   } catch (cause) {
     if (createdId) {

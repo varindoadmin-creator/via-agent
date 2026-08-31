@@ -14,6 +14,10 @@ import {
   getPurchaseOrderTool, getSalesOrderTool, searchPurchaseOrdersTool, searchSalesOrdersTool,
 } from './operations';
 import { getItemStockTool, searchCustomerTool, searchItemTool } from './zoho';
+import {
+  getCustomerServiceMetricsTool, getConversionFunnelTool, getStockOperationsMetricsTool,
+  getBottleneckBreakdownTool, getVendorPerformanceTool,
+} from './customerOperationsAnalytics';
 import { authorizeJarvisAction, permissionForTool, type JarvisPermission } from '@/lib/jarvis/security/policy';
 import { recordJarvisSecurityEvent } from '@/lib/jarvis/security/events';
 import { classifyJarvisFailure, JarvisReliabilityError } from '@/lib/jarvis/reliability/errors';
@@ -73,6 +77,11 @@ const definitions: JarvisToolDefinition[] = [
   analyze('analyze_gross_profit', 'Gross profit analysis', 'Analyze monthly gross profit using current Zoho purchase-rate costs.', 'finance', 'Zoho Books', 'Reporting month and grouping', analyzeGrossProfitTool),
   analyze('analyze_inventory_risk', 'Inventory risk analysis', 'Analyze portfolio-level inventory exceptions using current system data.', 'inventory', 'VIA + Zoho Books', 'Optional stock-risk filters', analyzeInventoryRiskTool),
   read('search_knowledge', 'Knowledge search', 'Search approved static VIA policies and Zoho concepts.', 'knowledge', 'VIA', 'Knowledge query', searchKnowledgeTool),
+  analyze('get_customer_service_metrics', 'Customer service metrics', 'Get customer-service funnel metrics (inbound conversations, auto/human resolution rates, SLA compliance, handoff reasons) for a time period.', 'analytics', 'VIA', 'Time-period grain', getCustomerServiceMetricsTool),
+  analyze('get_conversion_funnel', 'Conversion funnel', 'Get the commercial funnel (drafts, quotations, orders, draft-to-order conversion, Sales Order value) for a time period.', 'analytics', 'VIA', 'Time-period grain', getConversionFunnelTool),
+  analyze('get_stock_operations_metrics', 'Stock operations metrics', 'Get stock/vendor operations metrics (inquiry volume, vendor response time, OOS rate, fallback rate) for a time period, by vendor.', 'analytics', 'VIA', 'Time-period grain', getStockOperationsMetricsTool),
+  analyze('get_bottleneck_breakdown', 'Bottleneck breakdown', 'Get a FACT/DIAGNOSIS/RECOMMENDATION breakdown of what is driving a change in customer-service resolution time or SLA compliance vs. the prior period.', 'analytics', 'VIA', 'Time-period grain', getBottleneckBreakdownTool),
+  analyze('get_vendor_performance', 'Vendor performance', 'Get per-vendor stock-check performance (median response time, availability rate, OOS rate) for a time period.', 'analytics', 'VIA', 'Time-period grain', getVendorPerformanceTool),
 ];
 
 function roleCanUse(role: Role, requiredRole: Role): boolean {

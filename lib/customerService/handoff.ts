@@ -15,6 +15,8 @@ import { computeInitialPriority } from './priority.ts';
 import { computeCaseSlaStatus } from './sla.ts';
 import { recordServiceEvent } from './auditLog.ts';
 import { sendMail } from '../email/sendMail.ts';
+import { recordAnalyticsEvent } from '../analytics/events.ts';
+import { isAnalyticsEventPipelineEnabled } from '../customerIdentity/featureFlags.ts';
 
 const ACTIVE_HUMAN_STATES = new Set(['NEEDS_HUMAN', 'HUMAN_ASSIGNED', 'HUMAN_ACTIVE']);
 const URGENT_REASONS = new Set<HandoffReason>(['COMPLAINT', 'SECURITY_SENSITIVE_REQUEST', 'PAYMENT_REVIEW', 'ZOHO_WRITE_FAILURE']);
@@ -55,6 +57,9 @@ export async function triggerHandoff(phone: string, reason: HandoffReason, conte
   if (!updated) throw new Error('Unable to create handoff case.');
 
   await recordServiceEvent({ normalizedPhone: phone, eventType: 'service.handoff_created', actor: 'SYSTEM', toValue: reason, metadata: { team, priority } });
+  if (isAnalyticsEventPipelineEnabled()) {
+    void recordAnalyticsEvent({ eventType: 'handoff.created', sourceId: `${phone}:${now}`, conversationId: phone, teamId: team, properties: { reason, priority } });
+  }
 
   await sendHandoffNotification(phone, reason, team, priority).catch(error => {
     console.error('[customerService.handoff] notification failed:', error);

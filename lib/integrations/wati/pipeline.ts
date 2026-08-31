@@ -43,6 +43,8 @@ import {
 import { triggerHandoff } from '../../customerService/handoff.ts';
 import type { HandoffReason } from '../../customerService/handoffReasons.ts';
 import { getServiceCase } from './conversationState.ts';
+import { recordAnalyticsEvent } from '../../analytics/events.ts';
+import { isAnalyticsEventPipelineEnabled } from '../../customerIdentity/featureFlags.ts';
 import { resolveCustomerIdentities } from '../../customerIdentity/channelIdentity.ts';
 import { runCustomerSelfService, resumeSelfServiceAfterSelection } from './selfService/orchestrator.ts';
 import { getPendingSelfService } from './conversationState.ts';
@@ -339,6 +341,26 @@ async function runResolutionAndResponse(
     sent,
     textPreview: redact(text).slice(0, 80),
   }));
+
+  if (isAnalyticsEventPipelineEnabled() && customerPhoneNormalized) {
+    // Brief section 66: "New Lead" = first inbound contact with no verified
+    // mapping at first contact — the dedupe key is keyed on phone alone
+    // (never the message id), so only the very first inbound message from
+    // an unmatched phone ever records this event, no matter how many later
+    // messages arrive.
+    if (customerResult.status === 'UNMATCHED') {
+      void recordAnalyticsEvent({ eventType: 'lead.created', sourceId: customerPhoneNormalized, conversationId, source, channel: 'WATI' });
+    }
+    if (productCandidate && productResult.status === 'EXACT' && productResult.item) {
+      void recordAnalyticsEvent({ eventType: 'product.inquiry', sourceId: id, conversationId, customerId: customerResult.customer?.contact_id ?? null, productId: productResult.item.item_id, source });
+    }
+    if (decision.case === 'D_STOCK_ACK') {
+      void recordAnalyticsEvent({ eventType: 'stock.inquiry', sourceId: id, conversationId, customerId: customerResult.customer?.contact_id ?? null, productId: productResult.item?.item_id ?? null, source });
+    }
+    if (decision.case === 'I_PRICE_LOOKUP') {
+      void recordAnalyticsEvent({ eventType: 'price.inquiry', sourceId: id, conversationId, customerId: customerResult.customer?.contact_id ?? null, productId: productResult.item?.item_id ?? null, source });
+    }
+  }
 
   return { status: 'processed', intent: intentResult.intent, responseCase, sent };
 }

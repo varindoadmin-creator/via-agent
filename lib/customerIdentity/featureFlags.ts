@@ -37,3 +37,13 @@ export const isSuggestedRepliesEnabled = () => flag('SUGGESTED_REPLIES_ENABLED')
 export const isAutoReturnToViaEnabled = () => flag('AUTO_RETURN_TO_VIA_ENABLED');
 /** Declared per the brief's own flag list, but its code path is a documented no-op — no verified WATI operator/assignment API exists in this codebase (see docs/customer-service-operations.md). */
 export const isWatiAssignmentSyncEnabled = () => flag('WATI_ASSIGNMENT_SYNC_ENABLED');
+
+// Phase 9 (brief section 106) — customer service / sales / marketing analytics, staged rollout, all off by default.
+export const isAnalyticsEventPipelineEnabled = () => flag('ANALYTICS_EVENT_PIPELINE_ENABLED');
+export const isCustomerServiceAnalyticsEnabled = () => flag('CUSTOMER_SERVICE_ANALYTICS_ENABLED');
+export const isCommercialFunnelAnalyticsEnabled = () => flag('COMMERCIAL_FUNNEL_ANALYTICS_ENABLED');
+export const isStockAnalyticsEnabled = () => flag('STOCK_ANALYTICS_ENABLED');
+export const isSourceAttributionAnalyticsEnabled = () => flag('SOURCE_ATTRIBUTION_ANALYTICS_ENABLED');
+export const isJarvisManagementAnalyticsEnabled = () => flag('JARVIS_MANAGEMENT_ANALYTICS_ENABLED');
+export const isAnomalyDetectionEnabled = () => flag('ANOMALY_DETECTION_ENABLED');
+export const isManagementRecommendationsEnabled = () => flag('MANAGEMENT_RECOMMENDATIONS_ENABLED');

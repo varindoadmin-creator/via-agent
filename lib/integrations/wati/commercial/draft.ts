@@ -6,6 +6,8 @@
 // Zoho write, only after WAITING_FOR_APPROVAL -> an internal approval.
 
 import { supabaseSelect, supabaseInsert, supabasePatch } from '../../../supabase/rest.ts';
+import { recordAnalyticsEvent } from '../../../analytics/events.ts';
+import { isAnalyticsEventPipelineEnabled } from '../../../customerIdentity/featureFlags.ts';
 
 const DRAFT_TABLE = 'commercial_drafts';
 const LINE_TABLE = 'commercial_draft_lines';
@@ -96,6 +98,9 @@ export async function createCommercialDraft(input: { type: CommercialDraftType; 
     source_message_ids: [input.sourceMessageId],
   });
   if (!row) throw new Error('Commercial draft was not created.');
+  if (isAnalyticsEventPipelineEnabled()) {
+    void recordAnalyticsEvent({ eventType: 'commercial_draft.created', sourceId: row.id, conversationId: row.conversation_id, draftId: row.id, source: row.source, properties: { type: row.type } });
+  }
   return row;
 }
 

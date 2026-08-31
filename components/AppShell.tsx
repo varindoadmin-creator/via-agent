@@ -105,6 +105,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-wati-orders', href: '/requests/wati/orders', label: 'Customer Orders' },
         { id: 'req-wati-mapping', href: '/requests/wati/mapping', label: 'WhatsApp Mapping' },
         { id: 'req-wati-customer-service', href: '/requests/wati/customer-service', label: 'Customer Service' },
+        { id: 'req-wati-analytics', href: '/requests/wati/analytics', label: 'Customer Ops Analytics' },
       ],
     },
   },

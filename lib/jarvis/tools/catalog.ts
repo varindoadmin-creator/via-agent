@@ -24,6 +24,11 @@ export const JARVIS_TOOL_LABELS: Record<string, string> = {
   analyze_gross_profit: 'Gross profit analysis',
   analyze_inventory_risk: 'Inventory risk analysis',
   search_knowledge: 'Knowledge search',
+  get_customer_service_metrics: 'Customer service metrics',
+  get_conversion_funnel: 'Conversion funnel',
+  get_stock_operations_metrics: 'Stock operations metrics',
+  get_bottleneck_breakdown: 'Bottleneck breakdown',
+  get_vendor_performance: 'Vendor performance',
 };
 
 // Lightweight metadata for routing context. It intentionally has no tool-handler
@@ -39,4 +44,7 @@ export const JARVIS_TOOL_CONTEXT_CATALOG = [
   ['boardroom_sales_brief', 'analytics', 'ANALYZE'], ['analyze_receivables', 'finance', 'ANALYZE'],
   ['get_operational_pipeline', 'sales', 'ANALYZE'], ['analyze_gross_profit', 'finance', 'ANALYZE'],
   ['analyze_inventory_risk', 'inventory', 'ANALYZE'], ['search_knowledge', 'knowledge', 'READ'],
+  ['get_customer_service_metrics', 'analytics', 'ANALYZE'], ['get_conversion_funnel', 'analytics', 'ANALYZE'],
+  ['get_stock_operations_metrics', 'analytics', 'ANALYZE'], ['get_bottleneck_breakdown', 'analytics', 'ANALYZE'],
+  ['get_vendor_performance', 'analytics', 'ANALYZE'],
 ] as const;

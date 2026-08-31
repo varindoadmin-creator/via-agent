@@ -5,6 +5,8 @@
 // uncertain Zoho outcome, never auto-retry).
 
 import { claimApprovalForExecution, finishApproval, markExecutionUnknown } from './store.ts';
+import { recordAnalyticsEvent } from '../analytics/events.ts';
+import { isAnalyticsEventPipelineEnabled } from '../customerIdentity/featureFlags.ts';
 import { getCustomerDraft, updateCustomerDraft } from '../customerIdentity/customerDraft.ts';
 import { isApprovalStillValid, computeDraftHash } from '../customerIdentity/approval.ts';
 import { checkForDuplicateCustomer } from '../customerIdentity/duplicateCheck.ts';
@@ -94,6 +96,9 @@ export async function approveAndCreateCustomer(approvalId: string): Promise<{ cu
     await attachCustomerToOnboardingDrafts(draft.id, customer.contact_id).catch(() => undefined);
 
     await finishApproval(action.id, { status: 'COMPLETED', zohoObjectId: customer.contact_id, zohoObjectNumber: customer.contact_name });
+    if (isAnalyticsEventPipelineEnabled()) {
+      void recordAnalyticsEvent({ eventType: 'customer.onboarding.completed', sourceId: draft.id, conversationId: draft.normalized_phone, customerId: customer.contact_id });
+    }
     return { customerId: customer.contact_id, customerName: customer.contact_name };
   } catch (cause) {
     if (createdCustomerId) {
