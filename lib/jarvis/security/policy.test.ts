@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { authorizeJarvisAction, createJarvisSecurityIdentity } from './policy.ts';
+import { authorizeJarvisAction, createJarvisSecurityIdentity, permissionForTool } from './policy.ts';
 
 const director = createJarvisSecurityIdentity({ role: 'director', sessionId: 'test-session', organizationId: 'varindo' });
 const readTool = { name: 'search_customer', category: 'customer', risk: 'READ' as const, permissions: ['customer.read'] as const };
@@ -50,4 +50,32 @@ test('disabled tool switch prevents execution server-side', () => {
     if (previous === undefined) delete process.env.JARVIS_DISABLED_TOOLS;
     else process.env.JARVIS_DISABLED_TOOLS = previous;
   }
+});
+
+// VIA Customer Operations Phase 10, brief section 109/137: internal permission model.
+test('Test 137 — an administrator (no operational_findings permissions) cannot use the operational-findings tools', () => {
+  const admin = createJarvisSecurityIdentity({ role: 'admin', sessionId: 'test-session', organizationId: 'varindo' });
+  const findingsRead = { name: 'get_open_operational_findings', category: 'analytics', risk: 'READ' as const, permissions: [permissionForTool({ name: 'get_open_operational_findings', category: 'analytics', risk: 'READ' })] };
+  const findingsWrite = { name: 'acknowledge_finding', category: 'analytics', risk: 'WRITE' as const, permissions: [permissionForTool({ name: 'acknowledge_finding', category: 'analytics', risk: 'WRITE' })] };
+  assert.equal(authorizeJarvisAction({ identity: admin, tool: findingsRead }).code, 'PERMISSION_DENIED');
+  assert.equal(authorizeJarvisAction({ identity: admin, tool: findingsWrite }).code, 'PERMISSION_DENIED');
+});
+
+test('a director has both operational_findings.view and operational_findings.manage', () => {
+  assert.equal(permissionForTool({ name: 'get_priority_findings', category: 'analytics', risk: 'READ' }), 'operational_findings.view');
+  assert.equal(permissionForTool({ name: 'close_finding', category: 'analytics', risk: 'WRITE' }), 'operational_findings.manage');
+  const findingsRead = { name: 'get_priority_findings', category: 'analytics', risk: 'READ' as const, permissions: ['operational_findings.view' as const] };
+  assert.equal(authorizeJarvisAction({ identity: director, tool: findingsRead }).code, 'ALLOWED');
+});
+
+// Brief section 113/136: WATI Jarvis must receive none of the Phase 10 management tools.
+// The structural guarantee is architectural (lib/integrations/wati/pipeline.ts never
+// imports lib/jarvis/tools/registry.ts or lib/operationalIntelligence/findingStore.ts
+// at all — the same guarantee Phase 9's analytics tools already rely on) — this test
+// verifies that guarantee still holds by scanning the pipeline's own source text.
+test('Test 136 — the WATI pipeline never imports the internal Jarvis tool registry or the operational-findings store', async () => {
+  const fs = await import('node:fs/promises');
+  const pipelineSource = await fs.readFile(new URL('../../integrations/wati/pipeline.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(pipelineSource, /jarvis\/tools\/registry/);
+  assert.doesNotMatch(pipelineSource, /operationalIntelligence\/(findingStore|detectionEngine)/);
 });

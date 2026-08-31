@@ -18,6 +18,10 @@ import {
   getCustomerServiceMetricsTool, getConversionFunnelTool, getStockOperationsMetricsTool,
   getBottleneckBreakdownTool, getVendorPerformanceTool,
 } from './customerOperationsAnalytics';
+import {
+  getOpenOperationalFindingsTool, getPriorityFindingsTool, getFindingDetailTool, getOperationalBriefTool,
+  acknowledgeFindingTool, assignFindingTool, createActionPlanTool, closeFindingTool,
+} from './operationalIntelligence';
 import { authorizeJarvisAction, permissionForTool, type JarvisPermission } from '@/lib/jarvis/security/policy';
 import { recordJarvisSecurityEvent } from '@/lib/jarvis/security/events';
 import { classifyJarvisFailure, JarvisReliabilityError } from '@/lib/jarvis/reliability/errors';
@@ -51,6 +55,7 @@ export interface JarvisToolDefinition {
 const RESULT_CONTRACT = 'Structured result with source, evidence, warnings, and a stable error field when data cannot be verified.';
 const read = (name: string, label: string, description: string, category: JarvisToolCategory, source: JarvisToolDefinition['source'], inputContract: string, handler: AnyJarvisTool): JarvisToolDefinition => ({ name, label, description, category, risk: 'READ', permissions: [permissionForTool({ name, category, risk: 'READ' })], requiredRole: 'director', status: 'ready', source, inputContract, outputContract: RESULT_CONTRACT, timeoutMs: 15_000, handler });
 const analyze = (name: string, label: string, description: string, category: JarvisToolCategory, source: JarvisToolDefinition['source'], inputContract: string, handler: AnyJarvisTool): JarvisToolDefinition => ({ name, label, description, category, risk: 'ANALYZE', permissions: [permissionForTool({ name, category, risk: 'ANALYZE' })], requiredRole: 'director', status: 'ready', source, inputContract, outputContract: RESULT_CONTRACT, timeoutMs: 30_000, handler });
+const write = (name: string, label: string, description: string, category: JarvisToolCategory, source: JarvisToolDefinition['source'], inputContract: string, handler: AnyJarvisTool): JarvisToolDefinition => ({ name, label, description, category, risk: 'WRITE', permissions: [permissionForTool({ name, category, risk: 'WRITE' })], requiredRole: 'director', status: 'ready', source, inputContract, outputContract: RESULT_CONTRACT, timeoutMs: 15_000, handler });
 
 const definitions: JarvisToolDefinition[] = [
   read('find_via_feature', 'VIA feature lookup', 'Find the appropriate existing VIA feature or report.', 'system', 'VIA', 'Feature query', findViaFeatureTool),
@@ -82,6 +87,14 @@ const definitions: JarvisToolDefinition[] = [
   analyze('get_stock_operations_metrics', 'Stock operations metrics', 'Get stock/vendor operations metrics (inquiry volume, vendor response time, OOS rate, fallback rate) for a time period, by vendor.', 'analytics', 'VIA', 'Time-period grain', getStockOperationsMetricsTool),
   analyze('get_bottleneck_breakdown', 'Bottleneck breakdown', 'Get a FACT/DIAGNOSIS/RECOMMENDATION breakdown of what is driving a change in customer-service resolution time or SLA compliance vs. the prior period.', 'analytics', 'VIA', 'Time-period grain', getBottleneckBreakdownTool),
   analyze('get_vendor_performance', 'Vendor performance', 'Get per-vendor stock-check performance (median response time, availability rate, OOS rate) for a time period.', 'analytics', 'VIA', 'Time-period grain', getVendorPerformanceTool),
+  read('get_open_operational_findings', 'Open operational findings', 'List currently open operational findings, optionally filtered by category.', 'analytics', 'VIA', 'Optional category filter', getOpenOperationalFindingsTool),
+  read('get_priority_findings', 'Priority findings', 'Get open operational findings ranked by a transparent priority score.', 'analytics', 'VIA', 'None', getPriorityFindingsTool),
+  read('get_finding_detail', 'Finding detail', 'Get the full detail, evidence, and post-action outcome for one operational finding.', 'analytics', 'VIA', 'Exact finding ID', getFindingDetailTool),
+  read('get_operational_brief', 'Operational brief', 'Get today\'s top 3-5 operational findings plus one commercial opportunity highlight.', 'analytics', 'VIA', 'None', getOperationalBriefTool),
+  write('acknowledge_finding', 'Acknowledge finding', 'Acknowledge an open operational finding.', 'analytics', 'VIA', 'Exact finding ID and expected version', acknowledgeFindingTool),
+  write('assign_finding', 'Assign finding', 'Assign an operational finding to a role and/or team.', 'analytics', 'VIA', 'Exact finding ID, expected version, assignee', assignFindingTool),
+  write('create_action_plan', 'Create action plan', 'Create a lightweight action-plan item for an operational finding.', 'analytics', 'VIA', 'Exact finding ID, expected version, description', createActionPlanTool),
+  write('close_finding', 'Resolve or dismiss finding', 'Resolve or dismiss an operational finding, with an optional dismissal reason.', 'analytics', 'VIA', 'Exact finding ID, expected version, action', closeFindingTool),
 ];
 
 function roleCanUse(role: Role, requiredRole: Role): boolean {

@@ -528,6 +528,42 @@ function ShipmentAgingAlert() {
   );
 }
 
+type OperationalBriefFinding = { id: string; severity: string; title: string; category: string };
+
+/** Brief section 142: a small sibling to AutomationHealthPanel, not a new home page. Renders nothing when OPERATIONAL_FINDINGS_UI_ENABLED is off. */
+function OperationalIntelligenceWidget() {
+  const [data, setData] = useState<{ enabled: boolean; topFindings?: OperationalBriefFinding[]; topOpportunity?: OperationalBriefFinding | null; totalOpenCount?: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/requests/wati/operational-findings/brief', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(body => { if (body.success) setData(body); })
+      .catch(() => undefined);
+  }, []);
+
+  if (!data?.enabled) return null;
+  const highOrCritical = (data.topFindings ?? []).filter(f => f.severity === 'HIGH' || f.severity === 'CRITICAL');
+  const medium = (data.topFindings ?? []).filter(f => f.severity === 'MEDIUM');
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 mb-5">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-[var(--text)] font-semibold text-sm">Jarvis — Needs Your Attention</h2>
+        <a href="/requests/wati/operational-intelligence" className="text-xs text-[#6161ff] font-medium">View all ({data.totalOpenCount ?? 0}) →</a>
+      </div>
+      {(data.topFindings ?? []).length === 0 && !data.topOpportunity ? (
+        <p className="text-sm text-[var(--text-secondary)]">No open findings need attention right now.</p>
+      ) : (
+        <div className="space-y-1.5 text-sm">
+          {highOrCritical.length > 0 && <p className="text-[var(--text-secondary)]">{highOrCritical.length} High Priority{medium.length > 0 ? `, ${medium.length} Medium Priority` : ''}</p>}
+          {data.topFindings?.[0] && <p className="text-[var(--text)]"><span className="font-medium">Top Issue:</span> {data.topFindings[0].title}</p>}
+          {data.topOpportunity && <p className="text-[var(--text)]"><span className="font-medium">Top Opportunity:</span> {data.topOpportunity.title}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <div className="via-page" style={{ background: 'var(--bg)', minHeight: '100%' }}>
@@ -538,6 +574,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <OperationalIntelligenceWidget />
         <PurchaseGapAlert />
         <ShipmentAgingAlert />
         <DuplicateCustomerReview />

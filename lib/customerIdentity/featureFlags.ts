@@ -47,3 +47,12 @@ export const isSourceAttributionAnalyticsEnabled = () => flag('SOURCE_ATTRIBUTIO
 export const isJarvisManagementAnalyticsEnabled = () => flag('JARVIS_MANAGEMENT_ANALYTICS_ENABLED');
 export const isAnomalyDetectionEnabled = () => flag('ANOMALY_DETECTION_ENABLED');
 export const isManagementRecommendationsEnabled = () => flag('MANAGEMENT_RECOMMENDATIONS_ENABLED');
+
+// Phase 10 (brief section 121) — proactive operational excellence, staged rollout, all off by default.
+export const isOperationalDetectionEnabled = () => flag('OPERATIONAL_DETECTION_ENABLED');
+export const isOperationalFindingsUiEnabled = () => flag('OPERATIONAL_FINDINGS_UI_ENABLED');
+export const isProactiveJarvisBriefEnabled = () => flag('PROACTIVE_JARVIS_BRIEF_ENABLED');
+export const isManagementAlertsEnabled = () => flag('MANAGEMENT_ALERTS_ENABLED');
+export const isOpportunityDetectionEnabled = () => flag('OPPORTUNITY_DETECTION_ENABLED');
+export const isActionPlansEnabled = () => flag('ACTION_PLANS_ENABLED');
+export const isAutoFindingResolutionEnabled = () => flag('AUTO_FINDING_RESOLUTION_ENABLED');

@@ -29,6 +29,14 @@ export const JARVIS_TOOL_LABELS: Record<string, string> = {
   get_stock_operations_metrics: 'Stock operations metrics',
   get_bottleneck_breakdown: 'Bottleneck breakdown',
   get_vendor_performance: 'Vendor performance',
+  get_open_operational_findings: 'Open operational findings',
+  get_priority_findings: 'Priority findings',
+  get_finding_detail: 'Finding detail',
+  get_operational_brief: 'Operational brief',
+  acknowledge_finding: 'Acknowledge finding',
+  assign_finding: 'Assign finding',
+  create_action_plan: 'Create action plan',
+  close_finding: 'Resolve or dismiss finding',
 };
 
 // Lightweight metadata for routing context. It intentionally has no tool-handler
@@ -47,4 +55,8 @@ export const JARVIS_TOOL_CONTEXT_CATALOG = [
   ['get_customer_service_metrics', 'analytics', 'ANALYZE'], ['get_conversion_funnel', 'analytics', 'ANALYZE'],
   ['get_stock_operations_metrics', 'analytics', 'ANALYZE'], ['get_bottleneck_breakdown', 'analytics', 'ANALYZE'],
   ['get_vendor_performance', 'analytics', 'ANALYZE'],
+  ['get_open_operational_findings', 'analytics', 'READ'], ['get_priority_findings', 'analytics', 'READ'],
+  ['get_finding_detail', 'analytics', 'READ'], ['get_operational_brief', 'analytics', 'READ'],
+  ['acknowledge_finding', 'analytics', 'WRITE'], ['assign_finding', 'analytics', 'WRITE'],
+  ['create_action_plan', 'analytics', 'WRITE'], ['close_finding', 'analytics', 'WRITE'],
 ] as const;
