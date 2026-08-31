@@ -185,6 +185,7 @@ async function runResolutionAndResponse(
     productCodeCandidate: productCandidate,
     conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ASSIGNED' || conversationState === 'HUMAN_ACTIVE',
     audience,
+    unsupportedScopeReason: intentResult.unsupportedScopeReason,
     commercialDraftEnabled: isCommercialDraftEnabled(),
     selfServiceFlags: {
       orderStatus: isCustomerOrderStatusEnabled(),
@@ -204,6 +205,20 @@ async function runResolutionAndResponse(
       decision: 'DENY',
       reasonCode: decision.disclosureReasonCode ?? 'UNKNOWN',
     });
+  }
+
+  // VIA Product/Pricing/Company Architecture brief section 94 — lightweight
+  // observability, same console.info convention as every other event in this
+  // pipeline. Never logs Tier/discount values (brief's explicit instruction).
+  const COMPANY_KNOWLEDGE_EVENTS: Partial<Record<string, string>> = {
+    O_COMPANY_INFO: 'company_knowledge.queried',
+    P_DEALER_STATUS: 'company_knowledge.queried',
+    Q_SHIPPING_POLICY: 'shipping_policy.queried',
+    R_PAYMENT_DESTINATION: 'payment_destination.queried',
+  };
+  const companyKnowledgeEvent = COMPANY_KNOWLEDGE_EVENTS[decision.case];
+  if (companyKnowledgeEvent) {
+    console.info('[wati.pipeline]', JSON.stringify({ event: companyKnowledgeEvent, responseCase: decision.case }));
   }
 
   // Tracks whether THIS pipeline invocation is itself the one triggering a

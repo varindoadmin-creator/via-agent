@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { matchRequestPhoneToIdentity } from '@/lib/companyKnowledge/requestIdentityMatch';
 
 // The `requests` table has a CHECK constraint allowing only these raw values —
 // each request-type page maps its own display labels on/off this fixed set.
@@ -58,7 +59,7 @@ export async function GET() {
   try {
     const rows = await sbGet('requests?request_type=eq.catalogue&order=created_at.desc&limit=500');
 
-    const requests = rows.map((row: Record<string, unknown>) => ({
+    const requests = await Promise.all(rows.map(async (row: Record<string, unknown>) => ({
       id: String(row.id || ''),
       timestamp: formatTs(String(row.created_at || '')),
       name: String(row.customer_name || row.company_name || ''),
@@ -66,7 +67,9 @@ export async function GET() {
       phone: String(row.phone || ''),
       status: normalizeStatus(row.status as string | null),
       notes: String(row.notes || ''),
-    }));
+      // Brief section 56 — read-only enrichment, never used to create a Zoho customer.
+      identityMatch: await matchRequestPhoneToIdentity(row.phone as string | null),
+    })));
 
     return NextResponse.json({ success: true, requests });
   } catch (err) {

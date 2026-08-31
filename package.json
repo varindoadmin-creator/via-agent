@@ -45,7 +45,8 @@
     "test:jarvis": "node --experimental-strip-types --test lib/jarvis/*.test.ts lib/jarvis/evals/*.test.ts lib/jarvis/intelligence/*.test.ts lib/jarvis/knowledge/*.test.ts lib/jarvis/memory/*.test.ts lib/jarvis/models/*.test.ts lib/jarvis/proactive/*.test.ts lib/jarvis/reliability/*.test.ts lib/jarvis/security/*.test.ts lib/jarvis/workflows/*.test.ts",
     "eval:jarvis": "node --experimental-strip-types scripts/eval-jarvis.ts",
     "test:purchasing-recommendations": "node --experimental-strip-types --test lib/purchasing/recommendations.test.ts",
-    "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts"
+    "test:reconciliation": "node --experimental-strip-types --test lib/reconciliation/*.test.ts",
+    "test:product-pricing-company": "node --experimental-strip-types --test lib/products/*.test.ts lib/companyKnowledge/*.test.ts lib/utils/normalizeItemCode.test.ts"
   },
   "dependencies": {
     "@openai/agents": "^0.17.0",

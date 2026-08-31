@@ -5,14 +5,15 @@
 /**
  * Normalize an item code by:
  * 1. Converting to uppercase
- * 2. Removing all internal spaces
- * This creates a canonical key for comparison.
+ * 2. Removing all internal spaces and hyphens
+ * This creates a canonical key for comparison — "ATP 11358M", "ATP-11358M",
+ * and "atp11358m" all normalize to the same key.
  */
 export function normalizeItemCode(code: string): string {
   if (!code) return '';
   return code
     .toUpperCase()
-    .replace(/\s+/g, '') // remove all whitespace
+    .replace(/[\s-]+/g, '') // remove all whitespace and hyphens
     .trim();
 }
 

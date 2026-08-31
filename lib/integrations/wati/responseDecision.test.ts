@@ -8,10 +8,11 @@ const ITEM: ZohoItem = { item_id: '1', name: 'LAMITAK HPL MARMO CLASSICO PRO', s
 
 const ANONYMOUS_AUDIENCE: AudienceContext = externalWatiAudience({ customerResolution: { status: 'UNMATCHED', customer: null }, externalPhone: '628123', conversationId: '628123' });
 
-test('Case A: greeting gets the generic menu', () => {
+test('Case A: greeting invites an open-ended request rather than a numbered menu (never nudges straight to "Hubungi Admin")', () => {
   const decision = decideResponse({ intent: 'GREETING', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
   assert.equal(decision.case, 'A_GREETING');
-  assert.match(decision.text ?? '', /Cek Stok/);
+  assert.match(decision.text ?? '', /sampaikan kebutuhan/i);
+  assert.doesNotMatch(decision.text ?? '', /Hubungi Admin/i);
 });
 
 test('Case B: brand inquiry without a resolved product does not ask which brand again', () => {
@@ -198,4 +199,73 @@ test('all remaining self-service intents (history, last order, delivery, invoice
 test('a suppressed conversation also blocks every self-service intent', () => {
   const decision = decideResponse({ intent: 'ORDER_STATUS_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true, audience: MATCHED_AUDIENCE });
   assert.equal(decision.case, 'SUPPRESSED');
+});
+
+// ─── Product/Pricing/Company Architecture brief — new response branches ──────
+
+test('Test 79/80 — a Tier/Special-Price probe never discloses and never hands off to a human', () => {
+  const decision = decideResponse({ intent: 'TIER_OR_PRICING_CLASSIFICATION_PROBE', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'N_TIER_PROBE_REDIRECT');
+  assert.equal(decision.markHumanRequest, false);
+  assert.doesNotMatch(decision.text ?? '', /tier|special\s*price/i);
+});
+
+test('COMPANY_INFO_INQUIRY returns the approved company info text', () => {
+  const decision = decideResponse({ intent: 'COMPANY_INFO_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'O_COMPANY_INFO');
+  assert.match(decision.text ?? '', /Varindo/);
+});
+
+test('Test 81/82 — DEALER_STATUS_INQUIRY with a named brand returns that brand\'s exact dealer statement', () => {
+  const edl = decideResponse({ intent: 'DEALER_STATUS_INQUIRY', brand: 'EDL', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(edl.case, 'P_DEALER_STATUS');
+  assert.match(edl.text ?? '', /Authorized Dealer of EDL in Indonesia/);
+
+  const lamitak = decideResponse({ intent: 'DEALER_STATUS_INQUIRY', brand: 'LAMITAK', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.match(lamitak.text ?? '', /Authorized Dealer of Lamitak/);
+});
+
+test('DEALER_STATUS_INQUIRY with no brand named shares both approved statements', () => {
+  const decision = decideResponse({ intent: 'DEALER_STATUS_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.match(decision.text ?? '', /EDL/);
+  assert.match(decision.text ?? '', /Lamitak/);
+});
+
+test('Test 85/86 — SHIPPING_POLICY_INQUIRY returns the cutoff and Java free-shipping policy', () => {
+  const decision = decideResponse({ intent: 'SHIPPING_POLICY_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'Q_SHIPPING_POLICY');
+  assert.match(decision.text ?? '', /14:00 WIB/);
+  assert.match(decision.text ?? '', /Gratis ongkir/);
+});
+
+test('Test 87 — PAYMENT_DESTINATION_INQUIRY returns the approved active bank destination', () => {
+  const decision = decideResponse({ intent: 'PAYMENT_DESTINATION_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'R_PAYMENT_DESTINATION');
+  assert.match(decision.text ?? '', /BCA/);
+  assert.match(decision.text ?? '', /7610516224/);
+});
+
+test('Test 89/90 — SAMPLE_CATALOGUE_REQUEST directs to the correct brand-specific website', () => {
+  const lamitak = decideResponse({ intent: 'SAMPLE_CATALOGUE_REQUEST', brand: 'LAMITAK', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.match(lamitak.text ?? '', /varindo\.co\.id/);
+
+  const edl = decideResponse({ intent: 'SAMPLE_CATALOGUE_REQUEST', brand: 'EDL', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.match(edl.text ?? '', /varindohpl\.com/);
+});
+
+test('Test 83/84 — UNSUPPORTED_PRODUCT_INQUIRY returns the correct decline text for brand vs. category, never a human handoff', () => {
+  const brand = decideResponse({ intent: 'UNSUPPORTED_PRODUCT_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, unsupportedScopeReason: 'BRAND' });
+  assert.equal(brand.case, 'T_UNSUPPORTED_PRODUCT');
+  assert.equal(brand.markHumanRequest, false);
+  assert.match(brand.text ?? '', /EDL dan Lamitak/);
+
+  const category = decideResponse({ intent: 'UNSUPPORTED_PRODUCT_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, unsupportedScopeReason: 'CATEGORY' });
+  assert.match(category.text ?? '', /tidak menjual plywood/);
+});
+
+test('every new company-knowledge intent is suppressed once a human has taken over, same as every other intent', () => {
+  for (const intent of ['TIER_OR_PRICING_CLASSIFICATION_PROBE', 'COMPANY_INFO_INQUIRY', 'DEALER_STATUS_INQUIRY', 'SHIPPING_POLICY_INQUIRY', 'PAYMENT_DESTINATION_INQUIRY', 'SAMPLE_CATALOGUE_REQUEST', 'UNSUPPORTED_PRODUCT_INQUIRY'] as const) {
+    const decision = decideResponse({ intent, brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true });
+    assert.equal(decision.case, 'SUPPRESSED', `expected ${intent} to be suppressed`);
+  }
 });

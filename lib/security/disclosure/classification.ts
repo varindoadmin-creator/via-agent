@@ -13,7 +13,12 @@ export type DataCategory =
   | 'EXACT_STOCK' | 'SUPPLIER_COST' | 'PURCHASE_PRICE' | 'MARGIN' | 'MARKUP' | 'DISCOUNT_FLOOR'
   | 'COMPANY_SALES' | 'BRAND_SALES' | 'SALESPERSON_PERFORMANCE' | 'INVENTORY_VALUE' | 'INTERNAL_NOTES'
   | 'OWN_ORDER_STATUS' | 'OWN_INVOICE' | 'OWN_PAYMENT_STATUS'
-  | 'OTHER_CUSTOMER_DATA' | 'CREDENTIALS';
+  | 'OTHER_CUSTOMER_DATA' | 'CREDENTIALS'
+  // VIA Product/Pricing/Company Architecture brief, sections 6, 19, 24, 39-41:
+  // company/commercial-policy facts and the internal pricing classifications
+  // that must never reach an external customer.
+  | 'COMPANY_INFO' | 'DEALER_STATUS' | 'SHIPPING_POLICY' | 'PAYMENT_DESTINATION'
+  | 'CUSTOMER_TIER' | 'SPECIAL_PRICE_CLASSIFICATION';
 
 export interface PolicyMatrixEntry {
   category: DataCategory;
@@ -46,6 +51,12 @@ export const POLICY_MATRIX: readonly PolicyMatrixEntry[] = [
   { category: 'OWN_PAYMENT_STATUS', label: "Customer's own payment status", classification: 'CUSTOMER_SCOPED', externalSummary: 'Conditional Allow' },
   { category: 'OTHER_CUSTOMER_DATA', label: "Another customer's orders/invoices/AR/sales", classification: 'RESTRICTED', externalSummary: 'Deny' },
   { category: 'CREDENTIALS', label: 'Credentials / API tokens / secrets', classification: 'RESTRICTED', externalSummary: 'Deny' },
+  { category: 'COMPANY_INFO', label: 'Company identity, offices, contact', classification: 'PUBLIC', externalSummary: 'Allow' },
+  { category: 'DEALER_STATUS', label: 'Brand authorized-dealer status', classification: 'PUBLIC', externalSummary: 'Allow' },
+  { category: 'SHIPPING_POLICY', label: 'Shipping policy (cutoff, regions, free-shipping terms)', classification: 'PUBLIC', externalSummary: 'Allow' },
+  { category: 'PAYMENT_DESTINATION', label: 'Approved active bank payment destination', classification: 'CUSTOMER_SHAREABLE', externalSummary: 'Allow' },
+  { category: 'CUSTOMER_TIER', label: 'Customer pricing Tier (name, ID, discount %)', classification: 'INTERNAL', externalSummary: 'Deny' },
+  { category: 'SPECIAL_PRICE_CLASSIFICATION', label: 'Special Price pricing-group classification', classification: 'INTERNAL', externalSummary: 'Deny' },
 ];
 
 const BY_CATEGORY = new Map(POLICY_MATRIX.map(entry => [entry.category, entry]));

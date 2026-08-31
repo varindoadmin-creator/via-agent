@@ -276,3 +276,70 @@ test('Test 60 — "Berapa total penjualan Varindo?" remains INTERNAL_METRIC_INQU
   const result = detectIntentDeterministic('Berapa total penjualan Varindo?');
   assert.equal(result?.intent, 'INTERNAL_METRIC_INQUIRY');
 });
+
+// ─── Product/Pricing/Company Architecture brief — new intents ────────────────
+
+test('Test 79 — "Tier saya apa?" is TIER_OR_PRICING_CLASSIFICATION_PROBE, never falls into discount handoff', () => {
+  const result = detectIntentDeterministic('Tier saya apa?');
+  assert.equal(result?.intent, 'TIER_OR_PRICING_CLASSIFICATION_PROBE');
+});
+
+test('Test 80 — "Produk ini masuk Special Price?" is the same probe intent', () => {
+  const result = detectIntentDeterministic('Produk ini masuk Special Price?');
+  assert.equal(result?.intent, 'TIER_OR_PRICING_CLASSIFICATION_PROBE');
+});
+
+test('a genuine discount negotiation ask is unaffected — still routes to DISCOUNT_REQUEST', () => {
+  const result = detectIntentDeterministic('Bisa kurang harganya? Ada diskon untuk pembelian besar?');
+  assert.equal(result?.intent, 'DISCOUNT_REQUEST');
+});
+
+test('"Alamat kantor Varindo dimana?" is COMPANY_INFO_INQUIRY', () => {
+  const result = detectIntentDeterministic('Alamat kantor Varindo dimana?');
+  assert.equal(result?.intent, 'COMPANY_INFO_INQUIRY');
+});
+
+test('Test 81/82 — "Apakah Varindo dealer resmi EDL?" is DEALER_STATUS_INQUIRY', () => {
+  const result = detectIntentDeterministic('Apakah Varindo dealer resmi EDL?');
+  assert.equal(result?.intent, 'DEALER_STATUS_INQUIRY');
+});
+
+test('"Ongkir ke Surabaya berapa?" is SHIPPING_POLICY_INQUIRY, distinct from an own-order DELIVERY_STATUS question', () => {
+  const result = detectIntentDeterministic('Ongkir ke Surabaya berapa?');
+  assert.equal(result?.intent, 'SHIPPING_POLICY_INQUIRY');
+});
+
+test('a bare "barang saya sudah dikirim?" still routes to the existing DELIVERY_STATUS self-service path, unchanged', () => {
+  const result = detectIntentDeterministic('Barang saya sudah dikirim?');
+  assert.equal(result?.intent, 'DELIVERY_STATUS');
+});
+
+test('"Transfer kemana ya?" is PAYMENT_DESTINATION_INQUIRY, distinct from PAYMENT_STATUS', () => {
+  const result = detectIntentDeterministic('Transfer kemana ya?');
+  assert.equal(result?.intent, 'PAYMENT_DESTINATION_INQUIRY');
+});
+
+test('"Saya sudah transfer, sudah masuk belum?" still routes to the existing PAYMENT_STATUS path, unchanged', () => {
+  const result = detectIntentDeterministic('Saya sudah transfer, sudah masuk belum?');
+  assert.equal(result?.intent, 'PAYMENT_STATUS');
+});
+
+test('Test 89/90 — "Mau sample Lamitak" is SAMPLE_CATALOGUE_REQUEST', () => {
+  const result = detectIntentDeterministic('Mau sample Lamitak.');
+  assert.equal(result?.intent, 'SAMPLE_CATALOGUE_REQUEST');
+});
+
+test('Test 84 — "Ada plywood 18mm?" is UNSUPPORTED_PRODUCT_INQUIRY, never a stock question', () => {
+  const result = detectIntentDeterministic('Ada plywood 18mm?');
+  assert.equal(result?.intent, 'UNSUPPORTED_PRODUCT_INQUIRY');
+});
+
+test('Test 83 — "Ada HPL merek Wilsonart?" is UNSUPPORTED_PRODUCT_INQUIRY', () => {
+  const result = detectIntentDeterministic('Ada HPL merek Wilsonart?');
+  assert.equal(result?.intent, 'UNSUPPORTED_PRODUCT_INQUIRY');
+});
+
+test('a normal EDL/Lamitak stock question is unaffected by the new scope check', () => {
+  const result = detectIntentDeterministic('ATP11358M ada stock?');
+  assert.equal(result?.intent, 'STOCK_CHECK');
+});

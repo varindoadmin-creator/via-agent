@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { matchRequestPhoneToIdentity } from '@/lib/companyKnowledge/requestIdentityMatch';
 
 type Row = {
   id: string;
@@ -114,7 +115,7 @@ export async function GET() {
     const rows = await sbGet('requests?request_type=eq.sample&order=created_at.desc&limit=500');
     const groups = groupRows(rows);
 
-    const requests = groups.map(({ rep, items }) => {
+    const requests = await Promise.all(groups.map(async ({ rep, items }) => {
       const samples = items.map(r => r.item_code || '').filter(Boolean);
       return {
         id: rep.id,
@@ -126,8 +127,10 @@ export async function GET() {
         total_samples: samples.length,
         status: normalizeStatus(rep.status),
         notes: rep.notes || '',
+        // Brief section 56 — read-only enrichment, never used to create a Zoho customer.
+        identityMatch: await matchRequestPhoneToIdentity(rep.phone),
       };
-    });
+    }));
 
     return NextResponse.json({ success: true, requests });
   } catch (err) {

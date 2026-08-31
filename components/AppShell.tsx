@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles, X,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles, X, BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -36,6 +36,7 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
       items: [
         { id: 'items-list',  href: '/inventory',                label: 'Items'       },
         { id: 'price-lists', href: '/inventory/price-lists',    label: 'Price Lists' },
+        { id: 'products-source', href: '/inventory/products',   label: 'Product Source' },
       ],
     },
     hidden: true,
@@ -45,6 +46,14 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
     section: {
       id: 'inventory', label: 'Inventory', icon: Truck,
       items: [{ id: 'shipments', href: '/inventory/shipments', label: 'Shipments' }],
+    },
+    hidden: true,
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'knowledge', label: 'Knowledge', icon: BookOpen,
+      items: [{ id: 'company-knowledge', href: '/knowledge', label: 'Company & Policy' }],
     },
     hidden: true,
   },

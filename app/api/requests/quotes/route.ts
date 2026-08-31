@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { matchRequestPhoneToIdentity } from '@/lib/companyKnowledge/requestIdentityMatch';
 
 type Row = {
   id: string;
@@ -116,7 +117,7 @@ export async function GET() {
     const rows = await sbGet('requests?request_type=eq.quote&order=created_at.desc&limit=500');
     const groups = groupRows(rows);
 
-    const requests = groups.map(({ rep, items }) => {
+    const requests = await Promise.all(groups.map(async ({ rep, items }) => {
       const quoteItems = items
         .filter(r => r.item_code)
         .map(r => ({ code: r.item_code || '', qty: r.quantity != null ? String(r.quantity) : '' }));
@@ -131,8 +132,10 @@ export async function GET() {
         status: normalizeStatus(rep.status),
         notes: rep.notes || '',
         raw: [],
+        // Brief section 56 — read-only enrichment, never used to create a Zoho customer.
+        identityMatch: await matchRequestPhoneToIdentity(rep.phone),
       };
-    });
+    }));
 
     return NextResponse.json({ success: true, requests });
   } catch (err) {

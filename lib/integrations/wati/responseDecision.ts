@@ -12,8 +12,23 @@ import { evaluateDisclosure, type DisclosureReasonCode } from '../../security/di
 import type { DataCategory } from '../../security/disclosure/classification.ts';
 import { responseForReasonCode } from '../../security/disclosure/responses.ts';
 import { broadBrandPriceClarification, discountHandoff } from './pricing/responses.ts';
+import {
+  companyInfoResponse, dealerStatusResponse, shippingPolicyResponse, paymentDestinationResponse,
+  tierProbeRedirect, unsupportedProductResponse, sampleCatalogueResponse,
+} from './companyKnowledge/responses.ts';
+import type { BrandName } from '../../companyKnowledge/brandRelationships.ts';
 
-export type ResponseCase = 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN' | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF' | 'K_COMMERCIAL_WORKFLOW' | 'L_CUSTOMER_SELF_SERVICE' | 'SUPPRESSED';
+export type ResponseCase =
+  | 'A_GREETING' | 'B_BRAND_INQUIRY' | 'C_PRODUCT_RESOLVED' | 'D_STOCK_ACK' | 'E_CLARIFICATION' | 'F_HUMAN'
+  | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF'
+  | 'K_COMMERCIAL_WORKFLOW' | 'L_CUSTOMER_SELF_SERVICE'
+  | 'N_TIER_PROBE_REDIRECT' | 'O_COMPANY_INFO' | 'P_DEALER_STATUS' | 'Q_SHIPPING_POLICY' | 'R_PAYMENT_DESTINATION'
+  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT'
+  | 'SUPPRESSED';
+
+function isBrandName(brand: string | null): brand is BrandName {
+  return brand === 'LAMITAK' || brand === 'EDL';
+}
 
 export interface ResponseDecisionInput {
   intent: WatiIntent;
@@ -24,6 +39,8 @@ export interface ResponseDecisionInput {
   conversationSuppressed: boolean; // true when conversation state is NEEDS_HUMAN/HUMAN_ACTIVE
   /** Required for the Phase 4 disclosure-gated intents (INTERNAL_METRIC/OTHER_CUSTOMER/ORDER_STATUS). */
   audience?: AudienceContext;
+  /** Only meaningful for UNSUPPORTED_PRODUCT_INQUIRY — see IntentDetectionResult.unsupportedScopeReason. */
+  unsupportedScopeReason?: 'BRAND' | 'CATEGORY' | null;
   /** Phase 6 feature flag (brief section 80) — defaults to enabled so existing tests/callers that don't pass it keep today's behavior; pipeline.ts passes the real flag value in production. */
   commercialDraftEnabled?: boolean;
   /** Phase 7 feature flags (brief section 76), one per self-service capability — each defaults to enabled so existing tests/callers keep today's behavior; pipeline.ts passes the real flag values in production. */
@@ -49,7 +66,7 @@ export interface ResponseDecision {
 const OPTIONS_MENU = '1. Cek Stok\n2. Informasi Produk\n3. Hubungi Admin';
 
 function greeting(): string {
-  return `Halo, selamat datang di Varindo. Terima kasih telah menghubungi kami. Ada yang dapat kami bantu?\n\n${OPTIONS_MENU}`;
+  return 'Halo, selamat datang di Varindo. Terima kasih telah menghubungi kami.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
 }
 
 function brandInquiry(brand: string): string {
@@ -156,6 +173,40 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
   if (input.intent === 'DISCOUNT_REQUEST') {
     // Brief section 37: no approved automatic-discount policy exists — human/Sales handoff, no threshold disclosed.
     return { case: 'M_DISCOUNT_HANDOFF', text: discountHandoff(), createStockInquiry: false, markHumanRequest: true };
+  }
+
+  // Product/Pricing/Company Architecture brief section 19/79/80: checked
+  // before any disclosure lookup — this is a fixed redirect, never a Tier or
+  // Special-Price disclosure, and never a human handoff (Jarvis can already
+  // help with the real price deterministically).
+  if (input.intent === 'TIER_OR_PRICING_CLASSIFICATION_PROBE') {
+    return { case: 'N_TIER_PROBE_REDIRECT', text: tierProbeRedirect(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'COMPANY_INFO_INQUIRY') {
+    return { case: 'O_COMPANY_INFO', text: companyInfoResponse(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'DEALER_STATUS_INQUIRY') {
+    return { case: 'P_DEALER_STATUS', text: dealerStatusResponse(isBrandName(input.brand) ? input.brand : null), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'SHIPPING_POLICY_INQUIRY') {
+    return { case: 'Q_SHIPPING_POLICY', text: shippingPolicyResponse(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'PAYMENT_DESTINATION_INQUIRY') {
+    return { case: 'R_PAYMENT_DESTINATION', text: paymentDestinationResponse(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'SAMPLE_CATALOGUE_REQUEST') {
+    // Brief section 53: never re-collects company/email/address/sample details in WhatsApp — just the correct website.
+    return { case: 'S_SAMPLE_CATALOGUE', text: sampleCatalogueResponse(isBrandName(input.brand) ? input.brand : null), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  if (input.intent === 'UNSUPPORTED_PRODUCT_INQUIRY') {
+    // Brief sections 9-11: a fixed decline, never invented, never escalated to human.
+    return { case: 'T_UNSUPPORTED_PRODUCT', text: unsupportedProductResponse(input.unsupportedScopeReason === 'BRAND' ? 'BRAND' : 'CATEGORY'), createStockInquiry: false, markHumanRequest: false };
   }
 
   // Phase 4: internal-metric and other-customer questions go through the

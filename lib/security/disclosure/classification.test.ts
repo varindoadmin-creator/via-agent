@@ -16,6 +16,15 @@ test('brief section 13 policy matrix: key categories map to the expected classif
   assert.equal(classificationForCategory('CREDENTIALS'), 'RESTRICTED');
 });
 
+test('Product/Pricing/Company brief: new company-knowledge categories are PUBLIC/CUSTOMER_SHAREABLE, Tier/Special-Price stay INTERNAL', () => {
+  assert.equal(classificationForCategory('COMPANY_INFO'), 'PUBLIC');
+  assert.equal(classificationForCategory('DEALER_STATUS'), 'PUBLIC');
+  assert.equal(classificationForCategory('SHIPPING_POLICY'), 'PUBLIC');
+  assert.equal(classificationForCategory('PAYMENT_DESTINATION'), 'CUSTOMER_SHAREABLE');
+  assert.equal(classificationForCategory('CUSTOMER_TIER'), 'INTERNAL');
+  assert.equal(classificationForCategory('SPECIAL_PRICE_CLASSIFICATION'), 'INTERNAL');
+});
+
 test('an unregistered category fails closed to the most sensitive tier, never PUBLIC', () => {
   // @ts-expect-error deliberately testing an out-of-registry value
   assert.equal(classificationForCategory('SOMETHING_NOT_REGISTERED'), 'RESTRICTED');
