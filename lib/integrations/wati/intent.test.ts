@@ -339,6 +339,33 @@ test('Test 77 — "Are you a bot?" is BOT_IDENTITY_INQUIRY', () => {
   assert.equal(result?.intent, 'BOT_IDENTITY_INQUIRY');
 });
 
+test('WATI/Jarvis knowledge test suite fixes — "ongkirnya" (suffix form) is recognized as SHIPPING_POLICY_INQUIRY', () => {
+  const result = detectIntentDeterministic('Kirim Jakarta berapa lama, ongkirnya?');
+  assert.equal(result?.intent, 'SHIPPING_POLICY_INQUIRY');
+});
+
+test('WATI/Jarvis knowledge test suite fixes — "Kirim Surabaya gratis?" (no "ongkir" word) is still recognized as SHIPPING_POLICY_INQUIRY, not a discount request', () => {
+  const result = detectIntentDeterministic('Kirim Surabaya gratis?');
+  assert.equal(result?.intent, 'SHIPPING_POLICY_INQUIRY');
+});
+
+test('WATI/Jarvis knowledge test suite fixes — "Sambungkan sales" is HUMAN_REQUEST, not INTERNAL_METRIC_INQUIRY', () => {
+  const result = detectIntentDeterministic('Sambungkan sales');
+  assert.equal(result?.intent, 'HUMAN_REQUEST');
+});
+
+test('WATI/Jarvis knowledge test suite fixes — natural dealer-status phrasings without the literal "resmi dealer" wording still match', () => {
+  for (const text of ['Varindo resmi Lamitak?', 'Varindo distributor Lamitak?', 'Varindo sole distributor Lamitak?', 'EDL asli dari Varindo?']) {
+    const result = detectIntentDeterministic(text);
+    assert.equal(result?.intent, 'DEALER_STATUS_INQUIRY', `expected "${text}" to match DEALER_STATUS_INQUIRY`);
+  }
+});
+
+test('WATI/Jarvis knowledge test suite fixes — American-spelling "catalog" and a bare English "catalogue" both match SAMPLE_CATALOGUE_REQUEST', () => {
+  assert.equal(detectIntentDeterministic('Catalog EDL dong')?.intent, 'SAMPLE_CATALOGUE_REQUEST');
+  assert.equal(detectIntentDeterministic('Send me Lamitak catalogue')?.intent, 'SAMPLE_CATALOGUE_REQUEST');
+});
+
 test('a real stock question is never shadowed by the bot-identity pattern', () => {
   const result = detectIntentDeterministic('ATP11358M ready?');
   assert.notEqual(result?.intent, 'BOT_IDENTITY_INQUIRY');
