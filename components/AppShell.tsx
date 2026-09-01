@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package, Boxes, Inbox,
-  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles, X, BookOpen,
+  ClipboardCheck, BarChart2, Circle, Target, FileText, Landmark, Truck, Sparkles, X, BookOpen, MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth';
@@ -107,6 +107,14 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-samples',    href: '/requests/samples',    label: 'Samples'    },
         { id: 'req-quotes',     href: '/requests/quotes',     label: 'Quotes'     },
         { id: 'req-catalogues', href: '/requests/catalogues', label: 'Catalogues' },
+      ],
+    },
+  },
+  {
+    type: 'section',
+    section: {
+      id: 'wati', label: 'WATI', icon: MessageSquare,
+      items: [
         { id: 'req-wati',       href: '/requests/wati',       label: 'WATI Inquiries' },
         { id: 'req-wati-stock', href: '/requests/wati/stock', label: 'Stock Inquiries' },
         { id: 'req-wati-policy', href: '/requests/wati/policy', label: 'Customer Data Policy' },
@@ -116,6 +124,8 @@ const NAV: Array<{ type: 'standalone'; item: NavItem & { icon: LucideIcon }; hid
         { id: 'req-wati-customer-service', href: '/requests/wati/customer-service', label: 'Customer Service' },
         { id: 'req-wati-analytics', href: '/requests/wati/analytics', label: 'Customer Ops Analytics' },
         { id: 'req-wati-operational-intelligence', href: '/requests/wati/operational-intelligence', label: 'Operational Intelligence' },
+        { id: 'req-wati-sales-opportunities', href: '/requests/wati/sales-opportunities', label: 'Sales Opportunities' },
+        { id: 'req-wati-system-health', href: '/requests/wati/system-health', label: 'System Health' },
       ],
     },
   },
@@ -486,7 +496,7 @@ export default function AppShell({ children, role }: { children: React.ReactNode
   // this — this filter just keeps the sidebar honest about what's reachable.
   const visibleNav = role === 'admin'
     ? NAV.filter(entry =>
-        (entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'documents' || entry.section.id === 'sales' || entry.section.id === 'purchases')) ||
+        (entry.type === 'section' && (entry.section.id === 'approvals' || entry.section.id === 'requests' || entry.section.id === 'wati' || entry.section.id === 'documents' || entry.section.id === 'sales' || entry.section.id === 'purchases')) ||
         (entry.type === 'standalone' && entry.item.id === 'guide')
       ).map(entry => {
         // Sales is only shown so Admin can reach Customers — Invoices and Tax

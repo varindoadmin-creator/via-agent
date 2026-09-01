@@ -12,6 +12,7 @@
 
 import { getZohoAccessToken, getZohoApiBaseUrl, getZohoOrgId } from '@/lib/zoho/auth';
 import { fetchWithRetry } from '@/lib/zoho/retry';
+import { enqueueJob } from '@/lib/jobs/queue';
 
 const MAP_TABLE = 'customer_salesperson_map';
 const LOG_TABLE = 'salesperson_auto_assign_log';
@@ -253,6 +254,17 @@ export interface SyncResult {
   results: SyncResultRow[];
 }
 
+/** Retries exactly one document's salesperson-assignment PUT — the job handler for the `salesperson_assign_retry` background job (see app/api/jobs/sweep/route.ts). Throws on failure so the job queue's own retry/backoff/DLQ logic governs it. */
+export async function retrySalespersonAssignment(payload: { documentType: 'sales_order' | 'invoice'; documentId: string; salespersonId: string; salespersonName: string }): Promise<void> {
+  const endpoint = payload.documentType === 'sales_order' ? 'salesorders' : 'invoices';
+  await zohoPut(`/${endpoint}/${payload.documentId}`, { salesperson_id: payload.salespersonId });
+  await logAssignResults([{
+    document_type: payload.documentType, document_id: payload.documentId, document_number: payload.documentId,
+    customer_id: '', customer_name: '', salesperson_id: payload.salespersonId, salesperson_name: payload.salespersonName,
+    success: true, error: null,
+  }]);
+}
+
 export async function runSalespersonSync(options: SyncOptions = {}): Promise<SyncResult> {
   const mode = options.mode || 'incremental';
   const dryRun = Boolean(options.dryRun);
@@ -314,6 +326,15 @@ export async function runSalespersonSync(options: SyncOptions = {}): Promise<Syn
       return base;
     } catch (err) {
       failed++;
+      // Phase 13, brief sections 6/9/35: a single-document PUT failure no
+      // longer just gets logged and forgotten — it durably retries via the
+      // background job queue (app/api/jobs/sweep), bounded by that queue's
+      // own attempt/backoff policy, and surfaces in the DLQ if it keeps failing.
+      await enqueueJob({
+        jobType: 'salesperson_assign_retry',
+        payload: { documentType: doc.document_type, documentId: doc.document_id, salespersonId: best.salesperson_id, salespersonName: best.salesperson_name },
+        idempotencyKey: `salesperson_assign:${doc.document_type}:${doc.document_id}:${best.salesperson_id}`,
+      }).catch(queueErr => console.error('[SalespersonSync] Failed to enqueue retry job:', queueErr));
       return { ...base, success: false, error: String(err) };
     }
   });

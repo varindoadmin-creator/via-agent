@@ -5,7 +5,7 @@ const PUBLIC_PATHS = ['/login', '/privacy', '/api/auth/login', '/api/auth/logout
 
 // Hit by external cron-job.org scheduled jobs (no browser session available),
 // so these bypass session auth via a shared secret header instead.
-const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/customers/duplicates/scan', '/api/leads/auto-repair', '/api/invoices-page/auto-send', '/api/inventory/price-lists/sync', '/api/salesperson-map/sync', '/api/salesorders/purchase-gap-check', '/api/shipments/aging-check', '/api/data-quality', '/api/documents/npwp-repair', '/api/jarvis/recovery', '/api/wati/stock/sweep', '/api/wati/service/sweep', '/api/wati/analytics/sweep', '/api/wati/operational/sweep', '/api/requests/notify-sweep'];
+const CRON_PATHS = ['/api/shipments/auto-invoice', '/api/customers/auto-repair', '/api/customers/duplicates/scan', '/api/leads/auto-repair', '/api/invoices-page/auto-send', '/api/inventory/price-lists/sync', '/api/salesperson-map/sync', '/api/salesorders/purchase-gap-check', '/api/shipments/aging-check', '/api/data-quality', '/api/documents/npwp-repair', '/api/jarvis/recovery', '/api/wati/stock/sweep', '/api/wati/service/sweep', '/api/wati/analytics/sweep', '/api/wati/operational/sweep', '/api/wati/proactive/sweep', '/api/requests/notify-sweep', '/api/jobs/sweep'];
 
 function isCronAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

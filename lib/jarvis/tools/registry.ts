@@ -22,6 +22,17 @@ import {
   getOpenOperationalFindingsTool, getPriorityFindingsTool, getFindingDetailTool, getOperationalBriefTool,
   acknowledgeFindingTool, assignFindingTool, createActionPlanTool, closeFindingTool,
 } from './operationalIntelligence';
+import {
+  getProactiveOpportunitiesTool, getProactiveActionDetailTool, approveProactiveActionTool,
+  assignProactiveActionTool, dismissProactiveActionTool, cancelProactiveActionTool, recordCustomerCallbackTool,
+} from './proactiveActions';
+import {
+  getGovernedMetricDefinitionTool, getCustomerSegmentsTool, getCustomerConcentrationTool, getProductConcentrationTool,
+  getBrandPerformanceTool, getCustomerRetentionTool, getCohortAnalysisTool, forecastMetricTool, runBusinessScenarioTool,
+  getDecisionBriefTool, getExtendedDataQualityTool, recordManagementDecisionTool, reviewManagementDecisionTool,
+  listManagementDecisionsTool, getDecisionByIdTool, createManagementExperimentTool, recordExperimentResultTool,
+  listManagementExperimentsTool, getExperimentByIdTool, getCashCollectedTool,
+} from './decisionEngineering';
 import { authorizeJarvisAction, permissionForTool, type JarvisPermission } from '@/lib/jarvis/security/policy';
 import { recordJarvisSecurityEvent } from '@/lib/jarvis/security/events';
 import { classifyJarvisFailure, JarvisReliabilityError } from '@/lib/jarvis/reliability/errors';
@@ -95,6 +106,38 @@ const definitions: JarvisToolDefinition[] = [
   write('assign_finding', 'Assign finding', 'Assign an operational finding to a role and/or team.', 'analytics', 'VIA', 'Exact finding ID, expected version, assignee', assignFindingTool),
   write('create_action_plan', 'Create action plan', 'Create a lightweight action-plan item for an operational finding.', 'analytics', 'VIA', 'Exact finding ID, expected version, description', createActionPlanTool),
   write('close_finding', 'Resolve or dismiss finding', 'Resolve or dismiss an operational finding, with an optional dismissal reason.', 'analytics', 'VIA', 'Exact finding ID, expected version, action', closeFindingTool),
+  read('get_proactive_opportunities', 'Proactive opportunities', 'List open proactive customer/sales follow-up opportunities, optionally filtered by type, status, or team.', 'sales', 'VIA', 'Optional type/status/team filters', getProactiveOpportunitiesTool),
+  read('get_proactive_action_detail', 'Proactive action detail', 'Get the full detail and evidence for one proactive customer/sales action.', 'sales', 'VIA', 'Exact action ID', getProactiveActionDetailTool),
+  write('approve_proactive_action', 'Approve proactive action', 'Approve a proactive outreach action that requires review before it can be sent.', 'sales', 'VIA', 'Exact action ID and expected version', approveProactiveActionTool),
+  write('assign_proactive_action', 'Assign proactive action', 'Assign a proactive action to a role and/or team.', 'sales', 'VIA', 'Exact action ID, expected version, assignee', assignProactiveActionTool),
+  write('dismiss_proactive_action', 'Dismiss proactive action', 'Dismiss a proactive action with a reason; it will not be recreated.', 'sales', 'VIA', 'Exact action ID, expected version, reason', dismissProactiveActionTool),
+  write('cancel_proactive_action', 'Cancel proactive action', 'Cancel a scheduled/approved proactive action that should not proceed.', 'sales', 'VIA', 'Exact action ID and expected version', cancelProactiveActionTool),
+  write('record_customer_callback', 'Record customer callback', 'Record an explicit customer callback request as an internal task. Never claims the call already happened.', 'sales', 'VIA', 'Customer phone, context, optional requested time', recordCustomerCallbackTool),
+
+  // Phase 12 — BI & decision engineering. Every metric/forecast/scenario/
+  // brief tool is ANALYZE risk (never independently computing a business
+  // number); decision/experiment records are WRITE but never touch Zoho or
+  // contact a customer.
+  read('get_governed_metric_definition', 'Governed metric definition', 'Look up one or all governed metric definitions (formula, grain, source, classification).', 'analytics', 'VIA', 'Optional metric ID or owner filter', getGovernedMetricDefinitionTool),
+  analyze('get_customer_segments', 'Customer segments', 'Compute deterministic analytical customer segments from VIA-tracked activity — never the pricing Tier.', 'analytics', 'VIA', 'None', getCustomerSegmentsTool),
+  analyze('get_customer_concentration', 'Customer concentration', 'Analyze customer revenue concentration (top-N and Pareto) from live Zoho invoices.', 'analytics', 'Zoho Books', 'Explicit date range', getCustomerConcentrationTool),
+  analyze('get_product_concentration', 'Product concentration', 'Analyze product concentration and high-inquiry/low-conversion products by canonical Zoho Item ID.', 'analytics', 'VIA', 'None', getProductConcentrationTool),
+  analyze('get_brand_performance', 'Brand performance', 'Compare LAMITAK vs EDL inquiry volume and stock-issue rate. Never fabricates order-value-by-brand.', 'analytics', 'VIA', 'None', getBrandPerformanceTool),
+  analyze('get_customer_retention', 'Customer retention', 'Compute customer (not revenue) retention between two explicit Zoho invoice periods.', 'analytics', 'Zoho Books', 'Two explicit date ranges', getCustomerRetentionTool),
+  analyze('get_cohort_analysis', 'Cohort analysis', 'Build a first-invoice-month cohort retention table from live Zoho invoices.', 'analytics', 'Zoho Books', 'Trailing months window', getCohortAnalysisTool),
+  analyze('forecast_metric', 'Forecast metric', 'Forecast Sales Order value/count or inquiry count using a transparent method. Returns INSUFFICIENT_DATA rather than a fabricated number.', 'analytics', 'VIA', 'Metric, horizon, method', forecastMetricTool),
+  analyze('run_business_scenario', 'Business scenario', 'Run a deterministic "what if" scenario. Never a forecast — arithmetic on a supplied assumption.', 'analytics', 'VIA', 'Scenario type and assumption', runBusinessScenarioTool),
+  analyze('get_decision_brief', 'Decision brief', 'Build a FACTS/DIAGNOSIS/OPTIONS/RECOMMENDATION decision brief for a sales change, decomposed by customer or salesperson.', 'analytics', 'Zoho Books', 'Two explicit periods and a dimension', getDecisionBriefTool),
+  read('get_extended_data_quality_report', 'Extended data quality', 'Get the extended data-quality report: coverage, duplicates, orphan codes, missing salesperson, pricing gaps, sync freshness.', 'analytics', 'VIA', 'Time-period grain', getExtendedDataQualityTool),
+  write('record_management_decision', 'Record management decision', 'Record a management decision, rationale, and expected outcome for later comparison.', 'analytics', 'VIA', 'Decision, rationale, expected outcome, review date', recordManagementDecisionTool),
+  write('review_management_decision', 'Review management decision', 'Record the actual outcome of a previously-made decision.', 'analytics', 'VIA', 'Decision ID, expected version, actual outcome', reviewManagementDecisionTool),
+  read('list_management_decisions', 'List management decisions', 'List recorded management decisions, optionally filtered by review status.', 'analytics', 'VIA', 'Optional status filter', listManagementDecisionsTool),
+  read('get_decision_detail', 'Decision detail', 'Get one management decision record by ID.', 'analytics', 'VIA', 'Exact decision ID', getDecisionByIdTool),
+  write('create_management_experiment', 'Create management experiment', 'Start a controlled management experiment with a before value and sample size.', 'analytics', 'VIA', 'Name, hypothesis, metric, before value/sample size', createManagementExperimentTool),
+  write('record_experiment_result', 'Record experiment result', 'Record an experiment\'s after value/sample size. Never declares success/failure below the minimum sample size.', 'analytics', 'VIA', 'Experiment ID, expected version, after value/sample size', recordExperimentResultTool),
+  read('list_management_experiments', 'List management experiments', 'List management experiments, optionally filtered by status.', 'analytics', 'VIA', 'Optional status filter', listManagementExperimentsTool),
+  read('get_experiment_detail', 'Experiment detail', 'Get one management experiment record by ID.', 'analytics', 'VIA', 'Exact experiment ID', getExperimentByIdTool),
+  read('get_cash_collected', 'Cash collected', 'Get actual Zoho customer payments received for a date range — distinct from invoiced sales and Sales Order value.', 'analytics', 'Zoho Books', 'Explicit date range', getCashCollectedTool),
 ];
 
 function roleCanUse(role: Role, requiredRole: Role): boolean {

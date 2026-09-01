@@ -15,13 +15,13 @@ const parameters = z.object({ current: period, comparison: period.optional() });
 const comparisonParameters = z.object({ current: period, comparison: period });
 const customerRecoveryParameters = comparisonParameters.extend({ customer: z.string().min(1).max(200), recovery_rate: z.number().min(0).max(1) });
 
-function validatePeriod(from: string, to: string) {
+export function validatePeriod(from: string, to: string) {
   const start = Date.parse(`${from}T00:00:00Z`), end = Date.parse(`${to}T00:00:00Z`);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) throw new Error('Invalid analytics date range.');
   if ((end - start) / 86_400_000 > 366) throw new Error('Analytics date range cannot exceed 366 days.');
 }
 
-async function fetchInvoices(from: string, to: string): Promise<Row[]> {
+export async function fetchInvoices(from: string, to: string): Promise<Row[]> {
   validatePeriod(from, to);
   const rows: Row[] = [];
   const token = await getZohoAccessToken();
@@ -57,7 +57,7 @@ function summarize(label: string, from: string, to: string, invoices: Row[]) {
   };
 }
 
-function observations(invoices: Row[]): SalesObservation[] {
+export function observations(invoices: Row[]): SalesObservation[] {
   return invoices.map(invoice => ({
     invoiceId: String(invoice.invoice_id || ''), date: String(invoice.date || ''), revenue: Number(invoice.sub_total || 0),
     customer: String(invoice.customer_name || 'Unassigned'), salesperson: String(invoice.salesperson_name || 'Unassigned'),

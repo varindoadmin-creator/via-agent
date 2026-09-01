@@ -16,6 +16,7 @@ import { authorizeJarvisAction, createJarvisSecurityIdentity } from '@/lib/jarvi
 import { detectPromptInjection, labelUntrustedContent } from '@/lib/jarvis/security/untrustedContent';
 import { recordJarvisSecurityEvent } from '@/lib/jarvis/security/events';
 import type { JarvisSecurityEvent } from '@/lib/jarvis/security/events';
+import { checkRateLimit, getClientIp, JARVIS_CHAT_RATE_LIMIT } from '@/lib/security/rateLimit';
 
 export const maxDuration = 60;
 
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<ChatResponse>
   if (!role) {
     return NextResponse.json({ message: 'Unauthorized', type: 'error', error: 'UNAUTHORIZED' }, { status: 401 });
   }
+
+  const rateLimitKey = `jarvis-chat:${role}:${getClientIp(req.headers)}`;
+  const rateLimit = checkRateLimit(rateLimitKey, JARVIS_CHAT_RATE_LIMIT.limit, JARVIS_CHAT_RATE_LIMIT.windowMs);
+  if (!rateLimit.allowed) {
+    console.warn('[jarvis.chat]', JSON.stringify({ event: 'rate_limited', role }));
+    return NextResponse.json({ message: 'JARVIS is receiving requests too quickly right now. Please wait a moment and try again.', type: 'error', error: 'RATE_LIMITED' }, { status: 429 });
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({
       message: 'JARVIS is not configured yet. OPENAI_API_KEY is missing.',

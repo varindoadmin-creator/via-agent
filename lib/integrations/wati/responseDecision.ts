@@ -23,7 +23,7 @@ export type ResponseCase =
   | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF'
   | 'K_COMMERCIAL_WORKFLOW' | 'L_CUSTOMER_SELF_SERVICE'
   | 'N_TIER_PROBE_REDIRECT' | 'O_COMPANY_INFO' | 'P_DEALER_STATUS' | 'Q_SHIPPING_POLICY' | 'R_PAYMENT_DESTINATION'
-  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT'
+  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT' | 'U_BOT_IDENTITY'
   | 'SUPPRESSED';
 
 function isBrandName(brand: string | null): brand is BrandName {
@@ -37,6 +37,8 @@ export interface ResponseDecisionInput {
   product: ZohoItem | null;
   productCodeCandidate: string | null;
   conversationSuppressed: boolean; // true when conversation state is NEEDS_HUMAN/HUMAN_ACTIVE
+  /** Phase 14, brief section 43: true once this phone has exchanged more than one message recently — drops the "terima kasih telah menghubungi Varindo" opener from greeting()/brandInquiry()/productResolved() so it isn't repeated on every reply. Defaults to false so every existing caller/test keeps today's first-message wording unless the pipeline explicitly passes true. */
+  isReturningConversation?: boolean;
   /** Required for the Phase 4 disclosure-gated intents (INTERNAL_METRIC/OTHER_CUSTOMER/ORDER_STATUS). */
   audience?: AudienceContext;
   /** Only meaningful for UNSUPPORTED_PRODUCT_INQUIRY — see IntentDetectionResult.unsupportedScopeReason. */
@@ -63,18 +65,27 @@ export interface ResponseDecision {
   disclosureReasonCode?: DisclosureReasonCode;
 }
 
-function greeting(): string {
+function greeting(isReturning?: boolean): string {
+  if (isReturning) {
+    return 'Halo Pak/Bu, silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
+  }
   return 'Halo, selamat datang di Varindo. Terima kasih telah menghubungi kami.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
 }
 
 // Open-ended, same principle as greeting() — never a numbered menu ending in
 // "Hubungi Admin", since most initial questions can be answered directly.
-function brandInquiry(brand: string): string {
+function brandInquiry(brand: string, isReturning?: boolean): string {
+  if (isReturning) {
+    return `Baik Pak/Bu, dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
+  }
   return `Halo Pak/Bu, terima kasih telah menghubungi Varindo. Dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
 }
 
-function productResolved(item: ZohoItem): string {
+function productResolved(item: ZohoItem, isReturning?: boolean): string {
   const label = item.sku ? `${item.sku} - ${item.name}` : item.name;
+  if (isReturning) {
+    return `Baik Pak/Bu, untuk ${label}: silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
+  }
   return `Halo Pak/Bu, terima kasih telah menghubungi Varindo terkait ${label}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
 }
 
@@ -96,6 +107,23 @@ function ackRoute(): string {
   return 'Baik Pak/Bu, mohon ditunggu, tim kami akan segera membantu terkait hal tersebut.';
 }
 
+/** Phase 14, brief sections 49/77: transparent about being an assistant, never claims to be human. */
+function botIdentityResponse(): string {
+  return 'Saya asisten virtual Varindo yang membantu informasi produk, harga, stok, pesanan, dan kebutuhan lainnya. Jika diperlukan, saya juga bisa menghubungkan Bapak/Ibu dengan Admin.';
+}
+
+/**
+ * Phase 14, brief sections 41/46 (non-negotiable "failure is visible, not
+ * silent"): the one safe reply for a genuinely unhandled pipeline exception —
+ * never a stack trace, never silence. Exported so pipeline.ts's outer catch
+ * can send it as a last-resort, best-effort message; never wired into
+ * decideResponse's normal decision tree since it isn't a response to any
+ * classified intent.
+ */
+export function systemErrorFallback(): string {
+  return 'Mohon maaf Pak/Bu, sistem kami sedang mengalami kendala untuk memproses permintaan tersebut. Kami bantu teruskan ke Admin.';
+}
+
 /**
  * Pure decision function — no I/O. `conversationSuppressed` is checked first:
  * VIA still records the message, but section 21 forbids sending a further
@@ -111,7 +139,7 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
   }
 
   if (input.intent === 'GREETING') {
-    return { case: 'A_GREETING', text: greeting(), createStockInquiry: false, markHumanRequest: false };
+    return { case: 'A_GREETING', text: greeting(input.isReturningConversation), createStockInquiry: false, markHumanRequest: false };
   }
 
   if (input.intent === 'STOCK_CHECK') {
@@ -123,10 +151,10 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
 
   if (input.intent === 'PRODUCT_INQUIRY') {
     if (input.productResolution === 'EXACT' && input.product) {
-      return { case: 'C_PRODUCT_RESOLVED', text: productResolved(input.product), createStockInquiry: false, markHumanRequest: false };
+      return { case: 'C_PRODUCT_RESOLVED', text: productResolved(input.product, input.isReturningConversation), createStockInquiry: false, markHumanRequest: false };
     }
     if (input.brand) {
-      return { case: 'B_BRAND_INQUIRY', text: brandInquiry(input.brand), createStockInquiry: false, markHumanRequest: false };
+      return { case: 'B_BRAND_INQUIRY', text: brandInquiry(input.brand, input.isReturningConversation), createStockInquiry: false, markHumanRequest: false };
     }
     return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
   }
@@ -204,6 +232,11 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
     return { case: 'S_SAMPLE_CATALOGUE', text: sampleCatalogueResponse(isBrandName(input.brand) ? input.brand : null), createStockInquiry: false, markHumanRequest: false };
   }
 
+  if (input.intent === 'BOT_IDENTITY_INQUIRY') {
+    // Never a handoff, never a Tier/pricing question — a fixed, honest identity statement only.
+    return { case: 'U_BOT_IDENTITY', text: botIdentityResponse(), createStockInquiry: false, markHumanRequest: false };
+  }
+
   if (input.intent === 'UNSUPPORTED_PRODUCT_INQUIRY') {
     // Brief sections 9-11: a fixed decline, never invented, never escalated to human.
     return { case: 'T_UNSUPPORTED_PRODUCT', text: unsupportedProductResponse(input.unsupportedScopeReason === 'BRAND' ? 'BRAND' : 'CATEGORY'), createStockInquiry: false, markHumanRequest: false };
@@ -263,5 +296,5 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
   }
 
   // GENERAL_INQUIRY / UNKNOWN — safe default, makes no claims, offers the menu.
-  return { case: 'A_GREETING', text: greeting(), createStockInquiry: false, markHumanRequest: false };
+  return { case: 'A_GREETING', text: greeting(input.isReturningConversation), createStockInquiry: false, markHumanRequest: false };
 }

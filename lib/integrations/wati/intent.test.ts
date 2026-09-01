@@ -329,6 +329,21 @@ test('Test 89/90 — "Mau sample Lamitak" is SAMPLE_CATALOGUE_REQUEST', () => {
   assert.equal(result?.intent, 'SAMPLE_CATALOGUE_REQUEST');
 });
 
+test('Test 77 — "Ini bot ya?" is BOT_IDENTITY_INQUIRY', () => {
+  const result = detectIntentDeterministic('Ini bot ya?');
+  assert.equal(result?.intent, 'BOT_IDENTITY_INQUIRY');
+});
+
+test('Test 77 — "Are you a bot?" is BOT_IDENTITY_INQUIRY', () => {
+  const result = detectIntentDeterministic('Are you a bot?');
+  assert.equal(result?.intent, 'BOT_IDENTITY_INQUIRY');
+});
+
+test('a real stock question is never shadowed by the bot-identity pattern', () => {
+  const result = detectIntentDeterministic('ATP11358M ready?');
+  assert.notEqual(result?.intent, 'BOT_IDENTITY_INQUIRY');
+});
+
 test('Test 84 — "Ada plywood 18mm?" is UNSUPPORTED_PRODUCT_INQUIRY, never a stock question', () => {
   const result = detectIntentDeterministic('Ada plywood 18mm?');
   assert.equal(result?.intent, 'UNSUPPORTED_PRODUCT_INQUIRY');

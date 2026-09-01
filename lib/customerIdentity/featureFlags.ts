@@ -56,3 +56,46 @@ export const isManagementAlertsEnabled = () => flag('MANAGEMENT_ALERTS_ENABLED')
 export const isOpportunityDetectionEnabled = () => flag('OPPORTUNITY_DETECTION_ENABLED');
 export const isActionPlansEnabled = () => flag('ACTION_PLANS_ENABLED');
 export const isAutoFindingResolutionEnabled = () => flag('AUTO_FINDING_RESOLUTION_ENABLED');
+
+// Phase 11 — proactive customer & sales automation, staged rollout, all off by
+// default. Commercial/dormant/reorder auto-outreach is deliberately never
+// unlocked by a single flag alone — see lib/proactiveActions/approvalPolicy.ts.
+export const isProactiveActionsEnabled = () => flag('PROACTIVE_ACTIONS_ENABLED');
+export const isQuotationFollowupEnabled = () => flag('QUOTATION_FOLLOWUP_ENABLED');
+export const isReorderOpportunitiesEnabled = () => flag('REORDER_OPPORTUNITIES_ENABLED');
+export const isSampleFollowupEnabled = () => flag('SAMPLE_FOLLOWUP_ENABLED');
+export const isDormantCustomerEnabled = () => flag('DORMANT_CUSTOMER_ENABLED');
+export const isAutoServiceFollowupEnabled = () => flag('AUTO_SERVICE_FOLLOWUP_ENABLED');
+export const isAutoCommercialOutreachEnabled = () => flag('AUTO_COMMERCIAL_OUTREACH_ENABLED');
+
+// Phase 12 — BI & decision engineering. The Jarvis tools themselves are
+// already role-gated (director-only, same as every other analytics tool);
+// this one flag only controls whether the dashboard shows the additional
+// Phase 12 sections, staged rollout same as Phase 9's dashboard flags.
+export const isManagementDecisionEngineUiEnabled = () => flag('MANAGEMENT_DECISION_ENGINE_UI_ENABLED');
+
+// Phase 13 — production reliability, model routing cost observability, and
+// gradual customer-facing rollout. Staged rollout, all off by default; apply
+// supabase/jarvis_model_usage_log.sql before enabling the first one.
+export const isJarvisModelUsageLogEnabled = () => flag('JARVIS_MODEL_USAGE_LOG_ENABLED');
+
+// Phase 14 (brief section 81) — conversation UX / human-like Jarvis, staged
+// rollout. Most of this phase's fixes (the silent-failure fallback, the
+// bot-identity response) are safety nets or narrow additions with no
+// meaningful regression surface, so they ship unconditionally rather than
+// being hidden behind a flag a operator might forget to flip. Only the one
+// change to already-live, long-tested wording (dropping the repeated
+// "terima kasih" opener — see responseDecision.ts's isReturningConversation)
+// is gated, matching the brief's own staged-rollout intent (section 82).
+/** Kill switch for the greeting-repetition fix (brief section 43) — off by default; pipeline.ts only computes/passes isReturningConversation when this is true. */
+export const isContextualGreetingEnabled = () => flag('INTENT_CONTEXTUAL_GREETING');
+/** Declared per the brief's flag list; not wired to any code yet — see docs/conversation-ux.md's "deliberately deferred" section for what a real implementation would need (message-burst coalescing has no safe implementation without a queue this codebase deliberately doesn't have — see docs/reliability.md). */
+export const isMessageDebounceEnabled = () => flag('MESSAGE_DEBOUNCE');
+/** Declared per the brief's flag list; not wired to any code yet — see docs/conversation-ux.md (only the existing stock+price combo intent is implemented; a general multi-intent composer is deferred). */
+export const isMultiIntentEnabled = () => flag('MULTI_INTENT');
+/** Declared per the brief's flag list; not wired to any code yet — see docs/context-management.md (conversation summarization beyond the existing carried-product-code/brand lookback is deferred). */
+export const isContextSummarizationEnabled = () => flag('CONTEXT_SUMMARIZATION');
+/** Declared per the brief's flag list; not wired to any code yet — see docs/conversation-ux.md (clarification wording is already candidate-specific where a resolvable ambiguity exists; a broader "always list candidates" rework is deferred). */
+export const isNaturalClarificationEnabled = () => flag('NATURAL_CLARIFICATION');
+/** Master flag for this phase's staged rollout (brief section 82) — declared for symmetry with every other phase's master switch; today nothing checks it directly since each individual change above already has its own narrower gate or ships unconditionally. */
+export const isConversationUxV2Enabled = () => flag('CONVERSATION_UX_V2');

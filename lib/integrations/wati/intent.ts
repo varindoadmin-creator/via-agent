@@ -67,6 +67,8 @@ export type WatiIntent =
   | 'TIER_OR_PRICING_CLASSIFICATION_PROBE'
   | 'UNSUPPORTED_PRODUCT_INQUIRY'
   | 'SAMPLE_CATALOGUE_REQUEST'
+  // Phase 14 (brief sections 49, 77) — "is this a bot?" meta-question.
+  | 'BOT_IDENTITY_INQUIRY'
   | 'UNKNOWN';
 
 export interface IntentDetectionResult {
@@ -190,6 +192,12 @@ const SHIPPING_POLICY_PATTERN = /\bongkir\b|\bongkos\s+kirim\b|\bbiaya\s+kirim\b
 // Distinct keywords from PAYMENT_STATUS_PATTERN's "sudah/udah transfer/bayar".
 const PAYMENT_DESTINATION_PATTERN = /\btransfer\s*ke\s*mana\b|\bnomor\s+rekening\b|\brekening\s+(apa|mana)\b|\bbank\s+apa\b|\bno\.?\s*rek\b/i;
 const SAMPLE_CATALOGUE_PATTERN = /\b(minta|mau)\s+(sample|contoh|katalog|catalogue)\b|\bsample\b|\bkatalog\b/i;
+// Phase 14, brief sections 49/77: "is this a bot?" — never pretend to be
+// human, but also never let this shadow a real product/stock/price question
+// that happens to contain an unrelated word, so it's checked in the same
+// early company-policy tier as the patterns above, not inside the generic
+// product/stock fallback chain below.
+const BOT_IDENTITY_PATTERN = /\b(ini|kah\s+ini)\s+bot\b|\bbot\s*(kah)?\?|\brobot\b|\bapakah\s+ini\s+(ai|bot|manusia)\b|\bini\s+manusia\s+atau\s+bot\b|\b(are\s+you|is\s+this)\s+a?\s*(bot|ai|human|robot)\b/i;
 
 function extractProductCodeCandidate(text: string): string | null {
   const match = text.match(ITEM_CODE_PATTERN);
@@ -245,6 +253,9 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
   }
   if (SAMPLE_CATALOGUE_PATTERN.test(trimmed)) {
     return { intent: 'SAMPLE_CATALOGUE_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null, unsupportedScopeReason: null };
+  }
+  if (BOT_IDENTITY_PATTERN.test(trimmed)) {
+    return { intent: 'BOT_IDENTITY_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null, unsupportedScopeReason: null };
   }
   // Brief sections 9-11: checked before any stock/price/product fallback so
   // "plywood ada?" is never mistaken for a stock question about a real product.

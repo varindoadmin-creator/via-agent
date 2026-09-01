@@ -40,6 +40,16 @@ interface AnalyticsResponse {
   };
   sourceAttribution: { known: { source: string; count: number }[]; unknownCount: number };
   dataQuality: { coverage: { attributionCoverage: number | null; customerMappingCoverage: number | null; orderLinkageCoverage: number | null } };
+  decisionEngineering: {
+    customerSegments: Record<string, number>;
+    extendedDataQuality: {
+      duplicateCustomerGroups: { count: number | null; snapshotComputedAt: string | null };
+      orphanProductCodes: number;
+      customersMissingSalesperson: { activeCustomers: number; missingSalesperson: number };
+      priceResolutionFailuresOpen: number;
+      syncFreshness: { jobName: string; hoursSinceLastSuccess: number | null; stale: boolean }[];
+    };
+  } | null;
 }
 
 function fmtPct(v: number | null): string {
@@ -192,6 +202,33 @@ export default function CustomerOperationsAnalyticsPage() {
           <Card label="Order Linkage Coverage" value={fmtPct(data.dataQuality.coverage.orderLinkageCoverage)} />
         </div>
       </Section>
+
+      {data.decisionEngineering && <Section title="Customer Segments (Analytical — never the pricing Tier)">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(data.decisionEngineering.customerSegments).map(([segment, count]) => (
+              <span key={segment} className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-medium">{segment.replace(/_/g, ' ')} <span className="tabular-nums text-[var(--text-secondary)]">({count})</span></span>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-[var(--text-secondary)]">Deterministic analytical segments computed from VIA-tracked orders only. A customer can carry more than one tag. This is never the Zoho pricing Tier — see docs/metric-registry.md. Ask Jarvis for forecasts, scenarios, concentration/Pareto, cohort retention, and decision briefs, which need explicit date ranges better suited to a conversation than a fixed dashboard grain.</p>
+        </div>
+      </Section>}
+
+      {data.decisionEngineering && <Section title="Extended Data Quality">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Card label="Duplicate Customer Groups" value={data.decisionEngineering.extendedDataQuality.duplicateCustomerGroups.count === null ? '—' : String(data.decisionEngineering.extendedDataQuality.duplicateCustomerGroups.count)} sub={data.decisionEngineering.extendedDataQuality.duplicateCustomerGroups.snapshotComputedAt ? `as of ${new Date(data.decisionEngineering.extendedDataQuality.duplicateCustomerGroups.snapshotComputedAt).toLocaleString('en-ID')}` : 'no scan yet'} />
+          <Card label="Orphan Product Codes" value={String(data.decisionEngineering.extendedDataQuality.orphanProductCodes)} />
+          <Card label="Customers Missing Salesperson" value={`${data.decisionEngineering.extendedDataQuality.customersMissingSalesperson.missingSalesperson} / ${data.decisionEngineering.extendedDataQuality.customersMissingSalesperson.activeCustomers}`} />
+          <Card label="Open Pricing-Resolution Findings" value={String(data.decisionEngineering.extendedDataQuality.priceResolutionFailuresOpen)} />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {data.decisionEngineering.extendedDataQuality.syncFreshness.map(s => (
+            <span key={s.jobName} className={`rounded-full px-3 py-1 text-xs font-medium ${s.stale ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+              {s.jobName}: {s.hoursSinceLastSuccess === null ? 'never synced' : `${Math.round(s.hoursSinceLastSuccess)}h ago`}{s.stale && ' — stale'}
+            </span>
+          ))}
+        </div>
+      </Section>}
     </>}
   </div></div>;
 }

@@ -272,8 +272,33 @@ test('Test 83/84 — UNSUPPORTED_PRODUCT_INQUIRY returns the correct decline tex
 });
 
 test('every new company-knowledge intent is suppressed once a human has taken over, same as every other intent', () => {
-  for (const intent of ['TIER_OR_PRICING_CLASSIFICATION_PROBE', 'COMPANY_INFO_INQUIRY', 'DEALER_STATUS_INQUIRY', 'SHIPPING_POLICY_INQUIRY', 'PAYMENT_DESTINATION_INQUIRY', 'SAMPLE_CATALOGUE_REQUEST', 'UNSUPPORTED_PRODUCT_INQUIRY'] as const) {
+  for (const intent of ['TIER_OR_PRICING_CLASSIFICATION_PROBE', 'COMPANY_INFO_INQUIRY', 'DEALER_STATUS_INQUIRY', 'SHIPPING_POLICY_INQUIRY', 'PAYMENT_DESTINATION_INQUIRY', 'SAMPLE_CATALOGUE_REQUEST', 'UNSUPPORTED_PRODUCT_INQUIRY', 'BOT_IDENTITY_INQUIRY'] as const) {
     const decision = decideResponse({ intent, brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true });
     assert.equal(decision.case, 'SUPPRESSED', `expected ${intent} to be suppressed`);
   }
+});
+
+test('Test 43 — greeting/brand/product-resolved responses drop the "terima kasih" opener once isReturningConversation is true, but keep it by default', () => {
+  const firstGreeting = decideResponse({ intent: 'GREETING', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.match(firstGreeting.text ?? '', /terima kasih telah menghubungi/i);
+
+  const returningGreeting = decideResponse({ intent: 'GREETING', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, isReturningConversation: true });
+  assert.doesNotMatch(returningGreeting.text ?? '', /terima kasih telah menghubungi/i);
+  assert.match(returningGreeting.text ?? '', /sampaikan kebutuhan/i);
+
+  const returningBrand = decideResponse({ intent: 'PRODUCT_INQUIRY', brand: 'LAMITAK', productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, isReturningConversation: true });
+  assert.doesNotMatch(returningBrand.text ?? '', /terima kasih telah menghubungi/i);
+  assert.match(returningBrand.text ?? '', /LAMITAK/);
+
+  const returningProduct = decideResponse({ intent: 'PRODUCT_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false, isReturningConversation: true });
+  assert.doesNotMatch(returningProduct.text ?? '', /terima kasih telah menghubungi/i);
+  assert.match(returningProduct.text ?? '', new RegExp(ITEM.sku!));
+});
+
+test('Test 77 — BOT_IDENTITY_INQUIRY gives a transparent, non-human-pretending identity statement, never a handoff', () => {
+  const decision = decideResponse({ intent: 'BOT_IDENTITY_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'U_BOT_IDENTITY');
+  assert.equal(decision.markHumanRequest, false);
+  assert.match(decision.text ?? '', /asisten virtual/i);
+  assert.doesNotMatch(decision.text ?? '', /saya manusia|saya orang/i);
 });

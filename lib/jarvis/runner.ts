@@ -7,6 +7,8 @@ import { withJarvisRunSlot } from './reliability/runGuard';
 import { withTimeout } from './reliability/timeout';
 import { routeJarvisModel } from './models/router';
 import { estimateJarvisCost, jarvisCostAlert, usageFromJarvisResult } from './models/cost';
+import { recordModelUsage } from './models/usageLog';
+import { isJarvisModelUsageLogEnabled } from '../customerIdentity/featureFlags.ts';
 
 export interface JarvisHistoryMessage {
   role: 'user' | 'assistant';
@@ -84,6 +86,15 @@ export async function runJarvis(input: RunJarvisInput) {
     memoryQueryCount: input.context.memoryObservation.queriedIds.length,
     memoryCandidateAction: input.context.memoryObservation.candidate?.action,
   }));
+
+  if (isJarvisModelUsageLogEnabled()) {
+    void recordModelUsage({
+      runId: orchestration.runId, conversationId: input.context.conversationId,
+      model: orchestration.model || route.selected.id, routingTier: route.requirements.tier, routingReason: route.routingReason,
+      inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, totalTokens: usage.totalTokens, modelRequests: usage.requests,
+      pricingAvailable: cost.pricingAvailable, estimatedCostUsd: cost.totalUsd ?? null, latencyMs: Date.now() - startedAt,
+    });
+  }
 
   return {
     message: typeof result.finalOutput === 'string' && result.finalOutput.trim()

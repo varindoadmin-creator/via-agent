@@ -6,7 +6,8 @@ export type JarvisPermission =
   | 'jarvis.chat' | 'customer.read' | 'products.read' | 'sales.read' | 'inventory.read'
   | 'purchasing.read' | 'finance.read' | 'analytics.analyze' | 'knowledge.read'
   | 'sales_order.prepare' | 'sales_order.create'
-  | 'operational_findings.view' | 'operational_findings.manage';
+  | 'operational_findings.view' | 'operational_findings.manage'
+  | 'management_decisions.manage' | 'management_experiments.manage';
 
 export type JarvisSecurityDecisionCode =
   | 'ALLOWED' | 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'CROSS_TENANT_BLOCKED'
@@ -33,6 +34,7 @@ const DIRECTOR_PERMISSIONS: readonly JarvisPermission[] = [
   'purchasing.read', 'finance.read', 'analytics.analyze', 'knowledge.read',
   'sales_order.prepare', 'sales_order.create',
   'operational_findings.view', 'operational_findings.manage',
+  'management_decisions.manage', 'management_experiments.manage',
 ];
 
 // Keep the current product posture: administrator accounts can sign in, but no
@@ -57,12 +59,20 @@ export function createJarvisSecurityIdentity(input: { role: Role; sessionId: str
 
 const OPERATIONAL_FINDINGS_WRITE_TOOLS = new Set(['acknowledge_finding', 'assign_finding', 'create_action_plan', 'close_finding']);
 const OPERATIONAL_FINDINGS_READ_TOOLS = new Set(['get_open_operational_findings', 'get_priority_findings', 'get_finding_detail', 'get_operational_brief']);
+// Phase 12 — decision/experiment records are write actions with no natural
+// read-permission fallback (unlike most WRITE tools, which reuse an existing
+// domain's `.read` permission); named explicitly, same pattern as the
+// Phase 10 findings sets above.
+const MANAGEMENT_DECISION_WRITE_TOOLS = new Set(['record_management_decision', 'review_management_decision']);
+const MANAGEMENT_EXPERIMENT_WRITE_TOOLS = new Set(['create_management_experiment', 'record_experiment_result']);
 
 export function permissionForTool(input: { category: string; risk: JarvisToolRisk; name: string }): JarvisPermission {
   if (input.name === 'prepare_sales_order') return 'sales_order.prepare';
   if (input.name === 'search_knowledge') return 'knowledge.read';
   if (OPERATIONAL_FINDINGS_WRITE_TOOLS.has(input.name)) return 'operational_findings.manage';
   if (OPERATIONAL_FINDINGS_READ_TOOLS.has(input.name)) return 'operational_findings.view';
+  if (MANAGEMENT_DECISION_WRITE_TOOLS.has(input.name)) return 'management_decisions.manage';
+  if (MANAGEMENT_EXPERIMENT_WRITE_TOOLS.has(input.name)) return 'management_experiments.manage';
   if (input.risk === 'ANALYZE') return 'analytics.analyze';
   const category = input.category === 'products' ? 'products' : input.category;
   return `${category}.read` as JarvisPermission;

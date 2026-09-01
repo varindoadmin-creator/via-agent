@@ -12,7 +12,15 @@ const TABLE = 'analytics_events';
 export type AnalyticsEventType =
   | 'lead.created' | 'product.inquiry' | 'stock.inquiry' | 'price.inquiry'
   | 'handoff.created' | 'commercial_draft.created' | 'quotation.created'
-  | 'order.created' | 'customer.onboarding.completed';
+  | 'order.created' | 'customer.onboarding.completed'
+  // Phase 11 — proactive customer & sales automation (brief section 47).
+  | 'proactive_action.detected' | 'proactive_action.approved' | 'proactive_action.sent'
+  | 'proactive_action.suppressed' | 'proactive_action.responded' | 'proactive_action.converted'
+  | 'proactive_action.expired' | 'outbound.eligibility_denied' | 'outbound.optout_detected'
+  | 'outbound.duplicate_prevented'
+  // Phase 12 — BI & decision engineering (brief section 51).
+  | 'metric.queried' | 'forecast.generated' | 'forecast.insufficient_data'
+  | 'scenario.executed' | 'decision.recorded' | 'data_quality.issue' | 'bi.exported';
 
 export interface RecordAnalyticsEventInput {
   eventType: AnalyticsEventType;

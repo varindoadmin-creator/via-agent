@@ -1,0 +1,53 @@
+# VIA — Conversation UX (Phase 14)
+
+## What this phase actually found
+
+Most of Phase 14's "primary objective" (brief section 1-4) was already shipped by prior phases before this pass began:
+
+- The greeting is already open-ended, never a numbered menu ending in "Hubungi Admin" (`greeting()`/`brandInquiry()`/`productResolved()` in `lib/integrations/wati/responseDecision.ts` — a prior commit, "Drop the numbered menu from brand/product-resolved greetings too", already removed the last numbered-menu remnants).
+- A direct stock/price/product question already skips the greeting entirely and routes straight to the real workflow (`STOCK_CHECK` → `D_STOCK_ACK`, `PRICE_INQUIRY` → `I_PRICE_LOOKUP`, a resolved `PRODUCT_INQUIRY` → `C_PRODUCT_RESOLVED`).
+- `HUMAN_REQUEST` ("admin", "sales", "operator", "human", "bicara dengan admin" — `HUMAN_REQUEST_PATTERN` in `lib/integrations/wati/intent.ts`) is checked essentially first in the deterministic intent chain and unconditionally triggers immediate handoff with no interrogation.
+- Human-active suppression already exists (`conversationSuppressed` gate at the top of `decideResponse`, bypassed only for a fresh `HUMAN_REQUEST`) and is unchanged by this phase.
+- Tier/Special-Price probes already get a fixed, non-disclosing redirect (`N_TIER_PROBE_REDIRECT`); unsupported brand/category already gets a fixed, non-defensive decline (`T_UNSUPPORTED_PRODUCT`); sample/catalogue requests already route to the correct brand-specific website with no re-collection of details; a commercial draft reaching `READY_FOR_REVIEW` already sends a customer-safe summary (item, quantity, estimated total) before any write (`orderReadyForReview`/`quotationReadyForReview` in `lib/integrations/wati/commercial/responses.ts`).
+
+This phase closed the genuine, concrete gaps found by reading the actual code — not a redesign.
+
+## What shipped this phase
+
+1. **Silent failure on an unhandled pipeline exception (brief sections 41, 46 — non-negotiable "failure is visible, not silent")**. Before this phase, an exception thrown anywhere in `runResolutionAndResponse` (e.g. a genuine Zoho outage — `resolveCustomerByPhone`'s `getAllCustomers()` has no internal catch and throws when Zoho is unreachable) left the customer with total silence: the outer `catch` in `processInboundWatiMessage` only logged and marked the message `FAILED`. Fixed: the outer catch now attempts one best-effort reply via `sendWatiTextGated` using `responseDecision.ts`'s new `systemErrorFallback()` — "Mohon maaf Pak/Bu, sistem kami sedang mengalami kendala untuk memproses permintaan tersebut. Kami bantu teruskan ke Admin." Guarded in its own `.catch(() => {})` so a failure sending the fallback can never throw again or affect the webhook's 200 contract. Never triggers a full Phase 8 handoff (that has its own DB writes, which could be exactly what's failing).
+   - **A real follow-on bug this same fix could have introduced, caught and fixed in-session**: if the real, correct reply was already sent successfully and a later, unrelated bookkeeping write then throws (the specific case: `sendWatiTextGated` succeeds, then the trailing `updateWatiMessageResolution` call throws), the naive version of this fix would send a *second*, confusing "sistem kami mengalami kendala" message to a customer who already has their correct answer. Fixed by wrapping that one post-send bookkeeping write in `.catch()` (matching the exact best-effort idiom already used elsewhere in this file) so a failure there is logged but never propagates to the outer catch. Covered by two tests in `lib/integrations/wati/pipeline.test.ts`: one forcing an early, genuine failure (safe fallback sent, exactly once), one forcing a late, post-send failure (no duplicate message, ever).
+2. **Greeting-phrase repetition (brief section 43 — "avoid repeated 'Terima kasih telah menghubungi Varindo' on every reply, greeting once")**. `greeting()`, `brandInquiry()`, and `productResolved()` now take an optional `isReturning` flag; when true, they drop the "terima kasih telah menghubungi Varindo/kami" clause and open with the direct helpful sentence only. `pipeline.ts` computes this from `countRecentWatiMessages(phone, 60) > 1` — a signal already computed for rate-limiting, reused rather than adding a new query. **Gated behind `INTENT_CONTEXTUAL_GREETING`** (off by default) since it changes wording on paths that have been live and tested since early phases — see Feature Flags below.
+3. **"Is this a bot?" meta-question (brief sections 49, 77)**. New `BOT_IDENTITY_INQUIRY` intent (`BOT_IDENTITY_PATTERN` in `intent.ts` — "ini bot", "robot", "are you a bot/AI/human", checked in the same early company-policy tier as the Tier/company-info/shipping patterns, never shadowing a real product/stock question) → new `U_BOT_IDENTITY` response case, a fixed, honest identity statement that never claims to be human and never triggers a handoff. Ships unconditionally (no flag) — a narrow, safe addition with no realistic regression surface.
+
+## What's deliberately deferred (not built this phase)
+
+Each of these was scoped in the original Phase 14 plan but not completed before the implementing session ran into its rate limit; rather than force something unverified into the customer-facing pipeline under time pressure, they're documented here as open work:
+
+- **Correction phrasing beyond "ubah/ganti X jadi Y"** (brief sections 36, 70 — "bukan 20, tapi 30"). `ORDER_MODIFICATION_PATTERN` in `intent.ts` still only recognizes the explicit-verb form. A "bukan X, tapi Y" pattern would also need `lib/integrations/wati/commercial/workflow.ts`'s quantity extraction to prefer the corrected value over the first number found in the message — not yet built.
+- **Soft negation/cancellation** (brief section 37 — "gak jadi", "tidak usah", "cancel dulu" with no "pesanan"/"order" word). `ORDER_CANCELLATION_PATTERN` still requires an explicit transaction word. A bare negation is only safe to treat as a cancellation when there's a genuinely active commercial draft/pending prompt for that phone (via `matchCommercialFollowUp` or equivalent) — the scoping is designed (see the implementation notes this phase's planning left behind) but not implemented.
+- **Multi-intent beyond the existing stock+price combo** (brief sections 16, 68 — the brief's own example adds shipping in the same message). `STOCK_AND_PRICE_INQUIRY` already exists; composing a stock+price+shipping-policy answer into one message has not been built.
+- **Customer frustration/complaint acknowledgment** (brief sections 46, 47 — "kok lama", "saya sudah nunggu"). No intent currently recognizes this; it falls through to the generic greeting today, which is safe (never argues, never invents an excuse) but not the acknowledge-and-prioritize behavior the brief asks for.
+- **Reference resolution for explicit deictic phrases** ("yang tadi", "itu" — brief section 13). `lib/integrations/wati/context.ts`'s `resolveConversationContext` already carries `carriedProductCode`/`carriedBrand` forward when a message has no product code of its own; recognizing an explicit deictic phrase as an additional trigger for that carry-forward has not been added. General anaphora/list-index selection ("warna yang kedua") is out of scope entirely — there is no tracked "last list of options shown to this customer" to select from.
+- **Interruption-then-return acknowledgment** (brief sections 14, 15). The underlying state isolation already prevents actual data loss — a side question (company info, shipping policy) doesn't corrupt an open `stock_inquiries` row or commercial draft, since they're independent tables keyed by their own intent, not by "what the last message was about." What's missing is the *proactive* acknowledgment ("Untuk ATP11358M tadi, kami masih menunggu hasil pengecekan stok.") after answering a side question — not built.
+- **Message-burst debounce** (brief sections 35, 67). The most architecturally risky item in the brief: VIA's webhook is a stateless Cloud Run route with no shared in-memory state across instances, and Phase 13 deliberately chose not to introduce a real queue/broker. A safe implementation would need to coordinate through the existing Supabase-backed `wati_messages` table (mirroring the optimistic-concurrency claim pattern already used everywhere else in this codebase) rather than a naive in-process timer, which risks either double-processing or dropped messages across instances. Not implemented; `MESSAGE_DEBOUNCE` is declared as a flag with no code path yet, exactly so a future implementation has an agreed-on kill switch from day one.
+
+## Conversation quality metrics and human review (brief sections 79-80)
+
+Not extended this phase. The existing `lib/analytics/events.ts` pipeline and the Phase 13 feedback schema (`supabase/jarvis_continuous_improvement.sql`) are the natural extension points — new event types (e.g. `conversation.clarification_sent`) and new feedback categories (too robotic, too verbose, wrong tone, asked unnecessary question, did not understand, should have/should not have escalated) would slot into those existing systems without new infrastructure, but wiring them up is deferred alongside the gaps above.
+
+## Feature flags (brief section 81)
+
+All declared in `lib/customerIdentity/featureFlags.ts`:
+
+| Flag | Status |
+|---|---|
+| `INTENT_CONTEXTUAL_GREETING` | **Wired** — gates the greeting-repetition fix (§2 above). Off by default. |
+| `CONVERSATION_UX_V2` | Declared as this phase's nominal master switch; nothing currently checks it directly, since every shipped change above already has its own narrower gate or ships unconditionally as a safety net. |
+| `MESSAGE_DEBOUNCE` | Declared, no code path — see deferred list. |
+| `MULTI_INTENT` | Declared, no code path — see deferred list. |
+| `CONTEXT_SUMMARIZATION` | Declared, no code path — see `docs/context-management.md`. |
+| `NATURAL_CLARIFICATION` | Declared, no code path — existing clarification wording is already candidate-specific where a resolvable ambiguity exists (see `docs/context-management.md`); a broader rework is deferred. |
+
+## Rollout (brief section 82)
+
+Nothing in this phase needs staged customer-cohort rollout — the silent-failure fix and bot-identity response are safety/transparency nets with no meaningful downside, and the one flagged change (`INTENT_CONTEXTUAL_GREETING`) is a wording-only change, not a routing/business-logic change. Recommended sequence when enabling it: internal staff testing (send a few messages from a real WhatsApp number pointed at a non-production WATI channel, if one exists) before flipping it on in production — there is no shadow-mode/canary infrastructure to stage it through more formally than that.

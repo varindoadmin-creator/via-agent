@@ -16,7 +16,7 @@ import { resolveSource } from './source.ts';
 import { extractQuantity } from './quantity.ts';
 import { resolveProduct } from './productResolution.ts';
 import { resolveConversationContext } from './context.ts';
-import { decideResponse } from './responseDecision.ts';
+import { decideResponse, systemErrorFallback } from './responseDecision.ts';
 import { createStockInquiry } from './stockInquiries.ts';
 import { redact } from '../../redact.ts';
 import { externalWatiAudience } from '../../security/disclosure/audience.ts';
@@ -38,7 +38,7 @@ import {
   isCommercialDraftEnabled, isCustomerIdentityMappingEnabled,
   isCustomerOrderStatusEnabled, isCustomerInvoiceStatusEnabled, isCustomerInvoiceDocumentEnabled,
   isCustomerPaymentStatusEnabled, isCustomerReceivableSummaryEnabled, isCustomerDeliveryStatusEnabled,
-  isCustomerServiceHandoffEnabled,
+  isCustomerServiceHandoffEnabled, isContextualGreetingEnabled,
 } from '../../customerIdentity/featureFlags.ts';
 import { triggerHandoff } from '../../customerService/handoff.ts';
 import type { HandoffReason } from '../../customerService/handoffReasons.ts';
@@ -48,6 +48,7 @@ import { isAnalyticsEventPipelineEnabled } from '../../customerIdentity/featureF
 import { resolveCustomerIdentities } from '../../customerIdentity/channelIdentity.ts';
 import { runCustomerSelfService, resumeSelfServiceAfterSelection } from './selfService/orchestrator.ts';
 import { getPendingSelfService } from './conversationState.ts';
+import { checkInboundForOptOut } from '../../proactiveActions/suppression.ts';
 
 const MAX_MESSAGES_PER_MINUTE = 20;
 
@@ -87,6 +88,15 @@ export async function processInboundWatiMessage(payload: Record<string, unknown>
   } catch (error) {
     console.error('[wati.pipeline]', JSON.stringify({ event: 'processing_failed', error: error instanceof Error ? error.message : 'unknown' }));
     await updateWatiMessageResolution(id, { processingStatus: 'FAILED' }).catch(() => {});
+    // Phase 14, brief sections 41/46 (non-negotiable "failure is visible, not
+    // silent"): a customer whose message hit an unhandled error must never be
+    // left with total silence. Best-effort only — a failure sending this
+    // fallback must never throw again or affect the webhook's 200 contract,
+    // and this never triggers a full Phase 8 handoff (that has its own DB
+    // writes, which could be exactly what's failing).
+    if (message.customerPhoneRaw) {
+      await sendWatiTextGated(message.customerPhoneRaw, systemErrorFallback(), { conversationId: customerPhoneNormalized ?? message.customerPhoneRaw, category: 'SYSTEM_ERROR' }).catch(() => {});
+    }
     return { status: 'failed' };
   }
 }
@@ -98,14 +108,21 @@ async function runResolutionAndResponse(
   payload: Record<string, unknown>,
   customerPhoneNormalized: string | null,
 ): Promise<PipelineOutcome> {
+  // Phase 14, brief section 43: reused below (not just for rate-limiting) as
+  // a cheap, already-computed "is this an active, ongoing conversation"
+  // signal — `reserveWatiMessage` already inserted the current message
+  // before this count runs, so `recentCount > 1` means at least one other
+  // message from this phone landed in the last hour.
+  let recentCount = 0;
   if (customerPhoneNormalized) {
-    const recentCount = await countRecentWatiMessages(customerPhoneNormalized, 60).catch(() => 0);
+    recentCount = await countRecentWatiMessages(customerPhoneNormalized, 60).catch(() => 0);
     if (recentCount > MAX_MESSAGES_PER_MINUTE) {
       console.warn('[wati.pipeline]', JSON.stringify({ event: 'rate_limited', phoneKey: customerPhoneNormalized, recentCount }));
       await updateWatiMessageResolution(id, { processingStatus: 'RATE_LIMITED' });
       return { status: 'rate_limited' };
     }
   }
+  const isReturningConversation = isContextualGreetingEnabled() && recentCount > 1;
 
   // Brief section 9: a bare quantity reply ("20") to VIA's own "berapa yang
   // dibutuhkan?" question must attach to the existing NEEDS_QUANTITY inquiry,
@@ -152,6 +169,11 @@ async function runResolutionAndResponse(
     customerPhoneNormalized && isCustomerIdentityMappingEnabled() ? resolveCustomerIdentities(customerPhoneNormalized).catch(() => ({ status: 'NONE' as const })) : Promise.resolve({ status: 'NONE' as const }),
   ]);
 
+  // Phase 11, brief section 15: best-effort, never awaited on the response
+  // path — an opt-out phrase suppresses future proactive outreach without
+  // affecting this turn's own reply.
+  void checkInboundForOptOut(customerPhoneNormalized, text);
+
   const websiteProduct = parseWebsiteStructuredProduct(text);
   const source = resolveSource(payload, Boolean(websiteProduct) || intentResult.source === 'WEBSITE');
   const quantity = extractQuantity(text);
@@ -184,6 +206,7 @@ async function runResolutionAndResponse(
     product: productResult.item,
     productCodeCandidate: productCandidate,
     conversationSuppressed: conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ASSIGNED' || conversationState === 'HUMAN_ACTIVE',
+    isReturningConversation,
     audience,
     unsupportedScopeReason: intentResult.unsupportedScopeReason,
     commercialDraftEnabled: isCommercialDraftEnabled(),
@@ -331,6 +354,12 @@ async function runResolutionAndResponse(
     }
   }
 
+  // Phase 14: this write happens AFTER the real customer-facing send above —
+  // best-effort, same as every other post-send bookkeeping call in this file.
+  // If this specific write throws (e.g. Supabase hiccup), it must never
+  // propagate to the outer catch in processInboundWatiMessage, which would
+  // otherwise send a confusing second "system error" fallback message to a
+  // customer who already received their correct, real reply.
   await updateWatiMessageResolution(id, {
     processingStatus: 'PROCESSED',
     source,
@@ -345,6 +374,8 @@ async function runResolutionAndResponse(
     requestedQuantity: quantity?.quantity ?? null,
     requestedUnit: quantity?.unit ?? null,
     responseType: responseCase,
+  }).catch(error => {
+    console.error('[wati.pipeline]', JSON.stringify({ event: 'post_send_bookkeeping_failed', error: error instanceof Error ? error.message : 'unknown' }));
   });
 
   console.info('[wati.pipeline]', JSON.stringify({
@@ -573,8 +604,8 @@ async function continueCommercialFollowUp(
   return { status: 'processed', intent: intentLabel, responseCase: result.responseCase, sent };
 }
 
-/** Brief sections 76-77's race-condition recheck: has this conversation become human-owned since the response decision was made? */
-async function isNowHumanOwned(customerPhoneNormalized: string): Promise<boolean> {
+/** Brief sections 76-77's race-condition recheck: has this conversation become human-owned since the response decision was made? Exported for a direct unit test (Phase 13, brief section 56) — the full pipeline has no dedicated test file, so this is tested in isolation rather than through a heavily-mocked end-to-end run. */
+export async function isNowHumanOwned(customerPhoneNormalized: string): Promise<boolean> {
   const current = await getServiceCase(customerPhoneNormalized);
   if (!current) return false;
   return current.state === 'NEEDS_HUMAN' || current.state === 'HUMAN_ASSIGNED' || current.state === 'HUMAN_ACTIVE';

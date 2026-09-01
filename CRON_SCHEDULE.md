@@ -20,6 +20,7 @@ the header `x-cron-secret: <CRON_SECRET>`.
 | 09:35 | `/api/customers/duplicates/scan` | `{}` |
 | 09:40 | `/api/leads/auto-repair` | `{}` |
 | 15:00 | `/api/salesorders/purchase-gap-check` | `{}` |
+| every 10 min | `/api/jobs/sweep` | `{}` |
 
 The application records every completed or failed invocation in
 `public.cron_run_log`, including successful runs that find no work. Apply
