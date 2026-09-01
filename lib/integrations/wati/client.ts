@@ -16,6 +16,31 @@ function watiConfig() {
   return { token, baseUrl: baseUrl.replace(/\/$/, '') };
 }
 
+/**
+ * WATI's sendSessionMessage (and every other endpoint checked so far —
+ * getWebhookUrls, whatsapp/phoneNumbers, etc.) returns HTTP 200 even when the
+ * actual send failed: the real outcome is in the body's top-level `ok`
+ * field and, for a message send specifically, `message.statusString`. A
+ * 2026-09-01 production incident (a customer-facing reply silently failed —
+ * WATI's own Team Inbox showed a red error mark — while this client's old
+ * `response.ok`-only check logged `send_ok`) confirmed this the hard way:
+ * a real failed-send response looks like
+ * `{"ok": false, "result": "success", "message": {"status": 0,
+ * "statusString": "FAILED", "failedDetail": "...", "failedCode": null}}` —
+ * HTTP 200, `result: "success"`, and yet the message never reached WhatsApp
+ * (`whatsappMessageId` was null). Never trust HTTP status alone for this API.
+ */
+interface WatiSendResponseBody {
+  ok?: boolean;
+  message?: { statusString?: string | null; failedDetail?: string | null; failedCode?: string | number | null; whatsappMessageId?: string | null };
+}
+
+function isGenuineWatiSuccess(body: WatiSendResponseBody | null): boolean {
+  if (!body || body.ok === false) return false;
+  if (body.message?.statusString === 'FAILED') return false;
+  return true;
+}
+
 /** Sends a plain session-message reply. Never throws — logs and returns a status instead. */
 export async function sendWatiText(whatsappNumber: string, text: string): Promise<WatiSendResult> {
   const config = watiConfig();
@@ -31,6 +56,14 @@ export async function sendWatiText(whatsappNumber: string, text: string): Promis
     });
     if (!response.ok) {
       console.error('[wati.client]', JSON.stringify({ event: 'send_failed', status: response.status }));
+      return 'failed';
+    }
+    const body = await response.json().catch(() => null) as WatiSendResponseBody | null;
+    if (!isGenuineWatiSuccess(body)) {
+      console.error('[wati.client]', JSON.stringify({
+        event: 'send_failed', reason: 'wati_reported_failure', to: whatsappNumber,
+        statusString: body?.message?.statusString ?? null, failedDetail: body?.message?.failedDetail ?? null, failedCode: body?.message?.failedCode ?? null,
+      }));
       return 'failed';
     }
     console.info('[wati.client]', JSON.stringify({ event: 'send_ok', to: whatsappNumber }));
@@ -61,6 +94,14 @@ export async function sendWatiDocument(whatsappNumber: string, fileBuffer: Buffe
     const response = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${config.token}` }, body: form });
     if (!response.ok) {
       console.error('[wati.client]', JSON.stringify({ event: 'document_send_failed', status: response.status }));
+      return 'failed';
+    }
+    const body = await response.json().catch(() => null) as WatiSendResponseBody | null;
+    if (!isGenuineWatiSuccess(body)) {
+      console.error('[wati.client]', JSON.stringify({
+        event: 'document_send_failed', reason: 'wati_reported_failure', to: whatsappNumber,
+        statusString: body?.message?.statusString ?? null, failedDetail: body?.message?.failedDetail ?? null,
+      }));
       return 'failed';
     }
     console.info('[wati.client]', JSON.stringify({ event: 'document_send_ok', to: whatsappNumber, fileName }));
@@ -95,6 +136,15 @@ export async function updateWatiContactAttributes(whatsappNumber: string, attrib
     });
     if (!response.ok) {
       console.error('[wati.client]', JSON.stringify({ event: 'contact_sync_failed', status: response.status }));
+      return 'failed';
+    }
+    // Not a message send, so `message.statusString` doesn't apply here — but
+    // the top-level `ok` field is consistent across every WATI endpoint
+    // checked (webhooks, phone numbers, business accounts, message sends),
+    // so it's still worth checking rather than trusting HTTP status alone.
+    const body = await response.json().catch(() => null) as { ok?: boolean } | null;
+    if (body?.ok === false) {
+      console.error('[wati.client]', JSON.stringify({ event: 'contact_sync_failed', reason: 'wati_reported_failure', to: whatsappNumber }));
       return 'failed';
     }
     console.info('[wati.client]', JSON.stringify({ event: 'contact_sync_ok', to: whatsappNumber, fields: Object.keys(attributes) }));
