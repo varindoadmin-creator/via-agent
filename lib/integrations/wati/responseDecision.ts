@@ -67,7 +67,7 @@ export interface ResponseDecision {
 
 function greeting(isReturning?: boolean): string {
   if (isReturning) {
-    return 'Halo Pak/Bu, silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
+    return 'Halo Kak, silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
   }
   return 'Halo, selamat datang di Varindo. Terima kasih telah menghubungi kami.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, informasi produk, katalog, pengiriman, atau pesanan. Kami akan bantu cek terlebih dahulu.';
 }
@@ -76,40 +76,45 @@ function greeting(isReturning?: boolean): string {
 // "Hubungi Admin", since most initial questions can be answered directly.
 function brandInquiry(brand: string, isReturning?: boolean): string {
   if (isReturning) {
-    return `Baik Pak/Bu, dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
+    return `Baik Kak, dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
   }
-  return `Halo Pak/Bu, terima kasih telah menghubungi Varindo. Dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
+  return `Halo Kak, terima kasih telah menghubungi Varindo. Dengan senang hati kami bantu terkait produk ${brand}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, kode produk, atau katalog. Kami akan bantu cek terlebih dahulu.`;
 }
 
+// Phase 15 fix (live WABA test, 2026-09-01): use the Zoho item's own `name`
+// as the customer-facing label — it already carries the item's display code
+// (e.g. "DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO"). `item.sku` is the
+// internal Zoho SKU (e.g. "LAM-DXO5338D") and must never be shown to a
+// customer in place of it.
 function productResolved(item: ZohoItem, isReturning?: boolean): string {
-  const label = item.sku ? `${item.sku} - ${item.name}` : item.name;
+  const label = item.name;
   if (isReturning) {
-    return `Baik Pak/Bu, untuk ${label}: silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
+    return `Baik Kak, untuk ${label}: silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
   }
-  return `Halo Pak/Bu, terima kasih telah menghubungi Varindo terkait ${label}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
+  return `Halo Kak, terima kasih telah menghubungi Varindo terkait ${label}.\nSilakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
 }
 
 /** Exported for reuse by the Phase 3 stock workflow (lib/integrations/wati/stock/service.ts) — same immediate acknowledgement, now followed by an actual vendor-first check instead of nothing. */
 export function stockAck(item: ZohoItem): string {
-  const label = item.sku || item.name;
-  return `Baik Pak/Bu, kami bantu cek ketersediaan stok ${label} terlebih dahulu. Mohon ditunggu sebentar ya.`;
+  const label = item.name;
+  return `Baik Kak, kami bantu cek ketersediaan stok ${label} terlebih dahulu. Mohon ditunggu sebentar ya.`;
 }
 
 function clarification(): string {
-  return 'Baik Pak/Bu. Boleh dibantu kirim kode barang atau foto produknya agar kami dapat membantu dengan tepat?';
+  return 'Baik Kak. Boleh dibantu kirim kode barang atau foto produknya agar kami dapat membantu dengan tepat?';
 }
 
 function humanRequest(): string {
-  return 'Baik Pak/Bu, kami bantu hubungkan dengan Admin Varindo.';
+  return 'Baik Kak, kami bantu hubungkan dengan Admin Varindo.';
 }
 
 function ackRoute(): string {
-  return 'Baik Pak/Bu, mohon ditunggu, tim kami akan segera membantu terkait hal tersebut.';
+  return 'Baik Kak, mohon ditunggu, tim kami akan segera membantu terkait hal tersebut.';
 }
 
 /** Phase 14, brief sections 49/77: transparent about being an assistant, never claims to be human. */
 function botIdentityResponse(): string {
-  return 'Saya asisten virtual Varindo yang membantu informasi produk, harga, stok, pesanan, dan kebutuhan lainnya. Jika diperlukan, saya juga bisa menghubungkan Bapak/Ibu dengan Admin.';
+  return 'Saya asisten virtual Varindo yang membantu informasi produk, harga, stok, pesanan, dan kebutuhan lainnya. Jika diperlukan, saya juga bisa menghubungkan Kakak dengan Admin.';
 }
 
 /**
@@ -121,7 +126,7 @@ function botIdentityResponse(): string {
  * classified intent.
  */
 export function systemErrorFallback(): string {
-  return 'Mohon maaf Pak/Bu, sistem kami sedang mengalami kendala untuk memproses permintaan tersebut. Kami bantu teruskan ke Admin.';
+  return 'Mohon maaf Kak, sistem kami sedang mengalami kendala untuk memproses permintaan tersebut. Kami bantu teruskan ke Admin.';
 }
 
 /**

@@ -19,13 +19,13 @@ export interface OnboardingStep {
   done: boolean;
 }
 
-const ASK_COMPANY = 'Baik Pak/Bu, karena data perusahaan belum terdaftar, kami bantu daftarkan terlebih dahulu.\n\nBoleh diinformasikan nama perusahaan?';
-const ASK_FAKTUR_PAJAK = 'Apakah Bapak/Ibu memerlukan Faktur Pajak?';
-const ASK_NPWP = 'Baik Pak/Bu, mohon diinformasikan NPWP perusahaan.';
+const ASK_COMPANY = 'Baik Kak, karena data perusahaan belum terdaftar, kami bantu daftarkan terlebih dahulu.\n\nBoleh diinformasikan nama perusahaan?';
+const ASK_FAKTUR_PAJAK = 'Apakah Kakak memerlukan Faktur Pajak?';
+const ASK_NPWP = 'Baik Kak, mohon diinformasikan NPWP perusahaan.';
 const ASK_NPWP_INVALID = 'Mohon maaf, format NPWP belum sesuai (15-16 digit). Mohon diinformasikan kembali NPWP perusahaan.';
 const ASK_BILLING_ADDRESS = 'Mohon diinformasikan alamat kantor untuk alamat penagihan.';
 const ASK_SHIPPING_SAME = 'Untuk alamat pengiriman, apakah sama dengan alamat kantor?';
-const ASK_SHIPPING_ADDRESS = 'Baik Pak/Bu, mohon diinformasikan alamat pengiriman.';
+const ASK_SHIPPING_ADDRESS = 'Baik Kak, mohon diinformasikan alamat pengiriman.';
 
 export function startOnboardingQuestion(): string {
   return ASK_COMPANY;

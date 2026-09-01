@@ -4,7 +4,7 @@ A reference for anyone writing a new customer-facing response string in `lib/int
 
 ## Indonesian (the default channel language)
 
-- **Pak/Bu, used naturally, not on every sentence.** "Baik Pak/Bu" opens most responses once; don't repeat "Pak/Bu" a second time in the same short message.
+- **Kak/Kakak (not Pak/Bu), used naturally, not on every sentence.** Phase 15 (live WABA test, 2026-09-01) switched the honorific from "Pak/Bu"/"Bapak/Ibu" to "Kak" (short, vocative/vocative-adjacent — "Baik Kak", "Halo Kak") and "Kakak" (the longer possessive/subject form — "data Kakak", "Jika Kakak..."), mirroring how "Pak/Bu" vs "Bapak/Ibu" were used before. "Baik Kak" opens most responses once; don't repeat the honorific a second time in the same short message.
 - **"Terima kasih telah menghubungi Varindo" — once per conversation, not once per message.** See `docs/conversation-ux.md`'s greeting-repetition fix. If you're writing a new first-contact-style response, follow `greeting()`/`brandInquiry()`/`productResolved()` in `lib/integrations/wati/responseDecision.ts`: two variants, one for a genuinely first message, one for an ongoing conversation.
 - **Professional, warm, concise.** Look at `stockAck()`, `clarification()`, `humanRequest()` in `responseDecision.ts` for the register: short sentences, no corporate jargon, no slang unless the business context calls for it (it never has, so far).
 - **No excessive formality, no stiffness.** "Mohon ditunggu sebentar ya" (from `stockAck()`) is the right level of warmth — not "Dengan hormat, kami informasikan bahwa..."
@@ -23,5 +23,5 @@ Not currently exercised by any shipped response — see `docs/jarvis-language-po
 
 ## Error and uncertainty (brief sections 41-42)
 
-- Don't say "Zoho API failed" or any technical term. Say what `systemErrorFallback()` says: "Mohon maaf Pak/Bu, sistem kami sedang mengalami kendala untuk memproses permintaan tersebut. Kami bantu teruskan ke Admin." (`lib/integrations/wati/responseDecision.ts`) — only for a genuinely unhandled pipeline exception, never as a first-choice answer to an ordinary question.
+- Don't say "Zoho API failed" or any technical term. Say what `systemErrorFallback()` says: "Mohon maaf Kak, sistem kami sedang mengalami kendala untuk memproses permintaan tersebut. Kami bantu teruskan ke Admin." (`lib/integrations/wati/responseDecision.ts`) — only for a genuinely unhandled pipeline exception, never as a first-choice answer to an ordinary question.
 - When VIA genuinely doesn't know something yet (not a system failure, just information that needs confirming), say so plainly rather than guessing — "Untuk informasi tersebut perlu kami konfirmasi terlebih dahulu" reads better than a wrong or fabricated answer.

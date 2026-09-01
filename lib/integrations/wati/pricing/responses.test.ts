@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { priceOnly, priceWithStockAck, priceWithNeedQuantity, needsSizeClarification, priceNotFound, discountHandoff } from './responses.ts';
 
-test('price-only template matches the brief\'s exact worked format', () => {
-  const text = priceOnly('ATP 11358M', 'ATP 11358M - LAMITAK HPL', 'Rp2.886.000');
-  assert.equal(text, 'Untuk ATP 11358M, harga saat ini Rp2.886.000 termasuk PPN.');
+test('price-only template uses the Zoho item name, not the internal SKU', () => {
+  const text = priceOnly('LAM-ATP11358M', "ATP 11358M - LAMITAK HPL 4'x10' | MARMO CLASSICO PRO", 'Rp2.886.000');
+  assert.equal(text, "Untuk ATP 11358M - LAMITAK HPL 4'x10' | MARMO CLASSICO PRO, harga saat ini Rp2.886.000 termasuk PPN.");
+  assert.doesNotMatch(text, /LAM-ATP11358M/);
 });
 
 test('Test 51 — combined price+stock-ack never states a quantity', () => {

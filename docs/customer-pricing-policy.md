@@ -15,7 +15,7 @@ A new Zoho customer's `cf_tier` defaults to no assigned tier (`No Discount`) —
 
 ## Tier confidentiality
 
-Tier is internal/confidential. `lib/security/disclosure/classification.ts` now carries a `CUSTOMER_TIER` category (`INTERNAL`), which `evaluateDisclosure()` denies for any `EXTERNAL_CUSTOMER` audience. A customer asking "Tier saya apa?" or "kenapa harga saya beda?" is detected as `TIER_OR_PRICING_CLASSIFICATION_PROBE` (`lib/integrations/wati/intent.ts`) and answered with a fixed redirect — "Baik Pak/Bu, kami dapat membantu cek harga yang berlaku untuk akun perusahaan Bapak/Ibu. Boleh diinformasikan kode produknya?" — never a Tier name, ID, or discount percentage, and never escalated to a human (Jarvis can already help with the real price deterministically).
+Tier is internal/confidential. `lib/security/disclosure/classification.ts` now carries a `CUSTOMER_TIER` category (`INTERNAL`), which `evaluateDisclosure()` denies for any `EXTERNAL_CUSTOMER` audience. A customer asking "Tier saya apa?" or "kenapa harga saya beda?" is detected as `TIER_OR_PRICING_CLASSIFICATION_PROBE` (`lib/integrations/wati/intent.ts`) and answered with a fixed redirect — "Baik Kak, kami dapat membantu cek harga yang berlaku untuk akun perusahaan Kakak. Boleh diinformasikan kode produknya?" — never a Tier name, ID, or discount percentage, and never escalated to a human (Jarvis can already help with the real price deterministically).
 
 ## WATI never receives Tier data
 

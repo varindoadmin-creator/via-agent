@@ -6,19 +6,19 @@
 import type { DisclosureReasonCode } from './policy.ts';
 
 function internalDataDenied(): string {
-  return 'Mohon maaf Pak/Bu, informasi penjualan internal Varindo tidak dapat kami bagikan. Namun kami dapat membantu terkait produk, stok, harga, atau pesanan Bapak/Ibu.';
+  return 'Mohon maaf Kak, informasi penjualan internal Varindo tidak dapat kami bagikan. Namun kami dapat membantu terkait produk, stok, harga, atau pesanan Kakak.';
 }
 
 function otherCustomerDenied(): string {
-  return 'Mohon maaf Pak/Bu, kami tidak dapat membagikan informasi transaksi pelanggan lain.';
+  return 'Mohon maaf Kak, kami tidak dapat membagikan informasi transaksi pelanggan lain.';
 }
 
 function confidentialDenied(): string {
-  return 'Mohon maaf Pak/Bu, informasi tersebut merupakan data internal Varindo dan tidak dapat kami bagikan.';
+  return 'Mohon maaf Kak, informasi tersebut merupakan data internal Varindo dan tidak dapat kami bagikan.';
 }
 
 function verifyIdentity(): string {
-  return 'Baik Pak/Bu, untuk informasi tersebut kami perlu memverifikasi data Bapak/Ibu terlebih dahulu. Mohon hubungi Admin Varindo untuk verifikasi.';
+  return 'Baik Kak, untuk informasi tersebut kami perlu memverifikasi data Kakak terlebih dahulu. Mohon hubungi Admin Varindo untuk verifikasi.';
 }
 
 /** Maps a disclosure reason code straight to its fixed customer-facing text. Never used for ALLOW/INTERNAL_USER_GOVERNED_ELSEWHERE outcomes. */

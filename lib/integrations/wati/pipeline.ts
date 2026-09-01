@@ -14,7 +14,8 @@ import { detectIntent } from './intent.ts';
 import { parseWebsiteStructuredProduct } from './websiteParser.ts';
 import { resolveSource } from './source.ts';
 import { extractQuantity } from './quantity.ts';
-import { resolveProduct } from './productResolution.ts';
+import { resolveProduct, resolveSizeVariant } from './productResolution.ts';
+import { detectCustomerStatedSize, extractSizeFromItemName } from './pricing/lamitakSize.ts';
 import { resolveConversationContext } from './context.ts';
 import { decideResponse, systemErrorFallback } from './responseDecision.ts';
 import { createStockInquiry } from './stockInquiries.ts';
@@ -183,9 +184,28 @@ async function runResolutionAndResponse(
     : { carriedProductCode: null, carriedBrand: null };
 
   const productCandidate = websiteProduct?.productCode || intentResult.productCodeCandidate || context.carriedProductCode;
-  const productResult = productCandidate
+  let productResult = productCandidate
     ? await resolveProduct(productCandidate)
     : { status: 'NOT_FOUND' as const, item: null, brand: null, candidates: [] };
+
+  // Phase 15 fix (live WABA test, 2026-09-01): the product code this turn
+  // came only from carried conversation context (the customer didn't type a
+  // code themselves) — if their text states an explicit size that disagrees
+  // with that carried item's own size, re-resolve against the real sibling
+  // SKU instead of silently answering about the wrong-size item. Lamitak-only
+  // (lib/integrations/wati/pricing/lamitakSize.ts's documented scope).
+  if (
+    productCandidate && productCandidate === context.carriedProductCode &&
+    productResult.status === 'EXACT' && productResult.item && productResult.brand === 'LAMITAK'
+  ) {
+    const statedSize = detectCustomerStatedSize(text);
+    const currentSize = extractSizeFromItemName(productResult.item.name);
+    if (statedSize && currentSize && statedSize !== currentSize) {
+      productResult = await resolveSizeVariant(productResult.item, statedSize).catch(
+        () => ({ status: 'NOT_FOUND' as const, item: null, brand: null, candidates: [] }),
+      );
+    }
+  }
 
   const effectiveBrand = productResult.brand || intentResult.brand || context.carriedBrand;
   const conversationId = customerPhoneNormalized || message.providerConversationId || message.providerMessageId;

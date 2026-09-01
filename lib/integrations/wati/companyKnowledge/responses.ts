@@ -12,18 +12,18 @@ import { FREE_SHIPPING_JAVA_TEXT, SHIPPING_CONDITIONS_TEXT } from '../../../comp
 import { UNSUPPORTED_BRAND_TEXT, UNSUPPORTED_CATEGORY_TEXT } from '../../../companyKnowledge/productScope.ts';
 
 export function companyInfoResponse(): string {
-  return `Halo Pak/Bu, berikut informasi kantor Varindo:\n\nKantor Pusat:\n${COMPANY_IDENTITY.headOffice.lines.join('\n')}\nT. ${COMPANY_IDENTITY.headOffice.phone}\n\nEmail: ${COMPANY_IDENTITY.contact.email}\nWebsite: ${COMPANY_IDENTITY.contact.website}`;
+  return `Halo Kak, berikut informasi kantor Varindo:\n\nKantor Pusat:\n${COMPANY_IDENTITY.headOffice.lines.join('\n')}\nT. ${COMPANY_IDENTITY.headOffice.phone}\n\nEmail: ${COMPANY_IDENTITY.contact.email}\nWebsite: ${COMPANY_IDENTITY.contact.website}`;
 }
 
 /** brand is null when the customer didn't name one — both approved statements are shared. */
 export function dealerStatusResponse(brand: BrandName | null): string {
   if (brand) {
     const relationship = getBrandRelationship(brand);
-    return `Ya Pak/Bu, ${relationship.dealerStatement} Info lebih lanjut dapat dilihat di ${relationship.website}.`;
+    return `Ya Kak, ${relationship.dealerStatement} Info lebih lanjut dapat dilihat di ${relationship.website}.`;
   }
   const lamitak = getBrandRelationship('LAMITAK');
   const edl = getBrandRelationship('EDL');
-  return `Ya Pak/Bu. ${lamitak.dealerStatement} ${edl.dealerStatement}`;
+  return `Ya Kak. ${lamitak.dealerStatement} ${edl.dealerStatement}`;
 }
 
 export function shippingPolicyResponse(): string {
@@ -38,13 +38,13 @@ export function shippingPolicyResponse(): string {
 
 export function paymentDestinationResponse(): string {
   const destination = getActivePaymentDestination();
-  if (!destination) return 'Mohon maaf Pak/Bu, saat ini kami tidak dapat menampilkan tujuan pembayaran. Mohon hubungi Admin Varindo.';
-  return `Baik Pak/Bu, pembayaran dapat ditransfer ke:\n\nBank ${destination.bank}\na/n ${destination.accountName}\nNo. Rek. ${destination.accountNumber}\n${destination.branch}`;
+  if (!destination) return 'Mohon maaf Kak, saat ini kami tidak dapat menampilkan tujuan pembayaran. Mohon hubungi Admin Varindo.';
+  return `Baik Kak, pembayaran dapat ditransfer ke:\n\nBank ${destination.bank}\na/n ${destination.accountName}\nNo. Rek. ${destination.accountNumber}\n${destination.branch}`;
 }
 
 // Brief section 31 — the exact preferred redirect, never disclosing Tier/Special-Price classification.
 export function tierProbeRedirect(): string {
-  return 'Baik Pak/Bu, kami dapat membantu cek harga yang berlaku untuk akun perusahaan Bapak/Ibu. Boleh diinformasikan kode produknya?';
+  return 'Baik Kak, kami dapat membantu cek harga yang berlaku untuk akun perusahaan Kakak. Boleh diinformasikan kode produknya?';
 }
 
 export function unsupportedProductResponse(reason: 'BRAND' | 'CATEGORY'): string {
@@ -53,7 +53,7 @@ export function unsupportedProductResponse(reason: 'BRAND' | 'CATEGORY'): string
 
 /** brand is null when the customer didn't specify — both website options are shared. */
 export function sampleCatalogueResponse(brand: BrandName | null): string {
-  if (brand === 'LAMITAK') return `Baik Pak/Bu, untuk permintaan sample Lamitak, Bapak/Ibu dapat mengisi formulir melalui ${getBrandRelationship('LAMITAK').website}.`;
-  if (brand === 'EDL') return `Baik Pak/Bu, untuk permintaan sample EDL, Bapak/Ibu dapat mengisi formulir melalui ${getBrandRelationship('EDL').website}.`;
-  return `Baik Pak/Bu, untuk permintaan sample/katalog, Bapak/Ibu dapat mengisi formulir melalui ${getBrandRelationship('LAMITAK').website} (Lamitak) atau ${getBrandRelationship('EDL').website} (EDL) sesuai brand yang diinginkan.`;
+  if (brand === 'LAMITAK') return `Baik Kak, untuk permintaan sample Lamitak, Kakak dapat mengisi formulir melalui ${getBrandRelationship('LAMITAK').website}.`;
+  if (brand === 'EDL') return `Baik Kak, untuk permintaan sample EDL, Kakak dapat mengisi formulir melalui ${getBrandRelationship('EDL').website}.`;
+  return `Baik Kak, untuk permintaan sample/katalog, Kakak dapat mengisi formulir melalui ${getBrandRelationship('LAMITAK').website} (Lamitak) atau ${getBrandRelationship('EDL').website} (EDL) sesuai brand yang diinginkan.`;
 }

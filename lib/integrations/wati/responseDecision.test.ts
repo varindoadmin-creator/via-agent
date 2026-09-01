@@ -4,7 +4,9 @@ import { decideResponse } from './responseDecision.ts';
 import type { ZohoItem } from '../../../types/zoho.ts';
 import { externalWatiAudience, type AudienceContext } from '../../security/disclosure/audience.ts';
 
-const ITEM: ZohoItem = { item_id: '1', name: 'LAMITAK HPL MARMO CLASSICO PRO', sku: 'ATP11358M', rate: 0, status: 'active' };
+// name mirrors real Zoho data (the display code is embedded in the name);
+// sku is the separate internal code, which must never appear in customer text.
+const ITEM: ZohoItem = { item_id: '1', name: "ATP 11358M - LAMITAK HPL 4'x10' | MARMO CLASSICO PRO", sku: 'LAM-ATP11358M', rate: 0, status: 'active' };
 
 const ANONYMOUS_AUDIENCE: AudienceContext = externalWatiAudience({ customerResolution: { status: 'UNMATCHED', customer: null }, externalPhone: '628123', conversationId: '628123' });
 
@@ -26,7 +28,8 @@ test('Case B: brand inquiry without a resolved product does not ask which brand 
 test('Case C: a resolved product inquiry invites an open-ended request, never a numbered menu ending in "Hubungi Admin"', () => {
   const decision = decideResponse({ intent: 'PRODUCT_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
   assert.equal(decision.case, 'C_PRODUCT_RESOLVED');
-  assert.match(decision.text ?? '', new RegExp(ITEM.sku!));
+  assert.match(decision.text ?? '', /MARMO CLASSICO PRO/);
+  assert.doesNotMatch(decision.text ?? '', new RegExp(ITEM.sku!));
   assert.doesNotMatch(decision.text ?? '', /Hubungi Admin/i);
 });
 
@@ -292,7 +295,7 @@ test('Test 43 — greeting/brand/product-resolved responses drop the "terima kas
 
   const returningProduct = decideResponse({ intent: 'PRODUCT_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false, isReturningConversation: true });
   assert.doesNotMatch(returningProduct.text ?? '', /terima kasih telah menghubungi/i);
-  assert.match(returningProduct.text ?? '', new RegExp(ITEM.sku!));
+  assert.match(returningProduct.text ?? '', /MARMO CLASSICO PRO/);
 });
 
 test('Test 77 — BOT_IDENTITY_INQUIRY gives a transparent, non-human-pretending identity statement, never a handoff', () => {

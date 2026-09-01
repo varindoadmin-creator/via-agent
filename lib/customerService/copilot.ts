@@ -34,7 +34,7 @@ export async function summarizeConversation(context: HandoffContext, recentMessa
   return result.content.trim();
 }
 
-const SUGGESTED_REPLY_SYSTEM_PROMPT = 'You draft a suggested WhatsApp reply in Bahasa Indonesia for a Varindo staff member to review before sending to a customer. Base it only on the facts given below. Never promise a price, discount, refund, or compensation not already confirmed in the context. Never mention internal cost/margin/supplier data. Keep it under 3 sentences, professional and concise (Pak/Bu form).';
+const SUGGESTED_REPLY_SYSTEM_PROMPT = 'You draft a suggested WhatsApp reply in Bahasa Indonesia for a Varindo staff member to review before sending to a customer. Base it only on the facts given below. Never promise a price, discount, refund, or compensation not already confirmed in the context. Never mention internal cost/margin/supplier data. Keep it under 3 sentences, professional and concise (Kak/Kakak form).';
 
 /** Never sent automatically — brief section 27: Admin must explicitly Send/Edit/Discard. */
 export async function suggestReply(context: HandoffContext, recentMessages: string[]): Promise<string> {

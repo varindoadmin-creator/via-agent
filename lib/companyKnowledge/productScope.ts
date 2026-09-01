@@ -46,6 +46,6 @@ export function checkCommercialScope(messageText: string): ScopeCheckResult {
 }
 
 // Brief section 10 — exact approved wording for an unsupported HPL brand.
-export const UNSUPPORTED_BRAND_TEXT = 'Mohon maaf Pak/Bu, saat ini Varindo tidak menjual HPL merek tersebut. Produk HPL yang kami sediakan adalah EDL dan Lamitak.';
+export const UNSUPPORTED_BRAND_TEXT = 'Mohon maaf Kak, saat ini Varindo tidak menjual HPL merek tersebut. Produk HPL yang kami sediakan adalah EDL dan Lamitak.';
 // Brief section 11 — exact approved wording for plywood/unsupported products.
-export const UNSUPPORTED_CATEGORY_TEXT = 'Mohon maaf Pak/Bu, Varindo tidak menjual plywood. Produk yang kami sediakan berfokus pada HPL EDL dan Lamitak.';
+export const UNSUPPORTED_CATEGORY_TEXT = 'Mohon maaf Kak, Varindo tidak menjual plywood. Produk yang kami sediakan berfokus pada HPL EDL dan Lamitak.';

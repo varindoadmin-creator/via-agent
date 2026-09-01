@@ -105,6 +105,69 @@ test('Section 50 — a special-pricing handoff routes to SALES', async () => {
   }
 });
 
+test('a new handoff episode sends a WhatsApp alert to the staff number (unconditionally, not gated to urgent reasons)', async () => {
+  setEnv();
+  process.env.WATI_API_TOKEN = 'test-token';
+  process.env.WATI_API_BASE_URL = 'https://example.wati.io/tenant';
+  process.env.CS_STAFF_WHATSAPP_NUMBER = '081288885224';
+  const originalFetch = globalThis.fetch;
+  let watiSendUrl: string | null = null;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    const u = String(url);
+    if (u.includes('sendSessionMessage')) {
+      watiSendUrl = u;
+      return new Response(JSON.stringify({ ok: true, message: { statusString: 'SENT', whatsappMessageId: 'wamid.1' } }), { status: 200 });
+    }
+    if (u.includes('wati_conversation_state') && (!init?.method || init.method === 'GET')) return new Response('[]', { status: 200 });
+    if (u.includes('wati_conversation_state') && init?.method === 'POST') {
+      return new Response(JSON.stringify([{ customer_phone_normalized: '234567890', state: 'NEEDS_HUMAN' }]), { status: 201 });
+    }
+    return new Response('[]', { status: 200 });
+  }) as typeof fetch;
+  try {
+    // DISCOUNT_REQUEST is NORMAL priority, not in URGENT_REASONS — the email
+    // alert stays gated off for it, but the WhatsApp alert must still fire.
+    await triggerHandoff('234567890', 'DISCOUNT_REQUEST');
+    assert.ok(watiSendUrl, 'expected sendSessionMessage to be called');
+    assert.match(watiSendUrl!, /6281288885224/);
+    assert.match(decodeURIComponent(watiSendUrl!), /menunggu bantuan Admin/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.WATI_API_TOKEN;
+    delete process.env.WATI_API_BASE_URL;
+    delete process.env.CS_STAFF_WHATSAPP_NUMBER;
+  }
+});
+
+test('a new handoff episode still completes cleanly when the (unconditional) staff email alert fails to send, same best-effort contract as the other notification channels', async () => {
+  // setEnv() deletes SMTP_USER/SMTP_PASS, so sendMail() throws inside
+  // getTransporter() before any network call — the same pattern the
+  // existing "Test 80" test already relies on. sendMail uses
+  // nodemailer/SMTP directly (not fetch), so its content isn't observable
+  // through the fetch mock the way the WhatsApp alert's is; this test only
+  // confirms the new call site is wired in and doesn't break the handoff
+  // when it fails, matching this file's existing convention of not
+  // asserting on email content.
+  setEnv();
+  process.env.CS_STAFF_ALERT_EMAIL = 'admin@varindo.co.id';
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    const u = String(url);
+    if (u.includes('wati_conversation_state') && (!init?.method || init.method === 'GET')) return new Response('[]', { status: 200 });
+    if (u.includes('wati_conversation_state') && init?.method === 'POST') {
+      return new Response(JSON.stringify([{ customer_phone_normalized: '234567890', state: 'NEEDS_HUMAN' }]), { status: 201 });
+    }
+    return new Response('[]', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const result = await triggerHandoff('234567890', 'DISCOUNT_REQUEST');
+    assert.equal(result.isNewEpisode, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.CS_STAFF_ALERT_EMAIL;
+  }
+});
+
 test('Section 49 — a payment-review handoff routes to FINANCE', async () => {
   setEnv();
   const originalFetch = globalThis.fetch;
