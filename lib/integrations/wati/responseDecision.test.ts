@@ -131,6 +131,24 @@ test('Test 37/58 — a discount request always routes to human/Sales handoff and
   assert.doesNotMatch(decision.text ?? '', /\d/);
 });
 
+// ─── 2026-09-02: edge-band ("edging"/"newedge") inquiry ─────────────────────
+
+test('EDGE_BAND_INQUIRY with a resolved product defers the actual text to the async pipeline lookup (real Zoho verification), same pattern as I_PRICE_LOOKUP', () => {
+  const decision = decideResponse({ intent: 'EDGE_BAND_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: false });
+  assert.equal(decision.case, 'V_EDGE_BAND_INQUIRY');
+  assert.equal(decision.text, null);
+});
+
+test('EDGE_BAND_INQUIRY with no resolvable product asks for clarification, never guesses which item', () => {
+  const decision = decideResponse({ intent: 'EDGE_BAND_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false });
+  assert.equal(decision.case, 'E_CLARIFICATION');
+});
+
+test('a suppressed conversation also blocks EDGE_BAND_INQUIRY', () => {
+  const decision = decideResponse({ intent: 'EDGE_BAND_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: true });
+  assert.equal(decision.case, 'SUPPRESSED');
+});
+
 test('a suppressed conversation also blocks price and discount intents', () => {
   const priceDecision = decideResponse({ intent: 'PRICE_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: true });
   const discountDecision = decideResponse({ intent: 'DISCOUNT_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true });

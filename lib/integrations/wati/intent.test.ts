@@ -173,6 +173,20 @@ test('Section 38 — "Kalau ambil 500 lembar ada harga proyek?" is DISCOUNT_REQU
   assert.equal(result?.intent, 'DISCOUNT_REQUEST');
 });
 
+// ─── 2026-09-02: edge-band ("edging"/"newedge") inquiry ─────────────────────
+
+test('every stated keyword form maps to EDGE_BAND_INQUIRY: edge band, edging, ejing, newedge', () => {
+  for (const text of ['Ada edge band nya?', 'Ada edging?', 'Ejing nya ada?', 'Newedge nya ada?', 'DXO 5338D edge banding tersedia?']) {
+    const result = detectIntentDeterministic(text);
+    assert.equal(result?.intent, 'EDGE_BAND_INQUIRY', `expected "${text}" to be EDGE_BAND_INQUIRY`);
+  }
+});
+
+test('edge-band phrasing wins over the generic stock keyword ("ada") in the same message', () => {
+  const result = detectIntentDeterministic('Ada edging ga buat ini?');
+  assert.equal(result?.intent, 'EDGE_BAND_INQUIRY');
+});
+
 // ─── Phase 6: commercial intent ──────────────────────────────────────────────
 
 test('Brief example — "Saya ambil ATP11358M 20 lembar." is ORDER_INTENT', () => {

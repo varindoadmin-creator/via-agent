@@ -69,6 +69,8 @@ export type WatiIntent =
   | 'SAMPLE_CATALOGUE_REQUEST'
   // Phase 14 (brief sections 49, 77) — "is this a bot?" meta-question.
   | 'BOT_IDENTITY_INQUIRY'
+  // 2026-09-02 — "is edge banding available for the product just discussed".
+  | 'EDGE_BAND_INQUIRY'
   | 'UNKNOWN';
 
 export interface IntentDetectionResult {
@@ -136,6 +138,14 @@ const OWN_REFERENCE_PATTERN = /\bsaya\b/i;
 // checked before the stock/price keywords below so "ada harga proyek?" isn't
 // misread as a plain stock question.
 const DISCOUNT_REQUEST_PATTERN = /\bbisa\s+(kurang|nego)\b|\bkurang(in)?\b|\bnego\b|\bdiskon\b|\bpotongan\s*harga\b|\bharga\s+(khusus|proyek|spesial)\b/i;
+// 2026-09-02: "edge band"/"edging"/"ejing" (informal spelling)/"newedge"
+// (Lamitak's own brand name for its edge-band line, confirmed against real
+// Zoho item names, e.g. "EAP 5338R0V2/23 - NEWEDGE ABS EDGING W23MM X
+// T1.0MM | DXO 5338D") always mean "is edge banding available for the
+// product we were just discussing" — checked before the generic stock/price
+// keywords so it never gets misread as a plain stock/price question about
+// the panel itself.
+const EDGE_BAND_PATTERN = /\bedge\s*band\w*\b|\bedging\b|\bejing\b|\bnewedge\b/i;
 // Brief section 6: "stock", "stok", "ada?", "ready?" may strongly indicate
 // STOCK_CHECK on their own — not conditioned on a resolvable code being
 // present, since an unresolvable stock question still needs the same
@@ -355,6 +365,10 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
 
   if (DISCOUNT_REQUEST_PATTERN.test(trimmed)) {
     return { intent: 'DISCOUNT_REQUEST', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null, unsupportedScopeReason: null };
+  }
+
+  if (EDGE_BAND_PATTERN.test(trimmed)) {
+    return { intent: 'EDGE_BAND_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null, unsupportedScopeReason: null };
   }
 
   if (parseWebsiteStructuredProduct(trimmed)) {

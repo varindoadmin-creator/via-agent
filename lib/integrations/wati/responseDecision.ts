@@ -23,7 +23,7 @@ export type ResponseCase =
   | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF'
   | 'K_COMMERCIAL_WORKFLOW' | 'L_CUSTOMER_SELF_SERVICE'
   | 'N_TIER_PROBE_REDIRECT' | 'O_COMPANY_INFO' | 'P_DEALER_STATUS' | 'Q_SHIPPING_POLICY' | 'R_PAYMENT_DESTINATION'
-  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT' | 'U_BOT_IDENTITY'
+  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT' | 'U_BOT_IDENTITY' | 'V_EDGE_BAND_INQUIRY'
   | 'SUPPRESSED';
 
 function isBrandName(brand: string | null): brand is BrandName {
@@ -211,6 +211,17 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
   if (input.intent === 'DISCOUNT_REQUEST') {
     // Brief section 37: no approved automatic-discount policy exists — human/Sales handoff, no threshold disclosed.
     return { case: 'M_DISCOUNT_HANDOFF', text: discountHandoff(), createStockInquiry: false, markHumanRequest: true };
+  }
+
+  // 2026-09-02: "edge band"/"edging"/"ejing"/"newedge" always means "is edge
+  // banding available for the product just discussed" — same "text: null,
+  // resolved async by the pipeline" pattern as I_PRICE_LOOKUP, since the
+  // actual answer requires a real Zoho lookup (never guessed here).
+  if (input.intent === 'EDGE_BAND_INQUIRY') {
+    if (input.productResolution === 'EXACT' && input.product) {
+      return { case: 'V_EDGE_BAND_INQUIRY', text: null, createStockInquiry: false, markHumanRequest: false };
+    }
+    return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
   }
 
   // Product/Pricing/Company Architecture brief section 19/79/80: checked

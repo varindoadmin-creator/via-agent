@@ -89,3 +89,29 @@ export async function resolveSizeVariant(resolvedItem: ZohoItem, requestedSize: 
   }
   return { status: 'NOT_FOUND', item: null, brand: null, candidates: result.candidates };
 }
+
+/**
+ * 2026-09-02: edge-band ("edging"/"newedge") items are real, distinct, live
+ * Zoho catalogue items — not a static price sheet — cross-referenced to
+ * their matching panel motif right in the item name (verified against real
+ * production data, e.g. panel "DXO 5338D - LAMITAK HPL 4'x8' | STOFFA
+ * GRIGIO" has matching edging items "EAP 5338R0V2/23 - NEWEDGE ABS EDGING
+ * W23MM X T1.0MM | DXO 5338D" and the /44 width variant; EDL panels have
+ * their own "... EDL EDGE ABS EDGING ..." items the same way). Searching the
+ * panel's own leading code (the part of its name before " - ") reliably
+ * surfaces both the panel itself and its edging siblings in one Zoho search
+ * — filtering out the panel and anything not edging-shaped leaves just the
+ * real, live, per-motif edging variants (and their real rate), never a
+ * static/stale reference table.
+ */
+const EDGE_BAND_NAME_PATTERN = /EDGING|\bEDGE\b/i;
+
+function isEdgeBandItem(item: ZohoItem): boolean {
+  return EDGE_BAND_NAME_PATTERN.test(item.name);
+}
+
+export async function findEdgeBandVariants(product: ZohoItem): Promise<ZohoItem[]> {
+  const motifQuery = product.name.split(' - ')[0].trim() || product.sku || product.name;
+  const results = await searchItems(motifQuery, 15);
+  return results.filter(item => item.item_id !== product.item_id && isEdgeBandItem(item));
+}

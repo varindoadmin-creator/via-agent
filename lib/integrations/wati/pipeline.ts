@@ -32,7 +32,8 @@ import { updateStockInquiry } from './stock/store.ts';
 import { needQuantityPrompt } from './stock/responses.ts';
 import { getCustomerSafePrice } from './pricing/customerSafePrice.ts';
 import { formatIDR } from '../../zoho/tax.ts';
-import { priceOnly, priceWithStockAck, priceWithNeedQuantity, priceNotFound } from './pricing/responses.ts';
+import { priceOnly, priceWithStockAck, priceWithNeedQuantity, priceNotFound, edgeBandAvailable, edgeBandNotFound } from './pricing/responses.ts';
+import { resolveEdgeBandForProduct } from './edgeBand.ts';
 import { checkWebsitePriceMismatch, logWebsitePriceMismatch } from './pricing/websiteMismatch.ts';
 import { matchCommercialFollowUp } from './commercial/followUp.ts';
 import { continueOnboarding, resumeCustomerSelection, resumeAddressSelection, runCommercialWorkflow } from './commercial/workflow.ts';
@@ -329,6 +330,18 @@ async function runResolutionAndResponse(
     }
   }
 
+  if (decision.case === 'V_EDGE_BAND_INQUIRY' && productResult.item) {
+    const edgeBandResult = await startEdgeBandInquiry(productResult.item, effectiveBrand, customerResult.customer?.contact_id ?? null)
+      .catch(error => {
+        console.error('[wati.pipeline]', JSON.stringify({ event: 'edge_band_lookup_failed', error: error instanceof Error ? error.message : 'unknown' }));
+        return null;
+      });
+    if (edgeBandResult) {
+      outboundText = edgeBandResult.responseText;
+      responseCase = edgeBandResult.responseCase;
+    }
+  }
+
   if (decision.case === 'K_COMMERCIAL_WORKFLOW' && (intentResult.intent === 'ORDER_INTENT' || intentResult.intent === 'QUOTATION_REQUEST' || intentResult.intent === 'ORDER_MODIFICATION' || intentResult.intent === 'ORDER_CANCELLATION_REQUEST')) {
     const commercialResult = await runCommercialWorkflow({
       inboundMessageId: id, message, conversationId, customerPhoneNormalized,
@@ -618,6 +631,35 @@ async function startPriceInquiry(
       ? `${priceOnly(product.sku ?? null, product.name, formattedPrice)}\n\n${started.responseText}`
       : priceOnly(product.sku ?? null, product.name, formattedPrice);
   return { responseText, responseCase: `PRICE_VERIFIED_STOCK_${started.state}` };
+}
+
+/**
+ * 2026-09-02: "edge band"/"edging"/"ejing"/"newedge" for the resolved
+ * product. resolveEdgeBandForProduct() does the actual discovery (website-
+ * guided, Zoho-verified — see edgeBand.ts); this only turns the confirmed
+ * Zoho items into customer-safe priced text, one getCustomerSafePrice() call
+ * per variant, same never-a-raw-rate discipline as every other price in
+ * this pipeline.
+ */
+async function startEdgeBandInquiry(
+  product: NonNullable<Awaited<ReturnType<typeof resolveProduct>>['item']>,
+  effectiveBrand: string | null,
+  customerId: string | null,
+): Promise<{ responseText: string; responseCase: string }> {
+  const brand = effectiveBrand === 'LAMITAK' || effectiveBrand === 'EDL' ? effectiveBrand : null;
+  const edgeItems = await resolveEdgeBandForProduct(product, brand);
+
+  const variants: Array<{ label: string; formattedPrice: string; unit: string | null }> = [];
+  for (const item of edgeItems) {
+    const price = await getCustomerSafePrice(item.item_id, customerId);
+    if (price.sourceStatus !== 'VERIFIED') continue;
+    variants.push({ label: item.name, formattedPrice: formatIDR(price.amount), unit: item.unit ?? null });
+  }
+
+  if (variants.length === 0) {
+    return { responseText: edgeBandNotFound(product.name), responseCase: 'EDGE_BAND_NOT_FOUND' };
+  }
+  return { responseText: edgeBandAvailable(product.name, variants), responseCase: 'EDGE_BAND_AVAILABLE' };
 }
 
 async function checkAndLogWebsiteMismatch(itemId: string, itemCode: string | null, websiteDisplayedPrice: number, customerId: string | null): Promise<void> {

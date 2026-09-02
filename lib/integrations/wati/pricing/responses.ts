@@ -44,3 +44,14 @@ export function broadBrandPriceClarification(): string {
 export function discountHandoff(): string {
   return 'Baik Kak, untuk permintaan harga khusus kami bantu teruskan ke Admin/Sales Varindo.';
 }
+
+/** 2026-09-02: "edge band"/"edging"/"newedge" inquiry, one or more real Zoho-confirmed variants found. Never a raw internal rate — each entry's formattedPrice is already customer-safe (tax-aware, tier-aware). */
+export function edgeBandAvailable(panelLabel: string, variants: Array<{ label: string; formattedPrice: string; unit: string | null }>): string {
+  const lines = variants.map(v => `- ${v.label}: ${v.formattedPrice}${v.unit ? `/${v.unit}` : ''} termasuk PPN`).join('\n');
+  return `Baik Kak, tersedia edging untuk ${panelLabel}:\n${lines}`;
+}
+
+/** No Zoho-confirmed edging variant exists for this product (or the website/Zoho lookup found nothing) — never claims non-existence outright, offers the human follow-up instead of guessing. */
+export function edgeBandNotFound(panelLabel: string): string {
+  return `Mohon maaf Kak, untuk ${panelLabel} kami belum menemukan edging yang sesuai. Kami bantu teruskan ke Admin Varindo untuk konfirmasi.`;
+}
