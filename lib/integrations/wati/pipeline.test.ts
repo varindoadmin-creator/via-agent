@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { processInboundWatiMessage } from './pipeline.ts';
+import { clearTokenCache } from '../../zoho/auth.ts';
 
 function setEnv() {
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
   process.env.WATI_API_TOKEN = 'test-token';
   process.env.WATI_API_BASE_URL = 'https://live-mt-server.wati.io/test-tenant';
+}
+
+function setZohoEnv() {
+  process.env.ZOHO_CLIENT_ID = 'test-client';
+  process.env.ZOHO_CLIENT_SECRET = 'test-secret';
+  process.env.ZOHO_REFRESH_TOKEN = 'test-refresh';
+  process.env.ZOHO_ORGANIZATION_ID = 'test-org';
+  clearTokenCache();
 }
 
 /**
@@ -119,6 +128,86 @@ test('Test — a failure in post-send bookkeeping never produces a duplicate/con
     assert.ok(watiSendUrl);
     const sentText = decodeURIComponent(new URL(watiSendUrl!).searchParams.get('messageText') ?? '');
     assert.doesNotMatch(sentText, /maaf.*kendala/i, 'the real greeting must not be replaced by the system-error fallback text');
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+/**
+ * 2026-09-02 (live WABA test): an edge-band answer that resolves to exactly
+ * one unambiguous Zoho-verified variant must carry THAT item forward as the
+ * conversation's product context, not the panel it's for — so a follow-up
+ * like "bisa beli 15 meter?" (a quantity that only makes sense for the
+ * sellable edge-band SKU, not a panel sold by sheet) resolves against the
+ * right item. Exercises the real pipeline end-to-end: intent detection,
+ * Zoho product resolution, the website-guided edge-band discovery, Zoho
+ * verification, the send, and the post-send bookkeeping write.
+ */
+test('Test — an unambiguous edge-band answer carries the edge-band item itself forward, not the panel', async () => {
+  setEnv();
+  setZohoEnv();
+  let watiSendCount = 0;
+  let watiSendUrl: string | null = null;
+  let bookkeepingBody: Record<string, unknown> | null = null;
+
+  const PANEL = { item_id: 'panel-1', name: "DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO", sku: 'LAM-DXO5338D', rate: 700000, status: 'active', tax_percentage: 11, vendor_name: 'TAK PRODUCTS AND SERVICES, PT' };
+  const EDGE_ITEM = { item_id: 'edge-1', name: "EAP 5338R0V2/23 - NEWEDGE ABS EDGING W23MM X T1.0MM | DXO 5338D", sku: 'LAM-EAP5338R0V2/23', rate: 20000, status: 'active', tax_percentage: 11, unit: 'm' };
+
+  const fetchMock = (async (url: string, init?: RequestInit) => {
+    const u = String(url);
+    const method = init?.method || 'GET';
+
+    if (u.includes('/oauth/v2/token')) {
+      return new Response(JSON.stringify({ access_token: 'fake-token', expires_in: 3600 }), { status: 200 });
+    }
+    if (u.includes('/contacts')) {
+      return new Response(JSON.stringify({ contacts: [], page_context: { has_more_page: false } }), { status: 200 });
+    }
+    if (u.includes('/items/panel-1')) return new Response(JSON.stringify({ item: PANEL }), { status: 200 });
+    if (u.includes('/items/edge-1')) return new Response(JSON.stringify({ item: EDGE_ITEM }), { status: 200 });
+    if (u.includes('items?search_text')) {
+      const q = new URL(u).searchParams.get('search_text') || '';
+      if (q.includes('EAP5338R0V2')) return new Response(JSON.stringify({ items: [EDGE_ITEM] }), { status: 200 });
+      if (q.includes('DXO')) return new Response(JSON.stringify({ items: [PANEL] }), { status: 200 });
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    }
+    if (u.includes('varindo.co.id/products?search')) {
+      return new Response(`<a aria-label="DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO" class="block" href="/products/dxo-5338d-stoffa-grigio">`, { status: 200 });
+    }
+    if (u.includes('varindo.co.id/products/dxo-5338d-stoffa-grigio')) {
+      // Only ONE width listed — the unambiguous case this test targets.
+      return new Response(`<dt>Newedge Code (23mm Width)</dt><dd class="x">EAP5338R0V2/2310/1</dd>`, { status: 200 });
+    }
+    if (u.includes('/wati_messages') && method === 'POST') {
+      return new Response(JSON.stringify([{ id: 'msg-3', customer_phone_normalized: '6281234509999' }]), { status: 200 });
+    }
+    if (u.includes('/wati_messages') && method === 'PATCH') {
+      bookkeepingBody = JSON.parse(String(init!.body));
+      return new Response('[]', { status: 200 });
+    }
+    if (u.includes('wati.io') && u.includes('sendSessionMessage')) {
+      watiSendCount++;
+      watiSendUrl = u;
+      return new Response(JSON.stringify({ ok: true, result: 'success', message: { statusString: 'SENT', whatsappMessageId: 'wamid.1' } }), { status: 200 });
+    }
+    return new Response('[]', { status: 200 });
+  }) as typeof fetch;
+
+  const original = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const outcome = await processInboundWatiMessage({ id: 'wati-msg-edge-1', waId: '6281234509999', text: 'Apakah ada edging untuk DXO 5338D?', type: 'text' });
+    assert.equal(outcome.status, 'processed');
+    assert.equal(outcome.responseCase, 'EDGE_BAND_AVAILABLE');
+    assert.equal(watiSendCount, 1);
+    assert.ok(watiSendUrl);
+    const sentText = decodeURIComponent(new URL(watiSendUrl!).searchParams.get('messageText') ?? '');
+    assert.match(sentText, /EAP 5338R0V2\/23/, 'the customer-facing reply should name the real, Zoho-verified edge-band item');
+
+    assert.ok(bookkeepingBody, 'expected the post-send bookkeeping write to have run');
+    const patchedItemCode = (bookkeepingBody as Record<string, unknown>).item_code;
+    assert.equal(patchedItemCode, 'LAM-EAP5338R0V2/23', 'the carried context should be the edge-band item, not the panel');
+    assert.notEqual(patchedItemCode, 'LAM-DXO5338D');
   } finally {
     globalThis.fetch = original;
   }

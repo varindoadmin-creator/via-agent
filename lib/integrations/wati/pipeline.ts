@@ -304,6 +304,11 @@ async function runResolutionAndResponse(
 
   let outboundText = decision.text;
   let responseCase: string = decision.case;
+  // 2026-09-02: set only when an edge-band answer resolved to exactly one
+  // unambiguous variant — overrides the bookkeeping write below so the
+  // *edge-band item itself* (not the panel it's for) becomes the carried
+  // product context for the customer's next message.
+  let carriedEdgeBandItem: NonNullable<Awaited<ReturnType<typeof resolveProduct>>['item']> | null = null;
 
   if (decision.case === 'D_STOCK_ACK' && productResult.item) {
     const stockResult = await startStockInquiry(id, message, conversationId, customerResult.customer?.contact_id ?? null, productResult.item, effectiveBrand, text)
@@ -339,6 +344,7 @@ async function runResolutionAndResponse(
     if (edgeBandResult) {
       outboundText = edgeBandResult.responseText;
       responseCase = edgeBandResult.responseCase;
+      carriedEdgeBandItem = edgeBandResult.carriedItem;
     }
   }
 
@@ -409,6 +415,7 @@ async function runResolutionAndResponse(
   // propagate to the outer catch in processInboundWatiMessage, which would
   // otherwise send a confusing second "system error" fallback message to a
   // customer who already received their correct, real reply.
+  const carriedItem = carriedEdgeBandItem ?? productResult.item;
   await updateWatiMessageResolution(id, {
     processingStatus: 'PROCESSED',
     source,
@@ -416,10 +423,10 @@ async function runResolutionAndResponse(
     customerId: customerResult.customer?.contact_id ?? null,
     intent: intentResult.intent,
     productResolution: productCandidate ? productResult.status : null,
-    itemId: productResult.item?.item_id ?? null,
-    itemCode: productResult.item?.sku ?? (productCandidate || null),
+    itemId: carriedItem?.item_id ?? null,
+    itemCode: carriedItem?.sku ?? (productCandidate || null),
     brand: effectiveBrand,
-    productName: productResult.item?.name ?? null,
+    productName: carriedItem?.name ?? null,
     requestedQuantity: quantity?.quantity ?? null,
     requestedUnit: quantity?.unit ?? null,
     responseType: responseCase,
@@ -645,21 +652,29 @@ async function startEdgeBandInquiry(
   product: NonNullable<Awaited<ReturnType<typeof resolveProduct>>['item']>,
   effectiveBrand: string | null,
   customerId: string | null,
-): Promise<{ responseText: string; responseCase: string }> {
+): Promise<{ responseText: string; responseCase: string; carriedItem: NonNullable<Awaited<ReturnType<typeof resolveProduct>>['item']> | null }> {
   const brand = effectiveBrand === 'LAMITAK' || effectiveBrand === 'EDL' ? effectiveBrand : null;
   const edgeItems = await resolveEdgeBandForProduct(product, brand);
 
-  const variants: Array<{ label: string; formattedPrice: string; unit: string | null }> = [];
+  const verified: Array<{ item: typeof product; formattedPrice: string }> = [];
   for (const item of edgeItems) {
     const price = await getCustomerSafePrice(item.item_id, customerId);
     if (price.sourceStatus !== 'VERIFIED') continue;
-    variants.push({ label: item.name, formattedPrice: formatIDR(price.amount), unit: item.unit ?? null });
+    verified.push({ item, formattedPrice: formatIDR(price.amount) });
   }
 
-  if (variants.length === 0) {
-    return { responseText: edgeBandNotFound(product.name), responseCase: 'EDGE_BAND_NOT_FOUND' };
+  if (verified.length === 0) {
+    return { responseText: edgeBandNotFound(product.name), responseCase: 'EDGE_BAND_NOT_FOUND', carriedItem: null };
   }
-  return { responseText: edgeBandAvailable(product.name, variants), responseCase: 'EDGE_BAND_AVAILABLE' };
+  const variants = verified.map(v => ({ label: v.item.name, formattedPrice: v.formattedPrice, unit: v.item.unit ?? null }));
+  // 2026-09-02 (live WABA test): only carry the edge-band item forward as the
+  // conversation's product context when exactly one variant resolved —
+  // ambiguous between widths, keep the carried context on the panel (the
+  // caller leaves it unchanged) rather than silently picking one for the
+  // customer. A follow-up like "bisa beli 15 meter?" then correctly resolves
+  // against the specific sellable edge-band SKU, not the panel it's for.
+  const carriedItem = verified.length === 1 ? verified[0].item : null;
+  return { responseText: edgeBandAvailable(product.name, variants), responseCase: 'EDGE_BAND_AVAILABLE', carriedItem };
 }
 
 async function checkAndLogWebsiteMismatch(itemId: string, itemCode: string | null, websiteDisplayedPrice: number, customerId: string | null): Promise<void> {

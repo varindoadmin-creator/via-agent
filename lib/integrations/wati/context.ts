@@ -7,8 +7,20 @@
 
 import { fetchRecentWatiMessages } from './store.ts';
 
-const LOOKBACK_MINUTES = 10;
-const LOOKBACK_LIMIT = 5;
+/**
+ * 2026-09-02 (live WABA test): 10 minutes was too short for realistic B2B
+ * pacing — a real customer asked about edging, then came back 13m40s later
+ * ("Bisa beli 15 meter?") to find the carried product context had already
+ * expired, so the follow-up had nothing to resolve against. Widened to a
+ * more forgiving default; still bounded (never the full 24h WhatsApp session
+ * window) so a customer who's clearly moved to an unrelated topic hours
+ * later doesn't get a stale product silently assumed.
+ */
+function lookbackMinutes(): number {
+  const value = Number(process.env.WATI_CONTEXT_LOOKBACK_MINUTES);
+  return Number.isFinite(value) && value > 0 ? value : 30;
+}
+const LOOKBACK_LIMIT = 8;
 
 export interface ConversationContext {
   /** A product code/name carried over from a recent message in the same conversation, if any. */
@@ -19,7 +31,7 @@ export interface ConversationContext {
 export async function resolveConversationContext(customerPhoneNormalized: string | null): Promise<ConversationContext> {
   if (!customerPhoneNormalized) return { carriedProductCode: null, carriedBrand: null };
   try {
-    const recent = await fetchRecentWatiMessages(customerPhoneNormalized, LOOKBACK_MINUTES, LOOKBACK_LIMIT);
+    const recent = await fetchRecentWatiMessages(customerPhoneNormalized, lookbackMinutes(), LOOKBACK_LIMIT);
     for (const row of recent) {
       if (row.item_code) return { carriedProductCode: row.item_code, carriedBrand: row.brand };
     }
