@@ -20,7 +20,8 @@ import { recordAnalyticsEvent } from '../analytics/events.ts';
 import { isAnalyticsEventPipelineEnabled } from '../customerIdentity/featureFlags.ts';
 
 const ACTIVE_HUMAN_STATES = new Set(['NEEDS_HUMAN', 'HUMAN_ASSIGNED', 'HUMAN_ACTIVE']);
-const URGENT_REASONS = new Set<HandoffReason>(['COMPLAINT', 'SECURITY_SENSITIVE_REQUEST', 'PAYMENT_REVIEW', 'ZOHO_WRITE_FAILURE']);
+/** Exported for reuse by app/api/wati/service/sweep — these same reasons are also excluded from the end-of-day auto-return-to-VIA sweep, never silently closed out. */
+export const URGENT_REASONS = new Set<HandoffReason>(['COMPLAINT', 'SECURITY_SENSITIVE_REQUEST', 'PAYMENT_REVIEW', 'ZOHO_WRITE_FAILURE']);
 
 export interface HandoffResult {
   case: ServiceCase;

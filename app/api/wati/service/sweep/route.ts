@@ -4,6 +4,7 @@ import { sendMail } from '@/lib/email/sendMail';
 import { supabaseSelect } from '@/lib/supabase/rest';
 import { computeCaseSlaStatus } from '@/lib/customerService/sla';
 import { recordServiceEvent } from '@/lib/customerService/auditLog';
+import { autoReturnIdleActiveCases } from '@/lib/customerService/autoReturn';
 import { isCustomerServiceSlaEnabled, isSlaEscalationEnabled } from '@/lib/customerIdentity/featureFlags';
 
 export const maxDuration = 120;
@@ -23,13 +24,19 @@ interface OpenCaseRow {
  * middleware.ts CRON_PATHS), same pattern as app/api/wati/stock/sweep —
  * computes SLA status for every open human-owned case and sends one bounded
  * summary email for warnings/breaches, never per-case spam (brief section
- * 18/44).
+ * 18/44). Also runs the idle-active auto-return sweep (independently gated
+ * by AUTO_RETURN_TO_VIA_ENABLED, unrelated to the SLA flag below).
  */
 export async function POST() {
   const startedAt = new Date().toISOString();
+  const autoReturn = await autoReturnIdleActiveCases().catch(error => {
+    console.error('[wati.service.sweep] auto-return sweep failed:', error);
+    return { returned: 0, skipped: 0 };
+  });
+
   if (!isCustomerServiceSlaEnabled()) {
-    await recordCronRun('wati-service-sweep', 'success', startedAt, { skipped: 'CUSTOMER_SERVICE_SLA_ENABLED is off' });
-    return NextResponse.json({ success: true, skipped: true });
+    await recordCronRun('wati-service-sweep', 'success', startedAt, { skipped: 'CUSTOMER_SERVICE_SLA_ENABLED is off', autoReturned: autoReturn.returned, autoReturnSkipped: autoReturn.skipped });
+    return NextResponse.json({ success: true, skipped: true, autoReturned: autoReturn.returned });
   }
 
   try {
@@ -75,10 +82,10 @@ export async function POST() {
       emailed = true;
     }
 
-    await recordCronRun('wati-service-sweep', 'success', startedAt, { open: openCases.length, warnings: warnings.length, breached: breaches.length, emailed });
-    return NextResponse.json({ success: true, open: openCases.length, warnings: warnings.length, breached: breaches.length, emailed });
+    await recordCronRun('wati-service-sweep', 'success', startedAt, { open: openCases.length, warnings: warnings.length, breached: breaches.length, emailed, autoReturned: autoReturn.returned, autoReturnSkipped: autoReturn.skipped });
+    return NextResponse.json({ success: true, open: openCases.length, warnings: warnings.length, breached: breaches.length, emailed, autoReturned: autoReturn.returned });
   } catch (err) {
-    await recordCronRun('wati-service-sweep', 'failed', startedAt, {}, err instanceof Error ? err.message : String(err));
+    await recordCronRun('wati-service-sweep', 'failed', startedAt, { autoReturned: autoReturn.returned, autoReturnSkipped: autoReturn.skipped }, err instanceof Error ? err.message : String(err));
     return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }
