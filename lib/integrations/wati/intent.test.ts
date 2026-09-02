@@ -187,6 +187,37 @@ test('edge-band phrasing wins over the generic stock keyword ("ada") in the same
   assert.equal(result?.intent, 'EDGE_BAND_INQUIRY');
 });
 
+// ─── 2026-09-02: "bisa/boleh beli N [unit]?" — purchase-quantity question ───
+
+test('the exact reported phrasings map to PURCHASE_QUANTITY_INQUIRY, not a stock check', () => {
+  for (const text of ['Apakah bisa beli 15 meter?', 'Apakah saya bisa beli 1 lembar?', 'Bisa beli 15 meter?']) {
+    const result = detectIntentDeterministic(text);
+    assert.equal(result?.intent, 'PURCHASE_QUANTITY_INQUIRY', `expected "${text}" to be PURCHASE_QUANTITY_INQUIRY`);
+  }
+});
+
+test('a genuine commit statement ("Saya ambil 20 lembar") is unaffected — still ORDER_INTENT-shaped, not a question', () => {
+  const result = detectIntentDeterministic('Saya ambil ATP11358M 20 lembar.');
+  assert.notEqual(result?.intent, 'PURCHASE_QUANTITY_INQUIRY');
+});
+
+test('"Apakah saya bisa beli 1 lembar?" (a question) and "Saya mau beli 1 lembar" (a statement) are two different intents', () => {
+  const question = detectIntentDeterministic('Apakah saya bisa beli 1 lembar?');
+  assert.equal(question?.intent, 'PURCHASE_QUANTITY_INQUIRY');
+  const statement = detectIntentDeterministic('Saya mau beli 1 lembar');
+  assert.notEqual(statement?.intent, 'PURCHASE_QUANTITY_INQUIRY');
+});
+
+test('purchase-quantity phrasing wins over the broader edge-band-availability pattern when both are mentioned', () => {
+  const result = detectIntentDeterministic('Bisa beli edging 15 meter?');
+  assert.equal(result?.intent, 'PURCHASE_QUANTITY_INQUIRY');
+});
+
+test('"bisa/boleh" without a quantity number does not fire (nothing to evaluate)', () => {
+  const result = detectIntentDeterministic('Bisa beli ga?');
+  assert.notEqual(result?.intent, 'PURCHASE_QUANTITY_INQUIRY');
+});
+
 // ─── Phase 6: commercial intent ──────────────────────────────────────────────
 
 test('Brief example — "Saya ambil ATP11358M 20 lembar." is ORDER_INTENT', () => {

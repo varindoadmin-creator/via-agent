@@ -23,7 +23,7 @@ export type ResponseCase =
   | 'G_ACK_ROUTE' | 'H_DISCLOSURE_DENIED' | 'I_PRICE_LOOKUP' | 'J_BROAD_BRAND_PRICE' | 'M_DISCOUNT_HANDOFF'
   | 'K_COMMERCIAL_WORKFLOW' | 'L_CUSTOMER_SELF_SERVICE'
   | 'N_TIER_PROBE_REDIRECT' | 'O_COMPANY_INFO' | 'P_DEALER_STATUS' | 'Q_SHIPPING_POLICY' | 'R_PAYMENT_DESTINATION'
-  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT' | 'U_BOT_IDENTITY' | 'V_EDGE_BAND_INQUIRY'
+  | 'S_SAMPLE_CATALOGUE' | 'T_UNSUPPORTED_PRODUCT' | 'U_BOT_IDENTITY' | 'V_EDGE_BAND_INQUIRY' | 'W_PURCHASE_QUANTITY'
   | 'SUPPRESSED';
 
 function isBrandName(brand: string | null): brand is BrandName {
@@ -43,6 +43,8 @@ export interface ResponseDecisionInput {
   audience?: AudienceContext;
   /** Only meaningful for UNSUPPORTED_PRODUCT_INQUIRY — see IntentDetectionResult.unsupportedScopeReason. */
   unsupportedScopeReason?: 'BRAND' | 'CATEGORY' | null;
+  /** Only meaningful for PURCHASE_QUANTITY_INQUIRY ("bisa beli 15 meter?") — the number extracted from the message (lib/integrations/wati/quantity.ts). No I/O needed to answer this (the MOQ rule only depends on the already-resolved product's own `unit` field), so it's handled synchronously right here rather than deferred to the pipeline like price/stock. */
+  requestedQuantity?: number | null;
   /** Phase 6 feature flag (brief section 80) — defaults to enabled so existing tests/callers that don't pass it keep today's behavior; pipeline.ts passes the real flag value in production. */
   commercialDraftEnabled?: boolean;
   /** Phase 7 feature flags (brief section 76), one per self-service capability — each defaults to enabled so existing tests/callers keep today's behavior; pipeline.ts passes the real flag values in production. */
@@ -107,6 +109,39 @@ function clarification(): string {
 /** Phase 15 (image product identification): the photo was received but no legible code could be matched — never guesses, asks for the code directly instead of repeating the generic clarification()'s "send a photo" (they just did). */
 export function imageProductNotRecognized(): string {
   return 'Mohon maaf Kak, kami belum dapat mengenali produk dari foto tersebut. Boleh diinformasikan kode produknya?';
+}
+
+/**
+ * 2026-09-02: "Bisa beli 15 meter?" is asking whether that quantity is
+ * purchasable at all — not a stock check (no vendor-first workflow starts
+ * from this), and answerable without any I/O: edge-band items (Zoho
+ * `unit === 'm'`) are only ever sold in multiples of 10 meters (explicit
+ * business rule — no Zoho field encodes this, confirmed no
+ * minimum-order/multiple data exists for these items in this catalogue);
+ * everything else (panels, `unit === 'sht'`) has no minimum at all, down to
+ * a single sheet.
+ */
+const EDGE_BAND_UNIT = 'm';
+const EDGE_BAND_ORDER_MULTIPLE = 10;
+
+/** Zoho's raw unit abbreviations, translated to the natural Indonesian word customers actually see — only "sht" confirmed against real catalogue data so far; anything else falls back to the raw value rather than guessing a translation. */
+const UNIT_DISPLAY_NAME: Record<string, string> = { sht: 'lembar' };
+
+function displayUnit(unit: string | undefined): string {
+  if (!unit) return 'lembar';
+  return UNIT_DISPLAY_NAME[unit.toLowerCase()] ?? unit;
+}
+
+export function purchaseQuantityResponse(item: ZohoItem, requestedQuantity: number): string {
+  const label = item.name;
+  if (item.unit === EDGE_BAND_UNIT) {
+    if (requestedQuantity % EDGE_BAND_ORDER_MULTIPLE === 0) {
+      return `Baik Kak, bisa. ${label} dijual dalam kelipatan ${EDGE_BAND_ORDER_MULTIPLE} meter, jadi pemesanan ${requestedQuantity} meter dapat diproses.`;
+    }
+    const roundedUp = Math.ceil(requestedQuantity / EDGE_BAND_ORDER_MULTIPLE) * EDGE_BAND_ORDER_MULTIPLE;
+    return `Mohon maaf Kak, ${label} hanya dijual dalam kelipatan ${EDGE_BAND_ORDER_MULTIPLE} meter. Untuk kebutuhan ${requestedQuantity} meter, kami sarankan pemesanan ${roundedUp} meter.`;
+  }
+  return `Baik Kak, bisa. ${label} dapat dibeli mulai dari 1 ${displayUnit(item.unit)}.`;
 }
 
 function humanRequest(): string {
@@ -220,6 +255,16 @@ export function decideResponse(input: ResponseDecisionInput): ResponseDecision {
   if (input.intent === 'EDGE_BAND_INQUIRY') {
     if (input.productResolution === 'EXACT' && input.product) {
       return { case: 'V_EDGE_BAND_INQUIRY', text: null, createStockInquiry: false, markHumanRequest: false };
+    }
+    return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
+  }
+
+  // 2026-09-02: pure/synchronous — the MOQ rule only needs the already-
+  // resolved product's own `unit` field, no Zoho call required, unlike
+  // price/stock/edge-band which defer to the pipeline.
+  if (input.intent === 'PURCHASE_QUANTITY_INQUIRY') {
+    if (input.productResolution === 'EXACT' && input.product && input.requestedQuantity) {
+      return { case: 'W_PURCHASE_QUANTITY', text: purchaseQuantityResponse(input.product, input.requestedQuantity), createStockInquiry: false, markHumanRequest: false };
     }
     return { case: 'E_CLARIFICATION', text: clarification(), createStockInquiry: false, markHumanRequest: false };
   }

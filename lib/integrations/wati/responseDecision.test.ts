@@ -149,6 +149,49 @@ test('a suppressed conversation also blocks EDGE_BAND_INQUIRY', () => {
   assert.equal(decision.case, 'SUPPRESSED');
 });
 
+// ─── 2026-09-02: "bisa/boleh beli N [unit]?" — purchase-quantity question ───
+
+const EDGE_ITEM: ZohoItem = { item_id: '2', name: "EAP 5338R0V2/23 - NEWEDGE ABS EDGING W23MM X T1.0MM | DXO 5338D", sku: 'LAM-EAP5338R0V2/23', rate: 20000, status: 'active', unit: 'm' };
+const SHEET_ITEM: ZohoItem = { item_id: '3', name: "DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO", sku: 'LAM-DXO5338D', rate: 700000, status: 'active', unit: 'sht' };
+
+test('edging (unit "m"), a non-multiple-of-10 quantity: explains the rule and suggests rounding up, never claims it can be sold as-is', () => {
+  const decision = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: 'EXACT', product: EDGE_ITEM, productCodeCandidate: null, conversationSuppressed: false, requestedQuantity: 15 });
+  assert.equal(decision.case, 'W_PURCHASE_QUANTITY');
+  assert.match(decision.text ?? '', /kelipatan 10 meter/);
+  assert.match(decision.text ?? '', /20 meter/);
+  assert.doesNotMatch(decision.text ?? '', /^Baik Kak, bisa\./);
+});
+
+test('edging (unit "m"), a valid multiple-of-10 quantity: confirms it can be ordered', () => {
+  const decision = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: 'EXACT', product: EDGE_ITEM, productCodeCandidate: null, conversationSuppressed: false, requestedQuantity: 20 });
+  assert.equal(decision.case, 'W_PURCHASE_QUANTITY');
+  assert.match(decision.text ?? '', /^Baik Kak, bisa\./);
+});
+
+test('a panel (unit "sht"), even a single sheet: no minimum, confirms it can be bought — "sht" is translated to the natural word "lembar"', () => {
+  const decision = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: 'EXACT', product: SHEET_ITEM, productCodeCandidate: null, conversationSuppressed: false, requestedQuantity: 1 });
+  assert.equal(decision.case, 'W_PURCHASE_QUANTITY');
+  assert.match(decision.text ?? '', /1 lembar/);
+  assert.doesNotMatch(decision.text ?? '', /\bsht\b/);
+});
+
+test('PURCHASE_QUANTITY_INQUIRY never triggers a stock-check workflow — no createStockInquiry, matching "not a stock confirmation yet"', () => {
+  const decision = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: 'EXACT', product: EDGE_ITEM, productCodeCandidate: null, conversationSuppressed: false, requestedQuantity: 15 });
+  assert.equal(decision.createStockInquiry, false);
+});
+
+test('no resolved product or no quantity: falls back to clarification, never guesses', () => {
+  const noProduct = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: false, requestedQuantity: 15 });
+  assert.equal(noProduct.case, 'E_CLARIFICATION');
+  const noQuantity = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: 'EXACT', product: EDGE_ITEM, productCodeCandidate: null, conversationSuppressed: false, requestedQuantity: null });
+  assert.equal(noQuantity.case, 'E_CLARIFICATION');
+});
+
+test('a suppressed conversation also blocks PURCHASE_QUANTITY_INQUIRY', () => {
+  const decision = decideResponse({ intent: 'PURCHASE_QUANTITY_INQUIRY', brand: null, productResolution: 'EXACT', product: EDGE_ITEM, productCodeCandidate: null, conversationSuppressed: true, requestedQuantity: 15 });
+  assert.equal(decision.case, 'SUPPRESSED');
+});
+
 test('a suppressed conversation also blocks price and discount intents', () => {
   const priceDecision = decideResponse({ intent: 'PRICE_INQUIRY', brand: null, productResolution: 'EXACT', product: ITEM, productCodeCandidate: 'ATP11358M', conversationSuppressed: true });
   const discountDecision = decideResponse({ intent: 'DISCOUNT_REQUEST', brand: null, productResolution: null, product: null, productCodeCandidate: null, conversationSuppressed: true });

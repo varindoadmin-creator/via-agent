@@ -71,6 +71,10 @@ export type WatiIntent =
   | 'BOT_IDENTITY_INQUIRY'
   // 2026-09-02 — "is edge banding available for the product just discussed".
   | 'EDGE_BAND_INQUIRY'
+  // 2026-09-02 — "bisa beli 15 meter?": is that quantity purchasable at all
+  // (e.g. edging's 10-meter-multiple minimum), never a stock-availability
+  // check and never a committed order.
+  | 'PURCHASE_QUANTITY_INQUIRY'
   | 'UNKNOWN';
 
 export interface IntentDetectionResult {
@@ -172,6 +176,12 @@ const QUOTATION_REQUEST_PATTERN = /\b(quotation|quote|penawaran)\b/i;
 // confuse a price inquiry with a confirmed order").
 const ORDER_COMMIT_VERB_PATTERN = /\b(ambil|pesan|order|beli)\b/i;
 const QUANTITY_PATTERN = /\b\d+([.,]\d+)?\s*(lembar|pcs|pc|unit|dus|box|roll|meter|m|kg)?\b/i;
+// 2026-09-02: "bisa/boleh beli 15 meter?" is a QUESTION about whether that
+// quantity is purchasable at all (e.g. edging's real 10-meter-multiple
+// minimum) — never a commitment to order, unlike ORDER_COMMIT_VERB_PATTERN's
+// bare "beli"/"ambil"/"order" (a statement). Checked before ORDER_INTENT so
+// the question framing always wins over the commit-shaped verb it contains.
+const PURCHASE_QUANTITY_QUESTION_PATTERN = /\b(bisa|boleh)\b[^.!?]{0,25}\b(beli|ambil|order)\b|\b(beli|ambil|order)\b[^.!?]{0,25}\b(bisa|boleh)\b/i;
 const ORDER_CANCELLATION_PATTERN = /\bbatal(kan)?\b.*\b(pesanan|order|so)\b|\b(pesanan|order|so)\b.*\bbatal(kan)?\b/i;
 const ORDER_MODIFICATION_PATTERN = /\b(tambah|ubah|ganti|kurangi)\w*\s+(jadi|menjadi)\b/i;
 
@@ -357,6 +367,25 @@ export function detectIntentDeterministic(text: string): IntentDetectionResult |
   // above) is safe to treat as the customer's own order.
   if (soNumberCandidate && OWN_TRANSACTION_PATTERN.test(trimmed)) {
     return { intent: 'ORDER_STATUS_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null, unsupportedScopeReason: null };
+  }
+
+  // 2026-09-02: checked before the OWN_TRANSACTION+OWN_REFERENCE fallback
+  // just below — "Apakah saya bisa beli 1 lembar?" contains bare "saya" +
+  // "beli" (OWN_TRANSACTION_PATTERN's own keyword) and would otherwise be
+  // swallowed as an ORDER_STATUS_INQUIRY ("checking on my existing order"),
+  // same false-positive shape the brief already fixed once for "invoice
+  // saya..." above. "Bisa/boleh beli N [unit]?" is asking whether that
+  // quantity is purchasable at all (e.g. edging's 10-meter-multiple
+  // minimum) — never a stock check (no vendor-first workflow starts from
+  // this) and never a commitment, unlike a plain statement ("Saya mau beli 1
+  // lembar") which is a genuinely different intent and stays unaffected.
+  // Doesn't require a code/brand in this message — almost always relies on
+  // carried context (which item was just discussed), same as the
+  // size/edge-band follow-ups. Also checked before EDGE_BAND_PATTERN so
+  // "bisa beli edging 15 meter?" isn't swallowed by the broader "is edging
+  // available at all" case.
+  if (PURCHASE_QUANTITY_QUESTION_PATTERN.test(trimmed) && QUANTITY_PATTERN.test(trimmed)) {
+    return { intent: 'PURCHASE_QUANTITY_INQUIRY', deterministic: true, brand, productCodeCandidate, soNumberCandidate, invoiceNumberCandidate, source, mentionedEntity: null, unsupportedScopeReason: null };
   }
 
   if (OWN_TRANSACTION_PATTERN.test(trimmed) && OWN_REFERENCE_PATTERN.test(trimmed)) {

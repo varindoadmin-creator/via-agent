@@ -246,6 +246,7 @@ async function runResolutionAndResponse(
     isReturningConversation,
     audience,
     unsupportedScopeReason: intentResult.unsupportedScopeReason,
+    requestedQuantity: quantity?.quantity ?? null,
     commercialDraftEnabled: isCommercialDraftEnabled(),
     selfServiceFlags: {
       orderStatus: isCustomerOrderStatusEnabled(),
