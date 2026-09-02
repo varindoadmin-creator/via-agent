@@ -6,7 +6,7 @@
 // webhook's HTTP 200 contract (brief section 30), so the route wraps this in
 // its own try/catch and always acknowledges.
 
-import { normalizeWatiMessage } from './message.ts';
+import { normalizeWatiMessage, extractImageUrl } from './message.ts';
 import { reserveWatiMessage, updateWatiMessageResolution, countRecentWatiMessages } from './store.ts';
 import { resolveCustomerByPhone } from '../../customers/phoneResolution.ts';
 import { getConversationState, touchConversationState } from './conversationState.ts';
@@ -17,7 +17,8 @@ import { extractQuantity } from './quantity.ts';
 import { resolveProduct, resolveSizeVariant } from './productResolution.ts';
 import { detectCustomerStatedSize, extractSizeFromItemName } from './pricing/lamitakSize.ts';
 import { resolveConversationContext } from './context.ts';
-import { decideResponse, systemErrorFallback } from './responseDecision.ts';
+import { decideResponse, systemErrorFallback, productResolved, imageProductNotRecognized } from './responseDecision.ts';
+import { analyzeProductImage } from './imageAnalysis.ts';
 import { createStockInquiry } from './stockInquiries.ts';
 import { redact } from '../../redact.ts';
 import { externalWatiAudience } from '../../security/disclosure/audience.ts';
@@ -39,7 +40,7 @@ import {
   isCommercialDraftEnabled, isCustomerIdentityMappingEnabled,
   isCustomerOrderStatusEnabled, isCustomerInvoiceStatusEnabled, isCustomerInvoiceDocumentEnabled,
   isCustomerPaymentStatusEnabled, isCustomerReceivableSummaryEnabled, isCustomerDeliveryStatusEnabled,
-  isCustomerServiceHandoffEnabled, isContextualGreetingEnabled,
+  isCustomerServiceHandoffEnabled, isContextualGreetingEnabled, isImageProductAnalysisEnabled,
 } from '../../customerIdentity/featureFlags.ts';
 import { triggerHandoff } from '../../customerService/handoff.ts';
 import type { HandoffReason } from '../../customerService/handoffReasons.ts';
@@ -72,6 +73,21 @@ export async function processInboundWatiMessage(payload: Record<string, unknown>
   if (message.direction === 'OUTBOUND') {
     await updateWatiMessageResolution(id, { processingStatus: 'OUTBOUND_ECHO' });
     return { status: 'ignored_outbound' };
+  }
+
+  if (message.messageType === 'IMAGE') {
+    const imageUrl = extractImageUrl(payload);
+    if (imageUrl && isImageProductAnalysisEnabled()) {
+      try {
+        return await runImageResolutionAndResponse(id, message, imageUrl, customerPhoneNormalized);
+      } catch (error) {
+        console.error('[wati.pipeline]', JSON.stringify({ event: 'image_processing_failed', error: error instanceof Error ? error.message : 'unknown' }));
+        await updateWatiMessageResolution(id, { processingStatus: 'FAILED' }).catch(() => {});
+        return { status: 'failed' };
+      }
+    }
+    await updateWatiMessageResolution(id, { processingStatus: 'NON_TEXT_UNHANDLED', intent: 'UNKNOWN' });
+    return { status: 'ignored_non_text' };
   }
 
   if (message.messageType !== 'TEXT' || !message.text) {
@@ -429,6 +445,73 @@ async function runResolutionAndResponse(
   }
 
   return { status: 'processed', intent: intentResult.intent, responseCase, sent };
+}
+
+/**
+ * Phase 15 (2026-09-02): a customer photo instead of typed text. Deliberately
+ * narrow — vision only ever narrows a search string (analyzeProductImage()),
+ * every actual product fact still comes from resolveProduct()'s real Zoho
+ * search, same as a typed code. No quantity-follow-up/commercial-follow-up/
+ * self-service short-circuit applies (an image is never a reply to one of
+ * VIA's own text prompts), and it never creates a stock/price workflow on its
+ * own — a resolved product just gets the same open-ended productResolved()
+ * ack a typed code gets, so the customer's next message (stock/price/order)
+ * continues through the normal text pipeline.
+ */
+async function runImageResolutionAndResponse(
+  id: string,
+  message: ReturnType<typeof normalizeWatiMessage>,
+  imageUrl: string,
+  customerPhoneNormalized: string | null,
+): Promise<PipelineOutcome> {
+  if (customerPhoneNormalized) {
+    const recentCount = await countRecentWatiMessages(customerPhoneNormalized, 60).catch(() => 0);
+    if (recentCount > MAX_MESSAGES_PER_MINUTE) {
+      console.warn('[wati.pipeline]', JSON.stringify({ event: 'rate_limited', phoneKey: customerPhoneNormalized, recentCount }));
+      await updateWatiMessageResolution(id, { processingStatus: 'RATE_LIMITED' });
+      return { status: 'rate_limited' };
+    }
+  }
+
+  // Brief section 21 parity: never reply automatically once a human owns the conversation.
+  const conversationState = customerPhoneNormalized ? await getConversationState(customerPhoneNormalized) : 'AUTO';
+  if (conversationState === 'NEEDS_HUMAN' || conversationState === 'HUMAN_ASSIGNED' || conversationState === 'HUMAN_ACTIVE') {
+    await updateWatiMessageResolution(id, { processingStatus: 'PROCESSED', intent: 'PRODUCT_IMAGE', responseType: 'SUPPRESSED' });
+    return { status: 'processed', intent: 'PRODUCT_IMAGE', responseCase: 'SUPPRESSED', sent: false };
+  }
+
+  const analysis = await analyzeProductImage(imageUrl);
+  const productResult = analysis.codeCandidate
+    ? await resolveProduct(analysis.codeCandidate)
+    : { status: 'NOT_FOUND' as const, item: null, brand: null, candidates: [] };
+
+  const conversationId = customerPhoneNormalized || message.providerConversationId || message.providerMessageId;
+  const resolved = productResult.status === 'EXACT' && productResult.item;
+  const outboundText = resolved ? productResolved(productResult.item!) : imageProductNotRecognized();
+  const responseCase = resolved ? 'C_PRODUCT_RESOLVED' : 'E_CLARIFICATION';
+
+  let sent = false;
+  if (message.customerPhoneRaw) {
+    const result = await sendWatiTextGated(message.customerPhoneRaw, outboundText, { conversationId, category: 'PRODUCT_IMAGE' });
+    sent = result === 'sent';
+  }
+
+  await updateWatiMessageResolution(id, {
+    processingStatus: 'PROCESSED',
+    intent: 'PRODUCT_IMAGE',
+    productResolution: analysis.codeCandidate ? productResult.status : null,
+    itemId: productResult.item?.item_id ?? null,
+    itemCode: productResult.item?.sku ?? analysis.codeCandidate ?? null,
+    brand: productResult.brand,
+    productName: productResult.item?.name ?? null,
+    responseType: responseCase,
+  });
+
+  console.info('[wati.pipeline]', JSON.stringify({
+    event: 'image_processed', codeCandidate: analysis.codeCandidate, productResolution: productResult.status, responseCase, sent,
+  }));
+
+  return { status: 'processed', intent: 'PRODUCT_IMAGE', responseCase, sent };
 }
 
 /** Type C (COUNT_INQUIRY) asks for quantity and stops; Type A/B create the inquiry and start the vendor-first check (brief section 8). */

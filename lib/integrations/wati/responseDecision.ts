@@ -86,7 +86,7 @@ function brandInquiry(brand: string, isReturning?: boolean): string {
 // (e.g. "DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO"). `item.sku` is the
 // internal Zoho SKU (e.g. "LAM-DXO5338D") and must never be shown to a
 // customer in place of it.
-function productResolved(item: ZohoItem, isReturning?: boolean): string {
+export function productResolved(item: ZohoItem, isReturning?: boolean): string {
   const label = item.name;
   if (isReturning) {
     return `Baik Kak, untuk ${label}: silakan sampaikan kebutuhan Anda, misalnya cek stok, harga, atau pemesanan. Kami akan bantu cek terlebih dahulu.`;
@@ -102,6 +102,11 @@ export function stockAck(item: ZohoItem): string {
 
 function clarification(): string {
   return 'Baik Kak. Boleh dibantu kirim kode barang atau foto produknya agar kami dapat membantu dengan tepat?';
+}
+
+/** Phase 15 (image product identification): the photo was received but no legible code could be matched — never guesses, asks for the code directly instead of repeating the generic clarification()'s "send a photo" (they just did). */
+export function imageProductNotRecognized(): string {
+  return 'Mohon maaf Kak, kami belum dapat mengenali produk dari foto tersebut. Boleh diinformasikan kode produknya?';
 }
 
 function humanRequest(): string {

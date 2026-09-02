@@ -91,6 +91,16 @@ function extractText(payload: Record<string, unknown>): string | null {
 }
 
 /**
+ * For an IMAGE message, WATI's payload carries the downloadable file URL in
+ * `data` (confirmed against a real production payload, 2026-09-02:
+ * `{"type":"image","data":"https://live-mt-server.wati.io/<tenant>/api/file/showFile?fileName=..."}`)
+ * — undocumented in WATI's public docs, so this is the actual observed shape, not a guess.
+ */
+export function extractImageUrl(payload: Record<string, unknown>): string | null {
+  return stringOrNull(payload.data);
+}
+
+/**
  * `owner: true` on WATI's payload means the message was sent BY the business
  * (operator/API), not the customer — those must never be treated as inbound
  * customer messages. Absent the field, default to treating it as inbound,

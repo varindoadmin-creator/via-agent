@@ -2,9 +2,15 @@
 // Supports Anthropic Claude and OpenAI.
 // To swap providers, change AI_PROVIDER in .env.local.
 
+/** A single multimodal content block. `data` is raw base64 (no `data:` URI prefix). */
+export type AIContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: string; data: string };
+
 export interface AIMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  /** Plain text for every existing text-only caller; an array of blocks only for callers sending an image (system messages must stay plain text). */
+  content: string | AIContentBlock[];
 }
 
 export interface AICompletionOptions {
@@ -35,21 +41,30 @@ async function anthropicCompletion(
   const model = options.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
   const maxTokens = options.maxTokens || 4096;
 
-  // Separate system message from conversation
+  // Separate system message from conversation. System messages are always
+  // plain text in every caller (only user-role messages ever carry image
+  // blocks), so this join is safe.
   const systemMessages = messages.filter((m) => m.role === 'system');
   const conversationMessages = messages.filter((m) => m.role !== 'system');
 
   const systemContent =
     options.system ||
-    systemMessages.map((m) => m.content).join('\n\n') ||
+    systemMessages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n\n') ||
     undefined;
+
+  const toAnthropicContent = (content: string | AIContentBlock[]) => {
+    if (typeof content === 'string') return content;
+    return content.map(block => block.type === 'text'
+      ? { type: 'text', text: block.text }
+      : { type: 'image', source: { type: 'base64', media_type: block.mediaType, data: block.data } });
+  };
 
   const body: Record<string, unknown> = {
     model,
     max_tokens: maxTokens,
     messages: conversationMessages.map((m) => ({
       role: m.role,
-      content: m.content,
+      content: toAnthropicContent(m.content),
     })),
   };
 
@@ -105,6 +120,13 @@ async function openaiCompletion(
   const model = options.model || 'gpt-4o';
   const maxTokens = options.maxTokens || 4096;
 
+  const toOpenAIContent = (content: string | AIContentBlock[]) => {
+    if (typeof content === 'string') return content;
+    return content.map(block => block.type === 'text'
+      ? { type: 'text', text: block.text }
+      : { type: 'image_url', image_url: { url: `data:${block.mediaType};base64,${block.data}` } });
+  };
+
   // Add system message if provided
   const allMessages = options.system
     ? [{ role: 'system' as const, content: options.system }, ...messages]
@@ -113,7 +135,7 @@ async function openaiCompletion(
   const body = {
     model,
     max_tokens: maxTokens,
-    messages: allMessages,
+    messages: allMessages.map(m => ({ role: m.role, content: toOpenAIContent(m.content) })),
     temperature: options.temperature ?? 0.2,
   };
 

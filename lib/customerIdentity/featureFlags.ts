@@ -99,3 +99,10 @@ export const isContextSummarizationEnabled = () => flag('CONTEXT_SUMMARIZATION')
 export const isNaturalClarificationEnabled = () => flag('NATURAL_CLARIFICATION');
 /** Master flag for this phase's staged rollout (brief section 82) — declared for symmetry with every other phase's master switch; today nothing checks it directly since each individual change above already has its own narrower gate or ships unconditionally. */
 export const isConversationUxV2Enabled = () => flag('CONVERSATION_UX_V2');
+
+// Phase 15 (2026-09-02) — image-based product identification. Off by default,
+// same staged-rollout convention as every other customer-facing automation
+// flag above; gates lib/integrations/wati/imageAnalysis.ts's vision call in
+// pipeline.ts. Before this, any inbound image was recorded but silently
+// ignored (NON_TEXT_UNHANDLED) — no reply, no signal to staff either.
+export const isImageProductAnalysisEnabled = () => flag('IMAGE_PRODUCT_ANALYSIS_ENABLED');
