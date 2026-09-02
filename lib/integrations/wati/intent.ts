@@ -175,7 +175,7 @@ const QUOTATION_REQUEST_PATTERN = /\b(quotation|quote|penawaran)\b/i;
 // never fire on a bare price/stock question (brief section 2: "do not
 // confuse a price inquiry with a confirmed order").
 const ORDER_COMMIT_VERB_PATTERN = /\b(ambil|pesan|order|beli)\b/i;
-const QUANTITY_PATTERN = /\b\d+([.,]\d+)?\s*(lembar|pcs|pc|unit|dus|box|roll|meter|m|kg)?\b/i;
+const QUANTITY_PATTERN = /\b\d+([.,]\d+)?\s*(lembar|sheet|lbr|lb|pcs|pc|unit|dus|box|roll|meter|mtr|m|kg)?\b/i;
 // 2026-09-02: "bisa/boleh beli 15 meter?" is a QUESTION about whether that
 // quantity is purchasable at all (e.g. edging's real 10-meter-multiple
 // minimum) — never a commitment to order, unlike ORDER_COMMIT_VERB_PATTERN's

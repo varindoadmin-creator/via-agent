@@ -212,3 +212,74 @@ test('Test — an unambiguous edge-band answer carries the edge-band item itself
     globalThis.fetch = original;
   }
 });
+
+/**
+ * 2026-09-02 (live WABA test — real production incident): edging has TWO
+ * width variants (23mm/44mm), so the ambiguous case leaves the panel as the
+ * carried context (correct — never guess a width). But "Bisa beli 15
+ * meter?" is stated in an edge-band-only unit ("meter"), and answering
+ * about the panel instead ("dapat dibeli mulai dari 1 lembar") was the real
+ * bug this test targets. A single message carries both the code and the
+ * question so this doesn't need to mock the conversation-context lookback.
+ */
+test('Test — a purchase-quantity question in an edge-band-only unit ("meter") answers about the edging, not the panel, even when the width is ambiguous', async () => {
+  setEnv();
+  setZohoEnv();
+  let watiSendUrl: string | null = null;
+
+  const PANEL = { item_id: 'panel-2', name: "DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO", sku: 'LAM-DXO5338D', rate: 700000, status: 'active', tax_percentage: 11, unit: 'sht', vendor_name: 'TAK PRODUCTS AND SERVICES, PT' };
+  const EDGE_23 = { item_id: 'edge-23', name: "EAP 5338R0V2/23 - NEWEDGE ABS EDGING W23MM X T1.0MM | DXO 5338D", sku: 'LAM-EAP5338R0V2/23', rate: 20000, status: 'active', tax_percentage: 11, unit: 'm' };
+  const EDGE_44 = { item_id: 'edge-44', name: "EAP 5338R0V2/44 - NEWEDGE ABS EDGING W44MM X T1.0MM | DXO 5338D", sku: 'LAM-EAP5338R0V2/44', rate: 35000, status: 'active', tax_percentage: 11, unit: 'm' };
+
+  const fetchMock = (async (url: string, init?: RequestInit) => {
+    const u = String(url);
+    const method = init?.method || 'GET';
+
+    if (u.includes('/oauth/v2/token')) {
+      return new Response(JSON.stringify({ access_token: 'fake-token', expires_in: 3600 }), { status: 200 });
+    }
+    if (u.includes('/contacts')) {
+      return new Response(JSON.stringify({ contacts: [], page_context: { has_more_page: false } }), { status: 200 });
+    }
+    if (u.includes('items?search_text')) {
+      const q = new URL(u).searchParams.get('search_text') || '';
+      if (q.includes('EAP5338R0V2/23')) return new Response(JSON.stringify({ items: [EDGE_23] }), { status: 200 });
+      if (q.includes('EAP5338R0V2/44')) return new Response(JSON.stringify({ items: [EDGE_44] }), { status: 200 });
+      if (q.includes('DXO')) return new Response(JSON.stringify({ items: [PANEL] }), { status: 200 });
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    }
+    if (u.includes('varindo.co.id/products?search')) {
+      return new Response(`<a aria-label="DXO 5338D - LAMITAK HPL 4'x8' | STOFFA GRIGIO" class="block" href="/products/dxo-5338d-stoffa-grigio">`, { status: 200 });
+    }
+    if (u.includes('varindo.co.id/products/dxo-5338d-stoffa-grigio')) {
+      // BOTH widths listed — the ambiguous case this test targets.
+      return new Response(`<dt>Newedge Code (23mm Width)</dt><dd class="x">EAP5338R0V2/2310/1</dd><dt>Newedge Code (44mm Width)</dt><dd class="x">EAP5338R0V2/4410/1</dd>`, { status: 200 });
+    }
+    if (u.includes('/wati_messages') && method === 'POST') {
+      return new Response(JSON.stringify([{ id: 'msg-4', customer_phone_normalized: '6281234501111' }]), { status: 200 });
+    }
+    if (u.includes('/wati_messages') && method === 'PATCH') {
+      return new Response('[]', { status: 200 });
+    }
+    if (u.includes('wati.io') && u.includes('sendSessionMessage')) {
+      watiSendUrl = u;
+      return new Response(JSON.stringify({ ok: true, result: 'success', message: { statusString: 'SENT', whatsappMessageId: 'wamid.2' } }), { status: 200 });
+    }
+    return new Response('[]', { status: 200 });
+  }) as typeof fetch;
+
+  const original = globalThis.fetch;
+  globalThis.fetch = fetchMock;
+  try {
+    const outcome = await processInboundWatiMessage({ id: 'wati-msg-moq-1', waId: '6281234501111', text: 'DXO 5338D bisa beli 15 meter?', type: 'text' });
+    assert.equal(outcome.status, 'processed');
+    assert.equal(outcome.intent, 'PURCHASE_QUANTITY_INQUIRY');
+    assert.ok(watiSendUrl);
+    const sentText = decodeURIComponent(new URL(watiSendUrl!).searchParams.get('messageText') ?? '');
+    assert.doesNotMatch(sentText, /dapat dibeli mulai dari 1 lembar/, 'must not answer about the panel');
+    assert.match(sentText, /kelipatan 10 meter/, 'must apply the edging minimum-order rule');
+    assert.match(sentText, /20 meter/, 'must suggest rounding 15 up to 20');
+  } finally {
+    globalThis.fetch = original;
+  }
+});

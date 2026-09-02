@@ -13,11 +13,11 @@ import { getConversationState, touchConversationState } from './conversationStat
 import { detectIntent } from './intent.ts';
 import { parseWebsiteStructuredProduct } from './websiteParser.ts';
 import { resolveSource } from './source.ts';
-import { extractQuantity } from './quantity.ts';
+import { extractQuantity, isEdgeBandUnit } from './quantity.ts';
 import { resolveProduct, resolveSizeVariant } from './productResolution.ts';
 import { detectCustomerStatedSize, extractSizeFromItemName } from './pricing/lamitakSize.ts';
 import { resolveConversationContext } from './context.ts';
-import { decideResponse, systemErrorFallback, productResolved, imageProductNotRecognized } from './responseDecision.ts';
+import { decideResponse, systemErrorFallback, productResolved, imageProductNotRecognized, purchaseQuantityResponse } from './responseDecision.ts';
 import { analyzeProductImage } from './imageAnalysis.ts';
 import { createStockInquiry } from './stockInquiries.ts';
 import { redact } from '../../redact.ts';
@@ -346,6 +346,26 @@ async function runResolutionAndResponse(
       outboundText = edgeBandResult.responseText;
       responseCase = edgeBandResult.responseCase;
       carriedEdgeBandItem = edgeBandResult.carriedItem;
+    }
+  }
+
+  // 2026-09-02 (live WABA test): when edging was just discussed but had
+  // multiple width variants, carriedEdgeBandItem stays null by design (never
+  // guess a specific width) — so productResult.item here is the PANEL. If
+  // the customer's own quantity is stated in an edge-band-only unit
+  // ("meter"/"m"/"mtr"/"roll" — never a panel unit), answering about the
+  // panel is wrong regardless (real incident: "Bisa beli 15 meter?" got "...
+  // dapat dibeli mulai dari 1 lembar", ignoring that 15 *meter* only makes
+  // sense for the edging just discussed). Re-resolve against the real
+  // edge-band item(s) for this panel and answer against that instead — the
+  // 10-meter-multiple rule doesn't depend on which width, so not knowing the
+  // exact width doesn't block giving the right answer.
+  if (decision.case === 'W_PURCHASE_QUANTITY' && productResult.item && productResult.item.unit !== 'm'
+    && quantity && isEdgeBandUnit(quantity.unit)) {
+    const edgeBrand = effectiveBrand === 'LAMITAK' || effectiveBrand === 'EDL' ? effectiveBrand : null;
+    const edgeItems = await resolveEdgeBandForProduct(productResult.item, edgeBrand).catch(() => []);
+    if (edgeItems.length > 0) {
+      outboundText = purchaseQuantityResponse(edgeItems[0], quantity.quantity);
     }
   }
 
